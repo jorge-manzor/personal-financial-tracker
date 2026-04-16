@@ -1,0 +1,13 @@
+backend/.env
+# Scripts locales de prueba Fintual (no subir)
+backend/api_tests/
+# Caché de logos descargados (opcional en repo)
+backend/data/logos/
+backend/portfolio.db
+backend/portfolio.db-journal
+backend/__pycache__/
+backend/.venv/
+frontend/node_modules/
+frontend/dist/
+.DS_Store
+*.pyc

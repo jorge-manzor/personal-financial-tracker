@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0d1117;
+  --color-card: #161b22;
+  --color-border: #30363d;
+  --color-gain: #22c55e;
+  --color-loss: #ef4444;
+  --color-dividend: #2dd4bf;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: #e6edf3;
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes boot-indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+.boot-bar {
+  animation: boot-indeterminate 1.25s ease-in-out infinite;
+}
+
+/* Barra horizontal desplazable (lista de acciones) */
+.acciones-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #484f58 #21262d;
+}
+.acciones-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+.acciones-scroll::-webkit-scrollbar-track {
+  background: #21262d;
+  border-radius: 9999px;
+}
+.acciones-scroll::-webkit-scrollbar-thumb {
+  background: #484f58;
+  border-radius: 9999px;
+}
+.acciones-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6e7681;
+}
+
+/* Misma fila que el panel de sectores: oculta la barra pero mantiene el scroll */
+.acciones-scroll-x-hidden {
+  scrollbar-width: none;
+}
+.acciones-scroll-x-hidden::-webkit-scrollbar {
+  display: none;
+  height: 0;
+}
+
+/* Scroll vertical (lista de transacciones) */
+.tx-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #484f58 #21262d;
+}
+.tx-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.tx-scroll::-webkit-scrollbar-track {
+  background: #21262d;
+  border-radius: 9999px;
+}
+.tx-scroll::-webkit-scrollbar-thumb {
+  background: #484f58;
+  border-radius: 9999px;
+}
+.tx-scroll::-webkit-scrollbar-thumb:hover {
+  background: #6e7681;
+}
+
+/* Filtros: píldoras en una fila con scroll (Categoría / Tipo) */
+.filter-pills-scroll {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #484f58 #1c2128;
+}
+.filter-pills-scroll::-webkit-scrollbar {
+  height: 5px;
+}
+.filter-pills-scroll::-webkit-scrollbar-track {
+  background: #1c2128;
+  border-radius: 9999px;
+}
+.filter-pills-scroll::-webkit-scrollbar-thumb {
+  background: #484f58;
+  border-radius: 9999px;
+}

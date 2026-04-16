@@ -1,0 +1,3042 @@
+{
+    "A": {
+      "industry": "Ciencias de la Vida",
+      "sector": "Salud"
+    },
+    "AAPL": {
+      "industry": "Hardware y Periféricos",
+      "sector": "Tecnología"
+    },
+    "ABBV": {
+      "industry": "Biotecnología",
+      "sector": "Salud"
+    },
+    "ABNB": {
+      "industry": "Hoteles y Cruceros",
+      "sector": "Consumo Discrecional"
+    },
+    "ABT": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "ACGL": {
+      "industry": "Seguros de Propiedad",
+      "sector": "Finanzas"
+    },
+    "ACN": {
+      "industry": "Consultoría TI",
+      "sector": "Tecnología"
+    },
+    "ADBE": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "ADI": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "ADM": {
+      "industry": "Productos Agrícolas",
+      "sector": "Consumo Básico"
+    },
+    "ADP": {
+      "industry": "Recursos Humanos",
+      "sector": "Industria"
+    },
+    "ADSK": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "AEE": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "AEP": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "AES": {
+      "industry": "Productores Independientes de Energía",
+      "sector": "Servicios Básicos"
+    },
+    "AFL": {
+      "industry": "Seguros de Vida y Salud",
+      "sector": "Finanzas"
+    },
+    "AFRM": {
+      "industry": "Finanzas al Consumidor",
+      "sector": "Finanzas"
+    },
+    "AGG": {
+      "industry": "ETF Bonos Agregados",
+      "sector": "Renta Fija"
+    },
+    "AI": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "AIG": {
+      "industry": "Seguros Multirramo",
+      "sector": "Finanzas"
+    },
+    "AIQ": {
+      "industry": "ETF Inteligencia Artificial",
+      "sector": "Tecnología"
+    },
+    "AIZ": {
+      "industry": "Seguros Multirramo",
+      "sector": "Finanzas"
+    },
+    "AJG": {
+      "industry": "Corredores de Seguros",
+      "sector": "Finanzas"
+    },
+    "AKAM": {
+      "industry": "Servicios de Internet",
+      "sector": "Tecnología"
+    },
+    "ALB": {
+      "industry": "Químicos Especiales",
+      "sector": "Materiales"
+    },
+    "ALGN": {
+      "industry": "Suministros de Salud",
+      "sector": "Salud"
+    },
+    "ALL": {
+      "industry": "Seguros de Propiedad",
+      "sector": "Finanzas"
+    },
+    "ALLE": {
+      "industry": "Building Products",
+      "sector": "Industria"
+    },
+    "AMAT": {
+      "industry": "Equipos de Semiconductores",
+      "sector": "Tecnología"
+    },
+    "AMC": {
+      "industry": "Entretenimiento",
+      "sector": "Comunicaciones"
+    },
+    "AMCR": {
+      "industry": "Empaques",
+      "sector": "Materiales"
+    },
+    "AMD": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "AME": {
+      "industry": "Componentes Eléctricos",
+      "sector": "Industria"
+    },
+    "AMGN": {
+      "industry": "Biotecnología",
+      "sector": "Salud"
+    },
+    "AMLP": {
+      "industry": "ETF MLP Energía",
+      "sector": "Energía"
+    },
+    "AMP": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "AMT": {
+      "industry": "REIT Torres Telecom",
+      "sector": "Bienes Raíces"
+    },
+    "AMZN": {
+      "industry": "Comercio Minorista",
+      "sector": "Consumo Discrecional"
+    },
+    "ANET": {
+      "industry": "Equipos de Comunicación",
+      "sector": "Tecnología"
+    },
+    "AOA": {
+      "industry": "ETF Balanced Agresivo",
+      "sector": "Diversificado"
+    },
+    "AOM": {
+      "industry": "ETF Balanced Moderado",
+      "sector": "Diversificado"
+    },
+    "AON": {
+      "industry": "Corredores de Seguros",
+      "sector": "Finanzas"
+    },
+    "AOR": {
+      "industry": "ETF Balanced Crecimiento",
+      "sector": "Diversificado"
+    },
+    "AOS": {
+      "industry": "Building Products",
+      "sector": "Industria"
+    },
+    "APA": {
+      "industry": "Exploración de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "APD": {
+      "industry": "Gases Industriales",
+      "sector": "Materiales"
+    },
+    "APH": {
+      "industry": "Componentes Electrónicos",
+      "sector": "Tecnología"
+    },
+    "APO": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "APP": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "APTV": {
+      "industry": "Autopartes",
+      "sector": "Consumo Discrecional"
+    },
+    "ARE": {
+      "industry": "REIT Oficinas",
+      "sector": "Bienes Raíces"
+    },
+    "ARES": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "ARKF": {
+      "industry": "ETF Fintech",
+      "sector": "Finanzas"
+    },
+    "ARKG": {
+      "industry": "ETF Genómica",
+      "sector": "Salud"
+    },
+    "ARKK": {
+      "industry": "ETF Innovación",
+      "sector": "Tecnología"
+    },
+    "ARKQ": {
+      "industry": "ETF Robótica Autónoma",
+      "sector": "Tecnología"
+    },
+    "ARKW": {
+      "industry": "ETF Internet Nueva Gen",
+      "sector": "Tecnología"
+    },
+    "ARM": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "ASML": {
+      "industry": "Equipos de Semiconductores",
+      "sector": "Tecnología"
+    },
+    "ATO": {
+      "industry": "Gas",
+      "sector": "Servicios Básicos"
+    },
+    "AVB": {
+      "industry": "REIT Residencial",
+      "sector": "Bienes Raíces"
+    },
+    "AVGO": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "AVY": {
+      "industry": "Empaques",
+      "sector": "Materiales"
+    },
+    "AWAY": {
+      "industry": "ETF Viajes y Turismo",
+      "sector": "Consumo Discrecional"
+    },
+    "AWK": {
+      "industry": "Agua",
+      "sector": "Servicios Básicos"
+    },
+    "AXON": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "AXP": {
+      "industry": "Finanzas al Consumidor",
+      "sector": "Finanzas"
+    },
+    "AZO": {
+      "industry": "Venta de Automóviles",
+      "sector": "Consumo Discrecional"
+    },
+    "BA": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "BABA": {
+      "industry": "Comercio Electrónico",
+      "sector": "Consumo Discrecional"
+    },
+    "BAC": {
+      "industry": "Bancos Diversificados",
+      "sector": "Finanzas"
+    },
+    "BALL": {
+      "industry": "Envases y Contenedores",
+      "sector": "Materiales"
+    },
+    "BAX": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "BBY": {
+      "industry": "Venta de Electrónica",
+      "sector": "Consumo Discrecional"
+    },
+    "BDX": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "BEN": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "BETZ": {
+      "industry": "ETF Apuestas Deportivas",
+      "sector": "Consumo Discrecional"
+    },
+    "BF.B": {
+      "industry": "Destilerías y Viñedos",
+      "sector": "Consumo Básico"
+    },
+    "BG": {
+      "industry": "Productos Agrícolas",
+      "sector": "Consumo Básico"
+    },
+    "BIDU": {
+      "industry": "Medios Interactivos",
+      "sector": "Comunicaciones"
+    },
+    "BIIB": {
+      "industry": "Biotecnología",
+      "sector": "Salud"
+    },
+    "BIL": {
+      "industry": "ETF Letras del Tesoro 1-3 Meses",
+      "sector": "Renta Fija"
+    },
+    "BILL": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "BITO": {
+      "industry": "ETF Futuros Bitcoin",
+      "sector": "Cripto"
+    },
+    "BK": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "BKNG": {
+      "industry": "Hoteles y Cruceros",
+      "sector": "Consumo Discrecional"
+    },
+    "BKR": {
+      "industry": "Equipos de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "BLDR": {
+      "industry": "Building Products",
+      "sector": "Industria"
+    },
+    "BLK": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "BLOK": {
+      "industry": "ETF Blockchain",
+      "sector": "Tecnología"
+    },
+    "BMY": {
+      "industry": "Farmacéutica",
+      "sector": "Salud"
+    },
+    "BND": {
+      "industry": "ETF Bonos Totales",
+      "sector": "Renta Fija"
+    },
+    "BNDX": {
+      "industry": "ETF Bonos Internacionales",
+      "sector": "Renta Fija"
+    },
+    "BOTZ": {
+      "industry": "ETF Robótica e IA",
+      "sector": "Tecnología"
+    },
+    "BR": {
+      "industry": "Procesamiento de Datos",
+      "sector": "Industria"
+    },
+    "BRK.B": {
+      "industry": "Holdings Multisector",
+      "sector": "Finanzas"
+    },
+    "BRO": {
+      "industry": "Corredores de Seguros",
+      "sector": "Finanzas"
+    },
+    "BSX": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "BX": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "BXP": {
+      "industry": "REIT Oficinas",
+      "sector": "Bienes Raíces"
+    },
+    "C": {
+      "industry": "Bancos Diversificados",
+      "sector": "Finanzas"
+    },
+    "CAG": {
+      "industry": "Alimentos Envasados",
+      "sector": "Consumo Básico"
+    },
+    "CAH": {
+      "industry": "Distribuidores de Salud",
+      "sector": "Salud"
+    },
+    "CARR": {
+      "industry": "Building Products",
+      "sector": "Industria"
+    },
+    "CAT": {
+      "industry": "Maquinaria de Construcción",
+      "sector": "Industria"
+    },
+    "CB": {
+      "industry": "Seguros de Propiedad",
+      "sector": "Finanzas"
+    },
+    "CBOE": {
+      "industry": "Bolsas y Datos Financieros",
+      "sector": "Finanzas"
+    },
+    "CBRE": {
+      "industry": "Servicios Inmobiliarios",
+      "sector": "Bienes Raíces"
+    },
+    "CCI": {
+      "industry": "REIT Torres Telecom",
+      "sector": "Bienes Raíces"
+    },
+    "CCL": {
+      "industry": "Hoteles y Cruceros",
+      "sector": "Consumo Discrecional"
+    },
+    "CDNS": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "CDW": {
+      "industry": "Distribuidores de Tecnología",
+      "sector": "Tecnología"
+    },
+    "CEG": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "CELH": {
+      "industry": "Bebidas No Alcohólicas",
+      "sector": "Consumo Básico"
+    },
+    "CF": {
+      "industry": "Fertilizantes",
+      "sector": "Materiales"
+    },
+    "CFG": {
+      "industry": "Bancos Regionales",
+      "sector": "Finanzas"
+    },
+    "CFLT": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "CHD": {
+      "industry": "Productos del Hogar",
+      "sector": "Consumo Básico"
+    },
+    "CHRW": {
+      "industry": "Carga Aérea y Logística",
+      "sector": "Industria"
+    },
+    "CHTR": {
+      "industry": "Cable y Satélite",
+      "sector": "Comunicaciones"
+    },
+    "CI": {
+      "industry": "Servicios de Salud",
+      "sector": "Salud"
+    },
+    "CIBR": {
+      "industry": "ETF Ciberseguridad",
+      "sector": "Tecnología"
+    },
+    "CIEN": {
+      "industry": "Equipos de Comunicación",
+      "sector": "Tecnología"
+    },
+    "CINF": {
+      "industry": "Seguros de Propiedad",
+      "sector": "Finanzas"
+    },
+    "CL": {
+      "industry": "Productos del Hogar",
+      "sector": "Consumo Básico"
+    },
+    "CLOU": {
+      "industry": "ETF Cloud Computing",
+      "sector": "Tecnología"
+    },
+    "CLX": {
+      "industry": "Productos del Hogar",
+      "sector": "Consumo Básico"
+    },
+    "CMCSA": {
+      "industry": "Cable y Satélite",
+      "sector": "Comunicaciones"
+    },
+    "CME": {
+      "industry": "Bolsas y Datos Financieros",
+      "sector": "Finanzas"
+    },
+    "CMG": {
+      "industry": "Restaurantes",
+      "sector": "Consumo Discrecional"
+    },
+    "CMI": {
+      "industry": "Maquinaria de Construcción",
+      "sector": "Industria"
+    },
+    "CMS": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "CNC": {
+      "industry": "Salud Administrada",
+      "sector": "Salud"
+    },
+    "CNP": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "COF": {
+      "industry": "Finanzas al Consumidor",
+      "sector": "Finanzas"
+    },
+    "COHR": {
+      "industry": "Componentes Electrónicos",
+      "sector": "Tecnología"
+    },
+    "COIN": {
+      "industry": "Bolsas y Datos Financieros",
+      "sector": "Finanzas"
+    },
+    "COO": {
+      "industry": "Suministros de Salud",
+      "sector": "Salud"
+    },
+    "COP": {
+      "industry": "Exploración de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "COPX": {
+      "industry": "ETF Cobre",
+      "sector": "Commodities"
+    },
+    "COR": {
+      "industry": "Distribuidores de Salud",
+      "sector": "Salud"
+    },
+    "COST": {
+      "industry": "Comercio de Consumo Básico",
+      "sector": "Consumo Básico"
+    },
+    "CPAY": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "CPB": {
+      "industry": "Alimentos Envasados",
+      "sector": "Consumo Básico"
+    },
+    "CPRT": {
+      "industry": "Servicios de Soporte",
+      "sector": "Industria"
+    },
+    "CPT": {
+      "industry": "REIT Residencial",
+      "sector": "Bienes Raíces"
+    },
+    "CRH": {
+      "industry": "Materiales de Construcción",
+      "sector": "Materiales"
+    },
+    "CRL": {
+      "industry": "Ciencias de la Vida",
+      "sector": "Salud"
+    },
+    "CRM": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "CRWD": {
+      "industry": "Software de Sistemas",
+      "sector": "Tecnología"
+    },
+    "CSCO": {
+      "industry": "Equipos de Comunicación",
+      "sector": "Tecnología"
+    },
+    "CSGP": {
+      "industry": "Servicios Inmobiliarios",
+      "sector": "Bienes Raíces"
+    },
+    "CSX": {
+      "industry": "Transporte Ferroviario",
+      "sector": "Industria"
+    },
+    "CTAS": {
+      "industry": "Servicios de Soporte",
+      "sector": "Industria"
+    },
+    "CTRA": {
+      "industry": "Exploración de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "CTSH": {
+      "industry": "Consultoría TI",
+      "sector": "Tecnología"
+    },
+    "CTVA": {
+      "industry": "Fertilizantes",
+      "sector": "Materiales"
+    },
+    "CVNA": {
+      "industry": "Venta de Automóviles",
+      "sector": "Consumo Discrecional"
+    },
+    "CVS": {
+      "industry": "Servicios de Salud",
+      "sector": "Salud"
+    },
+    "CVX": {
+      "industry": "Petróleo y Gas Integrado",
+      "sector": "Energía"
+    },
+    "D": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "DAL": {
+      "industry": "Aerolíneas",
+      "sector": "Industria"
+    },
+    "DASH": {
+      "industry": "Servicios Especializados",
+      "sector": "Consumo Discrecional"
+    },
+    "DBA": {
+      "industry": "ETF Agricultura",
+      "sector": "Commodities"
+    },
+    "DBC": {
+      "industry": "ETF Commodities Diversificado",
+      "sector": "Commodities"
+    },
+    "DD": {
+      "industry": "Químicos Especiales",
+      "sector": "Materiales"
+    },
+    "DDOG": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "DE": {
+      "industry": "Maquinaria Agrícola",
+      "sector": "Industria"
+    },
+    "DECK": {
+      "industry": "Calzado",
+      "sector": "Consumo Discrecional"
+    },
+    "DELL": {
+      "industry": "Hardware y Periféricos",
+      "sector": "Tecnología"
+    },
+    "DG": {
+      "industry": "Comercio de Consumo Básico",
+      "sector": "Consumo Básico"
+    },
+    "DGRO": {
+      "industry": "ETF Dividendos Crecientes",
+      "sector": "Diversificado"
+    },
+    "DGRW": {
+      "industry": "ETF Dividendos Crecientes",
+      "sector": "Diversificado"
+    },
+    "DGX": {
+      "industry": "Servicios de Salud",
+      "sector": "Salud"
+    },
+    "DHI": {
+      "industry": "Construcción de Viviendas",
+      "sector": "Consumo Discrecional"
+    },
+    "DHR": {
+      "industry": "Ciencias de la Vida",
+      "sector": "Salud"
+    },
+    "DIS": {
+      "industry": "Entretenimiento",
+      "sector": "Comunicaciones"
+    },
+    "DLO": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "DLR": {
+      "industry": "REIT Centros de Datos",
+      "sector": "Bienes Raíces"
+    },
+    "DLTR": {
+      "industry": "Comercio de Consumo Básico",
+      "sector": "Consumo Básico"
+    },
+    "DOC": {
+      "industry": "REIT Salud",
+      "sector": "Bienes Raíces"
+    },
+    "DOV": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "DOW": {
+      "industry": "Químicos Básicos",
+      "sector": "Materiales"
+    },
+    "DPZ": {
+      "industry": "Restaurantes",
+      "sector": "Consumo Discrecional"
+    },
+    "DRI": {
+      "industry": "Restaurantes",
+      "sector": "Consumo Discrecional"
+    },
+    "DRIV": {
+      "industry": "ETF Vehículos Eléctricos",
+      "sector": "Consumo Discrecional"
+    },
+    "DTE": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "DUK": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "DUOL": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "DVA": {
+      "industry": "Servicios de Salud",
+      "sector": "Salud"
+    },
+    "DVN": {
+      "industry": "Exploración de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "DVY": {
+      "industry": "ETF Dividendos Selectos",
+      "sector": "Diversificado"
+    },
+    "DXCM": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "EA": {
+      "industry": "Entretenimiento Interactivo",
+      "sector": "Comunicaciones"
+    },
+    "EBAY": {
+      "industry": "Comercio Minorista",
+      "sector": "Consumo Discrecional"
+    },
+    "ECH": {
+      "industry": "ETF Chile",
+      "sector": "Diversificado"
+    },
+    "ECL": {
+      "industry": "Químicos Especiales",
+      "sector": "Materiales"
+    },
+    "ED": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "EEM": {
+      "industry": "ETF Mercados Emergentes",
+      "sector": "Diversificado"
+    },
+    "EFA": {
+      "industry": "ETF EAFE",
+      "sector": "Diversificado"
+    },
+    "EFX": {
+      "industry": "Consultoría",
+      "sector": "Industria"
+    },
+    "EG": {
+      "industry": "Reaseguros",
+      "sector": "Finanzas"
+    },
+    "EIX": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "EL": {
+      "industry": "Cuidado Personal",
+      "sector": "Consumo Básico"
+    },
+    "ELV": {
+      "industry": "Salud Administrada",
+      "sector": "Salud"
+    },
+    "EMB": {
+      "industry": "ETF Bonos Mercados Emergentes",
+      "sector": "Renta Fija"
+    },
+    "EME": {
+      "industry": "Construcción e Ingeniería",
+      "sector": "Industria"
+    },
+    "EMR": {
+      "industry": "Componentes Eléctricos",
+      "sector": "Industria"
+    },
+    "EOG": {
+      "industry": "Exploración de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "EPAM": {
+      "industry": "Consultoría TI",
+      "sector": "Tecnología"
+    },
+    "EQIX": {
+      "industry": "REIT Centros de Datos",
+      "sector": "Bienes Raíces"
+    },
+    "EQR": {
+      "industry": "REIT Residencial",
+      "sector": "Bienes Raíces"
+    },
+    "EQT": {
+      "industry": "Exploración de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "ERIE": {
+      "industry": "Corredores de Seguros",
+      "sector": "Finanzas"
+    },
+    "ES": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "ESGU": {
+      "industry": "ETF ESG US",
+      "sector": "Diversificado"
+    },
+    "ESGV": {
+      "industry": "ETF ESG US",
+      "sector": "Diversificado"
+    },
+    "ESPO": {
+      "industry": "ETF Videojuegos y eSports",
+      "sector": "Comunicaciones"
+    },
+    "ESS": {
+      "industry": "REIT Residencial",
+      "sector": "Bienes Raíces"
+    },
+    "ETHA": {
+      "industry": "ETF Ethereum Spot",
+      "sector": "Cripto"
+    },
+    "ETHE": {
+      "industry": "ETF Ethereum Spot",
+      "sector": "Cripto"
+    },
+    "ETN": {
+      "industry": "Componentes Eléctricos",
+      "sector": "Industria"
+    },
+    "ETR": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "EVRG": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "EW": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "EWA": {
+      "industry": "ETF Australia",
+      "sector": "Diversificado"
+    },
+    "EWC": {
+      "industry": "ETF Canadá",
+      "sector": "Diversificado"
+    },
+    "EWG": {
+      "industry": "ETF Alemania",
+      "sector": "Diversificado"
+    },
+    "EWJ": {
+      "industry": "ETF Japón",
+      "sector": "Diversificado"
+    },
+    "EWT": {
+      "industry": "ETF Taiwán",
+      "sector": "Diversificado"
+    },
+    "EWU": {
+      "industry": "ETF Reino Unido",
+      "sector": "Diversificado"
+    },
+    "EWW": {
+      "industry": "ETF México",
+      "sector": "Diversificado"
+    },
+    "EWY": {
+      "industry": "ETF Corea del Sur",
+      "sector": "Diversificado"
+    },
+    "EWZ": {
+      "industry": "ETF Brasil",
+      "sector": "Diversificado"
+    },
+    "EXC": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "EXE": {
+      "industry": "Exploración de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "EXPD": {
+      "industry": "Carga Aérea y Logística",
+      "sector": "Industria"
+    },
+    "EXPE": {
+      "industry": "Hoteles y Cruceros",
+      "sector": "Consumo Discrecional"
+    },
+    "EXR": {
+      "industry": "REIT Almacenamiento",
+      "sector": "Bienes Raíces"
+    },
+    "F": {
+      "industry": "Fabricantes de Automóviles",
+      "sector": "Consumo Discrecional"
+    },
+    "FANG": {
+      "industry": "Exploración de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "FAST": {
+      "industry": "Empresas Comerciales",
+      "sector": "Industria"
+    },
+    "FBTC": {
+      "industry": "ETF Bitcoin Spot",
+      "sector": "Cripto"
+    },
+    "FCX": {
+      "industry": "Cobre",
+      "sector": "Materiales"
+    },
+    "FDS": {
+      "industry": "Bolsas y Datos Financieros",
+      "sector": "Finanzas"
+    },
+    "FDX": {
+      "industry": "Carga Aérea y Logística",
+      "sector": "Industria"
+    },
+    "FE": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "FFIV": {
+      "industry": "Equipos de Comunicación",
+      "sector": "Tecnología"
+    },
+    "FICO": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "FINX": {
+      "industry": "ETF Fintech",
+      "sector": "Finanzas"
+    },
+    "FIS": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "FISV": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "FITB": {
+      "industry": "Bancos Regionales",
+      "sector": "Finanzas"
+    },
+    "FIX": {
+      "industry": "Construcción e Ingeniería",
+      "sector": "Industria"
+    },
+    "FOX": {
+      "industry": "Radiodifusión",
+      "sector": "Comunicaciones"
+    },
+    "FOXA": {
+      "industry": "Radiodifusión",
+      "sector": "Comunicaciones"
+    },
+    "FRT": {
+      "industry": "REIT Comercial",
+      "sector": "Bienes Raíces"
+    },
+    "FSLR": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "FTEC": {
+      "industry": "ETF Tecnología",
+      "sector": "Tecnología"
+    },
+    "FTNT": {
+      "industry": "Software de Sistemas",
+      "sector": "Tecnología"
+    },
+    "FTV": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "FXI": {
+      "industry": "ETF China Large Cap",
+      "sector": "Diversificado"
+    },
+    "GBTC": {
+      "industry": "ETF Bitcoin Spot",
+      "sector": "Cripto"
+    },
+    "GD": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "GDDY": {
+      "industry": "Servicios de Internet",
+      "sector": "Tecnología"
+    },
+    "GE": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "GEHC": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "GEN": {
+      "industry": "Software de Sistemas",
+      "sector": "Tecnología"
+    },
+    "GEV": {
+      "industry": "Equipos Eléctricos Pesados",
+      "sector": "Industria"
+    },
+    "GILD": {
+      "industry": "Biotecnología",
+      "sector": "Salud"
+    },
+    "GIS": {
+      "industry": "Alimentos Envasados",
+      "sector": "Consumo Básico"
+    },
+    "GL": {
+      "industry": "Seguros de Vida y Salud",
+      "sector": "Finanzas"
+    },
+    "GLD": {
+      "industry": "ETF Oro",
+      "sector": "Commodities"
+    },
+    "GLDM": {
+      "industry": "ETF Oro",
+      "sector": "Commodities"
+    },
+    "GLOB": {
+      "industry": "Consultoría TI",
+      "sector": "Tecnología"
+    },
+    "GLW": {
+      "industry": "Componentes Electrónicos",
+      "sector": "Tecnología"
+    },
+    "GM": {
+      "industry": "Fabricantes de Automóviles",
+      "sector": "Consumo Discrecional"
+    },
+    "GME": {
+      "industry": "Comercio Especializado",
+      "sector": "Consumo Discrecional"
+    },
+    "GNRC": {
+      "industry": "Componentes Eléctricos",
+      "sector": "Industria"
+    },
+    "GOOG": {
+      "industry": "Medios Interactivos",
+      "sector": "Comunicaciones"
+    },
+    "GOOGL": {
+      "industry": "Medios Interactivos",
+      "sector": "Comunicaciones"
+    },
+    "GOVT": {
+      "industry": "ETF Bonos Tesoro US",
+      "sector": "Renta Fija"
+    },
+    "GPC": {
+      "industry": "Distribuidores",
+      "sector": "Consumo Discrecional"
+    },
+    "GPN": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "GRAB": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "GRMN": {
+      "industry": "Electrónica de Consumo",
+      "sector": "Consumo Discrecional"
+    },
+    "GS": {
+      "industry": "Banca de Inversión",
+      "sector": "Finanzas"
+    },
+    "GSG": {
+      "industry": "ETF Commodities Diversificado",
+      "sector": "Commodities"
+    },
+    "GWW": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "HACK": {
+      "industry": "ETF Ciberseguridad",
+      "sector": "Tecnología"
+    },
+    "HAL": {
+      "industry": "Equipos de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "HAS": {
+      "industry": "Productos de Ocio",
+      "sector": "Consumo Discrecional"
+    },
+    "HBAN": {
+      "industry": "Bancos Regionales",
+      "sector": "Finanzas"
+    },
+    "HCA": {
+      "industry": "Instalaciones de Salud",
+      "sector": "Salud"
+    },
+    "HD": {
+      "industry": "Mejoramiento del Hogar",
+      "sector": "Consumo Discrecional"
+    },
+    "HDV": {
+      "industry": "ETF Alto Dividendo",
+      "sector": "Diversificado"
+    },
+    "HERO": {
+      "industry": "ETF Videojuegos y eSports",
+      "sector": "Comunicaciones"
+    },
+    "HIG": {
+      "industry": "Seguros de Propiedad",
+      "sector": "Finanzas"
+    },
+    "HII": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "HLT": {
+      "industry": "Hoteles y Cruceros",
+      "sector": "Consumo Discrecional"
+    },
+    "HMC": {
+      "industry": "Fabricantes de Automóviles",
+      "sector": "Consumo Discrecional"
+    },
+    "HOLX": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "HON": {
+      "industry": "Conglomerados Industriales",
+      "sector": "Industria"
+    },
+    "HOOD": {
+      "industry": "Banca de Inversión",
+      "sector": "Finanzas"
+    },
+    "HPE": {
+      "industry": "Hardware y Periféricos",
+      "sector": "Tecnología"
+    },
+    "HPQ": {
+      "industry": "Hardware y Periféricos",
+      "sector": "Tecnología"
+    },
+    "HRL": {
+      "industry": "Alimentos Envasados",
+      "sector": "Consumo Básico"
+    },
+    "HSIC": {
+      "industry": "Distribuidores de Salud",
+      "sector": "Salud"
+    },
+    "HST": {
+      "industry": "REIT Hoteles",
+      "sector": "Bienes Raíces"
+    },
+    "HSY": {
+      "industry": "Alimentos Envasados",
+      "sector": "Consumo Básico"
+    },
+    "HUBB": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "HUBS": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "HUM": {
+      "industry": "Salud Administrada",
+      "sector": "Salud"
+    },
+    "HWM": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "HYG": {
+      "industry": "ETF Bonos Alto Rendimiento",
+      "sector": "Renta Fija"
+    },
+    "IAU": {
+      "industry": "ETF Oro",
+      "sector": "Commodities"
+    },
+    "IBB": {
+      "industry": "ETF Biotecnología",
+      "sector": "Salud"
+    },
+    "IBIT": {
+      "industry": "ETF Bitcoin Spot",
+      "sector": "Cripto"
+    },
+    "IBKR": {
+      "industry": "Banca de Inversión",
+      "sector": "Finanzas"
+    },
+    "IBM": {
+      "industry": "Consultoría TI",
+      "sector": "Tecnología"
+    },
+    "ICE": {
+      "industry": "Bolsas y Datos Financieros",
+      "sector": "Finanzas"
+    },
+    "ICLN": {
+      "industry": "ETF Energía Limpia",
+      "sector": "Energía"
+    },
+    "IDRV": {
+      "industry": "ETF Vehículos Eléctricos",
+      "sector": "Consumo Discrecional"
+    },
+    "IDXX": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "IEF": {
+      "industry": "ETF Bonos 7-10 Años US",
+      "sector": "Renta Fija"
+    },
+    "IEFA": {
+      "industry": "ETF EAFE",
+      "sector": "Diversificado"
+    },
+    "IEMG": {
+      "industry": "ETF Mercados Emergentes",
+      "sector": "Diversificado"
+    },
+    "IEX": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "IFF": {
+      "industry": "Químicos Especiales",
+      "sector": "Materiales"
+    },
+    "IFRA": {
+      "industry": "ETF Infraestructura US",
+      "sector": "Industria"
+    },
+    "IGF": {
+      "industry": "ETF Infraestructura Global",
+      "sector": "Industria"
+    },
+    "IGV": {
+      "industry": "ETF Software",
+      "sector": "Tecnología"
+    },
+    "IHI": {
+      "industry": "ETF Dispositivos Médicos",
+      "sector": "Salud"
+    },
+    "IJH": {
+      "industry": "ETF Mid Cap S&P 400",
+      "sector": "Diversificado"
+    },
+    "IJR": {
+      "industry": "ETF Small Cap S&P 600",
+      "sector": "Diversificado"
+    },
+    "INCY": {
+      "industry": "Biotecnología",
+      "sector": "Salud"
+    },
+    "INDA": {
+      "industry": "ETF India",
+      "sector": "Diversificado"
+    },
+    "INTC": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "INTU": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "INVH": {
+      "industry": "REIT Viviendas",
+      "sector": "Bienes Raíces"
+    },
+    "IONQ": {
+      "industry": "Computación Cuántica",
+      "sector": "Tecnología"
+    },
+    "IP": {
+      "industry": "Empaques",
+      "sector": "Materiales"
+    },
+    "IQV": {
+      "industry": "Ciencias de la Vida",
+      "sector": "Salud"
+    },
+    "IR": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "IRM": {
+      "industry": "REIT Especializado",
+      "sector": "Bienes Raíces"
+    },
+    "ISRG": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "IT": {
+      "industry": "Consultoría TI",
+      "sector": "Tecnología"
+    },
+    "ITA": {
+      "industry": "ETF Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "ITOT": {
+      "industry": "ETF Mercado Total US",
+      "sector": "Diversificado"
+    },
+    "ITW": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "IVV": {
+      "industry": "ETF S&P 500",
+      "sector": "Diversificado"
+    },
+    "IVZ": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "IWD": {
+      "industry": "ETF Valor",
+      "sector": "Diversificado"
+    },
+    "IWF": {
+      "industry": "ETF Crecimiento",
+      "sector": "Diversificado"
+    },
+    "IWM": {
+      "industry": "ETF Small Cap Russell 2000",
+      "sector": "Diversificado"
+    },
+    "IXUS": {
+      "industry": "ETF Internacional Total",
+      "sector": "Diversificado"
+    },
+    "IYR": {
+      "industry": "ETF Bienes Raíces",
+      "sector": "Bienes Raíces"
+    },
+    "IYT": {
+      "industry": "ETF Transporte",
+      "sector": "Industria"
+    },
+    "J": {
+      "industry": "Construcción e Ingeniería",
+      "sector": "Industria"
+    },
+    "JBHT": {
+      "industry": "Transporte Terrestre",
+      "sector": "Industria"
+    },
+    "JBL": {
+      "industry": "Manufactura Electrónica",
+      "sector": "Tecnología"
+    },
+    "JCI": {
+      "industry": "Building Products",
+      "sector": "Industria"
+    },
+    "JD": {
+      "industry": "Comercio Electrónico",
+      "sector": "Consumo Discrecional"
+    },
+    "JEPI": {
+      "industry": "ETF Renta Premium",
+      "sector": "Diversificado"
+    },
+    "JEPQ": {
+      "industry": "ETF Renta Premium Nasdaq",
+      "sector": "Tecnología"
+    },
+    "JETS": {
+      "industry": "ETF Aerolíneas",
+      "sector": "Industria"
+    },
+    "JKHY": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "JNJ": {
+      "industry": "Farmacéutica",
+      "sector": "Salud"
+    },
+    "JNK": {
+      "industry": "ETF Bonos Alto Rendimiento",
+      "sector": "Renta Fija"
+    },
+    "JPM": {
+      "industry": "Bancos Diversificados",
+      "sector": "Finanzas"
+    },
+    "KBE": {
+      "industry": "ETF Bancos",
+      "sector": "Finanzas"
+    },
+    "KDP": {
+      "industry": "Bebidas No Alcohólicas",
+      "sector": "Consumo Básico"
+    },
+    "KEY": {
+      "industry": "Bancos Regionales",
+      "sector": "Finanzas"
+    },
+    "KEYS": {
+      "industry": "Equipos Electrónicos",
+      "sector": "Tecnología"
+    },
+    "KHC": {
+      "industry": "Alimentos Envasados",
+      "sector": "Consumo Básico"
+    },
+    "KIM": {
+      "industry": "REIT Comercial",
+      "sector": "Bienes Raíces"
+    },
+    "KKR": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "KLAC": {
+      "industry": "Equipos de Semiconductores",
+      "sector": "Tecnología"
+    },
+    "KMB": {
+      "industry": "Productos del Hogar",
+      "sector": "Consumo Básico"
+    },
+    "KMI": {
+      "industry": "Almacenamiento de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "KO": {
+      "industry": "Bebidas No Alcohólicas",
+      "sector": "Consumo Básico"
+    },
+    "KR": {
+      "industry": "Comercio de Alimentos",
+      "sector": "Consumo Básico"
+    },
+    "KRE": {
+      "industry": "ETF Bancos Regionales",
+      "sector": "Finanzas"
+    },
+    "KVUE": {
+      "industry": "Cuidado Personal",
+      "sector": "Consumo Básico"
+    },
+    "KWEB": {
+      "industry": "ETF Internet China",
+      "sector": "Tecnología"
+    },
+    "L": {
+      "industry": "Seguros Multirramo",
+      "sector": "Finanzas"
+    },
+    "LCID": {
+      "industry": "Fabricantes de Automóviles",
+      "sector": "Consumo Discrecional"
+    },
+    "LDOS": {
+      "industry": "Servicios de Soporte",
+      "sector": "Industria"
+    },
+    "LEN": {
+      "industry": "Construcción de Viviendas",
+      "sector": "Consumo Discrecional"
+    },
+    "LH": {
+      "industry": "Servicios de Salud",
+      "sector": "Salud"
+    },
+    "LHX": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "LII": {
+      "industry": "Building Products",
+      "sector": "Industria"
+    },
+    "LIN": {
+      "industry": "Gases Industriales",
+      "sector": "Materiales"
+    },
+    "LIT": {
+      "industry": "ETF Litio y Baterías",
+      "sector": "Energía"
+    },
+    "LITE": {
+      "industry": "Equipos de Comunicación",
+      "sector": "Tecnología"
+    },
+    "LLY": {
+      "industry": "Farmacéutica",
+      "sector": "Salud"
+    },
+    "LMT": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "LNT": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "LOW": {
+      "industry": "Mejoramiento del Hogar",
+      "sector": "Consumo Discrecional"
+    },
+    "LQD": {
+      "industry": "ETF Bonos Corporativos",
+      "sector": "Renta Fija"
+    },
+    "LRCX": {
+      "industry": "Equipos de Semiconductores",
+      "sector": "Tecnología"
+    },
+    "LULU": {
+      "industry": "Ropa y Accesorios de Lujo",
+      "sector": "Consumo Discrecional"
+    },
+    "LUV": {
+      "industry": "Aerolíneas",
+      "sector": "Industria"
+    },
+    "LVS": {
+      "industry": "Casinos y Juegos",
+      "sector": "Consumo Discrecional"
+    },
+    "LYB": {
+      "industry": "Químicos Especiales",
+      "sector": "Materiales"
+    },
+    "LYFT": {
+      "industry": "Transporte de Pasajeros",
+      "sector": "Industria"
+    },
+    "LYV": {
+      "industry": "Entretenimiento",
+      "sector": "Comunicaciones"
+    },
+    "MA": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "MAA": {
+      "industry": "REIT Residencial",
+      "sector": "Bienes Raíces"
+    },
+    "MAR": {
+      "industry": "Hoteles y Cruceros",
+      "sector": "Consumo Discrecional"
+    },
+    "MAS": {
+      "industry": "Building Products",
+      "sector": "Industria"
+    },
+    "MCD": {
+      "industry": "Restaurantes",
+      "sector": "Consumo Discrecional"
+    },
+    "MCHI": {
+      "industry": "ETF China",
+      "sector": "Diversificado"
+    },
+    "MCHP": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "MCK": {
+      "industry": "Distribuidores de Salud",
+      "sector": "Salud"
+    },
+    "MCO": {
+      "industry": "Bolsas y Datos Financieros",
+      "sector": "Finanzas"
+    },
+    "MDB": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "MDLZ": {
+      "industry": "Alimentos Envasados",
+      "sector": "Consumo Básico"
+    },
+    "MDT": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "MDY": {
+      "industry": "ETF Mid Cap S&P 400",
+      "sector": "Diversificado"
+    },
+    "MELI": {
+      "industry": "Comercio Electrónico",
+      "sector": "Consumo Discrecional"
+    },
+    "MET": {
+      "industry": "Seguros de Vida y Salud",
+      "sector": "Finanzas"
+    },
+    "META": {
+      "industry": "Medios Interactivos",
+      "sector": "Comunicaciones"
+    },
+    "MGK": {
+      "industry": "ETF Mega Cap Crecimiento",
+      "sector": "Diversificado"
+    },
+    "MGM": {
+      "industry": "Casinos y Juegos",
+      "sector": "Consumo Discrecional"
+    },
+    "MKC": {
+      "industry": "Alimentos Envasados",
+      "sector": "Consumo Básico"
+    },
+    "MLM": {
+      "industry": "Materiales de Construcción",
+      "sector": "Materiales"
+    },
+    "MMM": {
+      "industry": "Conglomerados Industriales",
+      "sector": "Industria"
+    },
+    "MNST": {
+      "industry": "Bebidas No Alcohólicas",
+      "sector": "Consumo Básico"
+    },
+    "MO": {
+      "industry": "Tabaco",
+      "sector": "Consumo Básico"
+    },
+    "MOS": {
+      "industry": "Fertilizantes",
+      "sector": "Materiales"
+    },
+    "MPC": {
+      "industry": "Refinación de Petróleo",
+      "sector": "Energía"
+    },
+    "MPWR": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "MRK": {
+      "industry": "Farmacéutica",
+      "sector": "Salud"
+    },
+    "MRNA": {
+      "industry": "Biotecnología",
+      "sector": "Salud"
+    },
+    "MRSH": {
+      "industry": "Corredores de Seguros",
+      "sector": "Finanzas"
+    },
+    "MS": {
+      "industry": "Banca de Inversión",
+      "sector": "Finanzas"
+    },
+    "MSCI": {
+      "industry": "Bolsas y Datos Financieros",
+      "sector": "Finanzas"
+    },
+    "MSFT": {
+      "industry": "Software de Sistemas",
+      "sector": "Tecnología"
+    },
+    "MSI": {
+      "industry": "Equipos de Comunicación",
+      "sector": "Tecnología"
+    },
+    "MSOS": {
+      "industry": "ETF Cannabis US",
+      "sector": "Salud"
+    },
+    "MSTR": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "MTB": {
+      "industry": "Bancos Regionales",
+      "sector": "Finanzas"
+    },
+    "MTD": {
+      "industry": "Ciencias de la Vida",
+      "sector": "Salud"
+    },
+    "MU": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "MUB": {
+      "industry": "ETF Bonos Municipales",
+      "sector": "Renta Fija"
+    },
+    "NCLH": {
+      "industry": "Hoteles y Cruceros",
+      "sector": "Consumo Discrecional"
+    },
+    "NDAQ": {
+      "industry": "Bolsas y Datos Financieros",
+      "sector": "Finanzas"
+    },
+    "NDSN": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "NEE": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "NEM": {
+      "industry": "Oro",
+      "sector": "Materiales"
+    },
+    "NET": {
+      "industry": "Servicios de Internet",
+      "sector": "Tecnología"
+    },
+    "NFLX": {
+      "industry": "Entretenimiento",
+      "sector": "Comunicaciones"
+    },
+    "NI": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "NKE": {
+      "industry": "Ropa y Accesorios de Lujo",
+      "sector": "Consumo Discrecional"
+    },
+    "NOBL": {
+      "industry": "ETF Aristócratas de Dividendos",
+      "sector": "Diversificado"
+    },
+    "NOC": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "NOW": {
+      "industry": "Software de Sistemas",
+      "sector": "Tecnología"
+    },
+    "NRG": {
+      "industry": "Productores Independientes de Energía",
+      "sector": "Servicios Básicos"
+    },
+    "NSC": {
+      "industry": "Transporte Ferroviario",
+      "sector": "Industria"
+    },
+    "NTAP": {
+      "industry": "Hardware y Periféricos",
+      "sector": "Tecnología"
+    },
+    "NTRS": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "NU": {
+      "industry": "Banca Digital",
+      "sector": "Finanzas"
+    },
+    "NUE": {
+      "industry": "Acero",
+      "sector": "Materiales"
+    },
+    "NVDA": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "NVO": {
+      "industry": "Farmacéutica",
+      "sector": "Salud"
+    },
+    "NVR": {
+      "industry": "Construcción de Viviendas",
+      "sector": "Consumo Discrecional"
+    },
+    "NWS": {
+      "industry": "Publicación",
+      "sector": "Comunicaciones"
+    },
+    "NWSA": {
+      "industry": "Publicación",
+      "sector": "Comunicaciones"
+    },
+    "NXPI": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "O": {
+      "industry": "REIT Comercial",
+      "sector": "Bienes Raíces"
+    },
+    "ODFL": {
+      "industry": "Transporte Terrestre",
+      "sector": "Industria"
+    },
+    "OIH": {
+      "industry": "ETF Servicios Petroleros",
+      "sector": "Energía"
+    },
+    "OKE": {
+      "industry": "Almacenamiento de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "OKTA": {
+      "industry": "Software de Sistemas",
+      "sector": "Tecnología"
+    },
+    "OMC": {
+      "industry": "Publicidad",
+      "sector": "Comunicaciones"
+    },
+    "ON": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "ORCL": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "ORLY": {
+      "industry": "Venta de Automóviles",
+      "sector": "Consumo Discrecional"
+    },
+    "OTIS": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "OXY": {
+      "industry": "Exploración de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "PAGS": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "PANW": {
+      "industry": "Software de Sistemas",
+      "sector": "Tecnología"
+    },
+    "PATH": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "PAVE": {
+      "industry": "ETF Infraestructura US",
+      "sector": "Industria"
+    },
+    "PAYX": {
+      "industry": "Recursos Humanos",
+      "sector": "Industria"
+    },
+    "PCAR": {
+      "industry": "Maquinaria de Construcción",
+      "sector": "Industria"
+    },
+    "PCG": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "PDBC": {
+      "industry": "ETF Commodities Diversificado",
+      "sector": "Commodities"
+    },
+    "PDD": {
+      "industry": "Comercio Electrónico",
+      "sector": "Consumo Discrecional"
+    },
+    "PEG": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "PEP": {
+      "industry": "Bebidas No Alcohólicas",
+      "sector": "Consumo Básico"
+    },
+    "PFE": {
+      "industry": "Farmacéutica",
+      "sector": "Salud"
+    },
+    "PFG": {
+      "industry": "Seguros de Vida y Salud",
+      "sector": "Finanzas"
+    },
+    "PG": {
+      "industry": "Cuidado Personal",
+      "sector": "Consumo Básico"
+    },
+    "PGR": {
+      "industry": "Seguros de Propiedad",
+      "sector": "Finanzas"
+    },
+    "PH": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "PHM": {
+      "industry": "Construcción de Viviendas",
+      "sector": "Consumo Discrecional"
+    },
+    "PINS": {
+      "industry": "Medios Interactivos",
+      "sector": "Comunicaciones"
+    },
+    "PKG": {
+      "industry": "Empaques",
+      "sector": "Materiales"
+    },
+    "PLD": {
+      "industry": "REIT Industrial",
+      "sector": "Bienes Raíces"
+    },
+    "PLTR": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "PM": {
+      "industry": "Tabaco",
+      "sector": "Consumo Básico"
+    },
+    "PNC": {
+      "industry": "Bancos Diversificados",
+      "sector": "Finanzas"
+    },
+    "PNR": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "PNW": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "PODD": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "POOL": {
+      "industry": "Distribuidores",
+      "sector": "Consumo Discrecional"
+    },
+    "PPA": {
+      "industry": "ETF Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "PPG": {
+      "industry": "Químicos Especiales",
+      "sector": "Materiales"
+    },
+    "PPL": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "PPLT": {
+      "industry": "ETF Platino",
+      "sector": "Commodities"
+    },
+    "PRU": {
+      "industry": "Seguros de Vida y Salud",
+      "sector": "Finanzas"
+    },
+    "PSA": {
+      "industry": "REIT Almacenamiento",
+      "sector": "Bienes Raíces"
+    },
+    "PSI": {
+      "industry": "ETF Semiconductores",
+      "sector": "Tecnología"
+    },
+    "PSKY": {
+      "industry": "Entretenimiento",
+      "sector": "Comunicaciones"
+    },
+    "PSX": {
+      "industry": "Refinación de Petróleo",
+      "sector": "Energía"
+    },
+    "PTC": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "PWR": {
+      "industry": "Construcción e Ingeniería",
+      "sector": "Industria"
+    },
+    "PYPL": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "Q": {
+      "industry": "Equipos de Semiconductores",
+      "sector": "Tecnología"
+    },
+    "QCLN": {
+      "industry": "ETF Energía Limpia",
+      "sector": "Energía"
+    },
+    "QCOM": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "QQQ": {
+      "industry": "ETF Nasdaq 100",
+      "sector": "Tecnología"
+    },
+    "QQQM": {
+      "industry": "ETF Nasdaq 100",
+      "sector": "Tecnología"
+    },
+    "RBLX": {
+      "industry": "Entretenimiento Interactivo",
+      "sector": "Comunicaciones"
+    },
+    "RCL": {
+      "industry": "Hoteles y Cruceros",
+      "sector": "Consumo Discrecional"
+    },
+    "RDDT": {
+      "industry": "Medios Interactivos",
+      "sector": "Comunicaciones"
+    },
+    "REG": {
+      "industry": "REIT Comercial",
+      "sector": "Bienes Raíces"
+    },
+    "REGN": {
+      "industry": "Biotecnología",
+      "sector": "Salud"
+    },
+    "REMX": {
+      "industry": "ETF Tierras Raras",
+      "sector": "Materiales"
+    },
+    "RF": {
+      "industry": "Bancos Regionales",
+      "sector": "Finanzas"
+    },
+    "RGTI": {
+      "industry": "Computación Cuántica",
+      "sector": "Tecnología"
+    },
+    "RIVN": {
+      "industry": "Fabricantes de Automóviles",
+      "sector": "Consumo Discrecional"
+    },
+    "RJF": {
+      "industry": "Banca de Inversión",
+      "sector": "Finanzas"
+    },
+    "RL": {
+      "industry": "Ropa y Accesorios de Lujo",
+      "sector": "Consumo Discrecional"
+    },
+    "RMD": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "ROBO": {
+      "industry": "ETF Robótica e IA",
+      "sector": "Tecnología"
+    },
+    "ROK": {
+      "industry": "Componentes Eléctricos",
+      "sector": "Industria"
+    },
+    "ROKU": {
+      "industry": "Entretenimiento",
+      "sector": "Comunicaciones"
+    },
+    "ROL": {
+      "industry": "Servicios Ambientales",
+      "sector": "Industria"
+    },
+    "ROP": {
+      "industry": "Equipos Electrónicos",
+      "sector": "Tecnología"
+    },
+    "ROST": {
+      "industry": "Venta de Ropa",
+      "sector": "Consumo Discrecional"
+    },
+    "RPV": {
+      "industry": "ETF Valor Puro S&P 500",
+      "sector": "Diversificado"
+    },
+    "RSG": {
+      "industry": "Servicios Ambientales",
+      "sector": "Industria"
+    },
+    "RTX": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "RVTY": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "S": {
+      "industry": "Software de Sistemas",
+      "sector": "Tecnología"
+    },
+    "SAP": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "SATS": {
+      "industry": "Telecomunicaciones Inalámbricas",
+      "sector": "Comunicaciones"
+    },
+    "SBAC": {
+      "industry": "REIT Torres Telecom",
+      "sector": "Bienes Raíces"
+    },
+    "SBUX": {
+      "industry": "Restaurantes",
+      "sector": "Consumo Discrecional"
+    },
+    "SCHA": {
+      "industry": "ETF Small Cap",
+      "sector": "Diversificado"
+    },
+    "SCHB": {
+      "industry": "ETF Mercado Total US",
+      "sector": "Diversificado"
+    },
+    "SCHD": {
+      "industry": "ETF Dividendos",
+      "sector": "Diversificado"
+    },
+    "SCHE": {
+      "industry": "ETF Mercados Emergentes",
+      "sector": "Diversificado"
+    },
+    "SCHF": {
+      "industry": "ETF Internacional Desarrollados",
+      "sector": "Diversificado"
+    },
+    "SCHG": {
+      "industry": "ETF Crecimiento",
+      "sector": "Diversificado"
+    },
+    "SCHH": {
+      "industry": "ETF REIT US",
+      "sector": "Bienes Raíces"
+    },
+    "SCHM": {
+      "industry": "ETF Mid Cap",
+      "sector": "Diversificado"
+    },
+    "SCHO": {
+      "industry": "ETF Bonos Corto Plazo US",
+      "sector": "Renta Fija"
+    },
+    "SCHV": {
+      "industry": "ETF Valor",
+      "sector": "Diversificado"
+    },
+    "SCHW": {
+      "industry": "Banca de Inversión",
+      "sector": "Finanzas"
+    },
+    "SCHZ": {
+      "industry": "ETF Bonos Agregados US",
+      "sector": "Renta Fija"
+    },
+    "SE": {
+      "industry": "Comercio Electrónico",
+      "sector": "Consumo Discrecional"
+    },
+    "SGOV": {
+      "industry": "ETF Letras del Tesoro 0-3 Meses",
+      "sector": "Renta Fija"
+    },
+    "SHOP": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "SHV": {
+      "industry": "ETF Bonos Muy Corto Plazo",
+      "sector": "Renta Fija"
+    },
+    "SHW": {
+      "industry": "Químicos Especiales",
+      "sector": "Materiales"
+    },
+    "SHY": {
+      "industry": "ETF Bonos Corto Plazo US",
+      "sector": "Renta Fija"
+    },
+    "SJM": {
+      "industry": "Alimentos Envasados",
+      "sector": "Consumo Básico"
+    },
+    "SKYY": {
+      "industry": "ETF Cloud Computing",
+      "sector": "Tecnología"
+    },
+    "SLB": {
+      "industry": "Equipos de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "SLV": {
+      "industry": "ETF Plata",
+      "sector": "Commodities"
+    },
+    "SMCI": {
+      "industry": "Hardware y Periféricos",
+      "sector": "Tecnología"
+    },
+    "SMH": {
+      "industry": "ETF Semiconductores",
+      "sector": "Tecnología"
+    },
+    "SNA": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "SNAP": {
+      "industry": "Medios Interactivos",
+      "sector": "Comunicaciones"
+    },
+    "SNDK": {
+      "industry": "Hardware y Periféricos",
+      "sector": "Tecnología"
+    },
+    "SNOW": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "SNPS": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "SNSR": {
+      "industry": "ETF Internet de las Cosas",
+      "sector": "Tecnología"
+    },
+    "SO": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "SOFI": {
+      "industry": "Banca Digital",
+      "sector": "Finanzas"
+    },
+    "SOLV": {
+      "industry": "Tecnología de Salud",
+      "sector": "Salud"
+    },
+    "SONY": {
+      "industry": "Electrónica de Consumo",
+      "sector": "Tecnología"
+    },
+    "SOXL": {
+      "industry": "ETF Semiconductores 3x Apalancado",
+      "sector": "Tecnología"
+    },
+    "SOXS": {
+      "industry": "ETF Semiconductores 3x Inverso",
+      "sector": "Tecnología"
+    },
+    "SOXX": {
+      "industry": "ETF Semiconductores",
+      "sector": "Tecnología"
+    },
+    "SPDW": {
+      "industry": "ETF Internacional Desarrollados",
+      "sector": "Diversificado"
+    },
+    "SPG": {
+      "industry": "REIT Comercial",
+      "sector": "Bienes Raíces"
+    },
+    "SPGI": {
+      "industry": "Bolsas y Datos Financieros",
+      "sector": "Finanzas"
+    },
+    "SPLG": {
+      "industry": "ETF S&P 500",
+      "sector": "Diversificado"
+    },
+    "SPOT": {
+      "industry": "Entretenimiento",
+      "sector": "Comunicaciones"
+    },
+    "SPTM": {
+      "industry": "ETF Mercado Total US",
+      "sector": "Diversificado"
+    },
+    "SPXU": {
+      "industry": "ETF S&P 500 3x Inverso",
+      "sector": "Diversificado"
+    },
+    "SPY": {
+      "industry": "ETF S&P 500",
+      "sector": "Diversificado"
+    },
+    "SPYD": {
+      "industry": "ETF Alto Dividendo S&P 500",
+      "sector": "Diversificado"
+    },
+    "SQ": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "SQQQ": {
+      "industry": "ETF Nasdaq 100 3x Inverso",
+      "sector": "Tecnología"
+    },
+    "SRE": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "STE": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "STLD": {
+      "industry": "Acero",
+      "sector": "Materiales"
+    },
+    "STNE": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "STT": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "STX": {
+      "industry": "Hardware y Periféricos",
+      "sector": "Tecnología"
+    },
+    "STZ": {
+      "industry": "Destilerías y Viñedos",
+      "sector": "Consumo Básico"
+    },
+    "SUSA": {
+      "industry": "ETF ESG US",
+      "sector": "Diversificado"
+    },
+    "SVXY": {
+      "industry": "ETF Volatilidad Inverso",
+      "sector": "Diversificado"
+    },
+    "SW": {
+      "industry": "Empaques",
+      "sector": "Materiales"
+    },
+    "SWK": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "SWKS": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "SYF": {
+      "industry": "Finanzas al Consumidor",
+      "sector": "Finanzas"
+    },
+    "SYK": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "SYY": {
+      "industry": "Distribuidores de Alimentos",
+      "sector": "Consumo Básico"
+    },
+    "T": {
+      "industry": "Telecomunicaciones",
+      "sector": "Comunicaciones"
+    },
+    "TAN": {
+      "industry": "ETF Energía Solar",
+      "sector": "Energía"
+    },
+    "TAP": {
+      "industry": "Cerveceras",
+      "sector": "Consumo Básico"
+    },
+    "TCEHY": {
+      "industry": "Medios Interactivos",
+      "sector": "Comunicaciones"
+    },
+    "TDG": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "TDY": {
+      "industry": "Equipos Electrónicos",
+      "sector": "Tecnología"
+    },
+    "TECH": {
+      "industry": "Ciencias de la Vida",
+      "sector": "Salud"
+    },
+    "TEL": {
+      "industry": "Manufactura Electrónica",
+      "sector": "Tecnología"
+    },
+    "TER": {
+      "industry": "Equipos de Semiconductores",
+      "sector": "Tecnología"
+    },
+    "TFC": {
+      "industry": "Bancos Diversificados",
+      "sector": "Finanzas"
+    },
+    "TGT": {
+      "industry": "Comercio de Consumo Básico",
+      "sector": "Consumo Básico"
+    },
+    "TIP": {
+      "industry": "ETF Bonos Protegidos Inflación",
+      "sector": "Renta Fija"
+    },
+    "TJX": {
+      "industry": "Venta de Ropa",
+      "sector": "Consumo Discrecional"
+    },
+    "TKO": {
+      "industry": "Entretenimiento",
+      "sector": "Comunicaciones"
+    },
+    "TLT": {
+      "industry": "ETF Bonos Largo Plazo",
+      "sector": "Renta Fija"
+    },
+    "TM": {
+      "industry": "Fabricantes de Automóviles",
+      "sector": "Consumo Discrecional"
+    },
+    "TMF": {
+      "industry": "ETF Bonos 20+ Años 3x Apalancado",
+      "sector": "Renta Fija"
+    },
+    "TMO": {
+      "industry": "Ciencias de la Vida",
+      "sector": "Salud"
+    },
+    "TMUS": {
+      "industry": "Telecomunicaciones Inalámbricas",
+      "sector": "Comunicaciones"
+    },
+    "TNA": {
+      "industry": "ETF Small Cap 3x Apalancado",
+      "sector": "Diversificado"
+    },
+    "TPL": {
+      "industry": "Exploración de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "TPR": {
+      "industry": "Ropa y Accesorios de Lujo",
+      "sector": "Consumo Discrecional"
+    },
+    "TQQQ": {
+      "industry": "ETF Nasdaq 100 3x Apalancado",
+      "sector": "Tecnología"
+    },
+    "TRGP": {
+      "industry": "Almacenamiento de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "TRMB": {
+      "industry": "Equipos Electrónicos",
+      "sector": "Tecnología"
+    },
+    "TROW": {
+      "industry": "Gestión de Activos",
+      "sector": "Finanzas"
+    },
+    "TRV": {
+      "industry": "Seguros de Propiedad",
+      "sector": "Finanzas"
+    },
+    "TSCO": {
+      "industry": "Comercio Especializado",
+      "sector": "Consumo Discrecional"
+    },
+    "TSLA": {
+      "industry": "Fabricantes de Automóviles",
+      "sector": "Consumo Discrecional"
+    },
+    "TSM": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "TSN": {
+      "industry": "Alimentos Envasados",
+      "sector": "Consumo Básico"
+    },
+    "TT": {
+      "industry": "Building Products",
+      "sector": "Industria"
+    },
+    "TTD": {
+      "industry": "Publicidad",
+      "sector": "Comunicaciones"
+    },
+    "TTWO": {
+      "industry": "Entretenimiento Interactivo",
+      "sector": "Comunicaciones"
+    },
+    "TWLO": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "TXN": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "TXT": {
+      "industry": "Aeroespacial y Defensa",
+      "sector": "Industria"
+    },
+    "TYL": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "U": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "UAL": {
+      "industry": "Aerolíneas",
+      "sector": "Industria"
+    },
+    "UBER": {
+      "industry": "Transporte de Pasajeros",
+      "sector": "Industria"
+    },
+    "UDR": {
+      "industry": "REIT Residencial",
+      "sector": "Bienes Raíces"
+    },
+    "UHS": {
+      "industry": "Instalaciones de Salud",
+      "sector": "Salud"
+    },
+    "ULTA": {
+      "industry": "Comercio Especializado",
+      "sector": "Consumo Discrecional"
+    },
+    "UMC": {
+      "industry": "Semiconductores",
+      "sector": "Tecnología"
+    },
+    "UNG": {
+      "industry": "ETF Gas Natural",
+      "sector": "Commodities"
+    },
+    "UNH": {
+      "industry": "Salud Administrada",
+      "sector": "Salud"
+    },
+    "UNP": {
+      "industry": "Transporte Ferroviario",
+      "sector": "Industria"
+    },
+    "UPRO": {
+      "industry": "ETF S&P 500 3x Apalancado",
+      "sector": "Diversificado"
+    },
+    "UPS": {
+      "industry": "Carga Aérea y Logística",
+      "sector": "Industria"
+    },
+    "UPST": {
+      "industry": "Finanzas al Consumidor",
+      "sector": "Finanzas"
+    },
+    "URA": {
+      "industry": "ETF Uranio",
+      "sector": "Energía"
+    },
+    "URI": {
+      "industry": "Empresas Comerciales",
+      "sector": "Industria"
+    },
+    "URNM": {
+      "industry": "ETF Uranio",
+      "sector": "Energía"
+    },
+    "USB": {
+      "industry": "Bancos Diversificados",
+      "sector": "Finanzas"
+    },
+    "USO": {
+      "industry": "ETF Petróleo",
+      "sector": "Commodities"
+    },
+    "UVXY": {
+      "industry": "ETF Volatilidad 1.5x",
+      "sector": "Diversificado"
+    },
+    "V": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "VAW": {
+      "industry": "ETF Materiales",
+      "sector": "Materiales"
+    },
+    "VB": {
+      "industry": "ETF Small Cap",
+      "sector": "Diversificado"
+    },
+    "VCIT": {
+      "industry": "ETF Bonos Corporativos Intermedio",
+      "sector": "Renta Fija"
+    },
+    "VCR": {
+      "industry": "ETF Consumo Discrecional",
+      "sector": "Consumo Discrecional"
+    },
+    "VCSH": {
+      "industry": "ETF Bonos Corporativos Corto",
+      "sector": "Renta Fija"
+    },
+    "VDC": {
+      "industry": "ETF Consumo Básico",
+      "sector": "Consumo Básico"
+    },
+    "VDE": {
+      "industry": "ETF Energía",
+      "sector": "Energía"
+    },
+    "VEA": {
+      "industry": "ETF Mercados Desarrollados",
+      "sector": "Diversificado"
+    },
+    "VFH": {
+      "industry": "ETF Financiero",
+      "sector": "Finanzas"
+    },
+    "VGIT": {
+      "industry": "ETF Bonos Intermedio Gobierno",
+      "sector": "Renta Fija"
+    },
+    "VGK": {
+      "industry": "ETF Europa",
+      "sector": "Diversificado"
+    },
+    "VGLT": {
+      "industry": "ETF Bonos Largo Plazo Gobierno",
+      "sector": "Renta Fija"
+    },
+    "VGSH": {
+      "industry": "ETF Bonos Corto Plazo Gobierno",
+      "sector": "Renta Fija"
+    },
+    "VGT": {
+      "industry": "ETF Tecnología",
+      "sector": "Tecnología"
+    },
+    "VHT": {
+      "industry": "ETF Salud",
+      "sector": "Salud"
+    },
+    "VICI": {
+      "industry": "REIT Hoteles",
+      "sector": "Bienes Raíces"
+    },
+    "VIG": {
+      "industry": "ETF Dividendos",
+      "sector": "Diversificado"
+    },
+    "VIS": {
+      "industry": "ETF Industrial",
+      "sector": "Industria"
+    },
+    "VLO": {
+      "industry": "Refinación de Petróleo",
+      "sector": "Energía"
+    },
+    "VLTO": {
+      "industry": "Servicios Ambientales",
+      "sector": "Industria"
+    },
+    "VMC": {
+      "industry": "Materiales de Construcción",
+      "sector": "Materiales"
+    },
+    "VNQ": {
+      "industry": "ETF REIT US",
+      "sector": "Bienes Raíces"
+    },
+    "VNQI": {
+      "industry": "ETF REIT Internacional",
+      "sector": "Bienes Raíces"
+    },
+    "VO": {
+      "industry": "ETF Mid Cap",
+      "sector": "Diversificado"
+    },
+    "VONG": {
+      "industry": "ETF Crecimiento Russell 1000",
+      "sector": "Diversificado"
+    },
+    "VOO": {
+      "industry": "ETF S&P 500",
+      "sector": "Diversificado"
+    },
+    "VOOV": {
+      "industry": "ETF Valor S&P 500",
+      "sector": "Diversificado"
+    },
+    "VOX": {
+      "industry": "ETF Comunicaciones",
+      "sector": "Comunicaciones"
+    },
+    "VPU": {
+      "industry": "ETF Servicios Básicos",
+      "sector": "Servicios Básicos"
+    },
+    "VRSK": {
+      "industry": "Consultoría",
+      "sector": "Industria"
+    },
+    "VRSN": {
+      "industry": "Servicios de Internet",
+      "sector": "Tecnología"
+    },
+    "VRT": {
+      "industry": "Componentes Eléctricos",
+      "sector": "Industria"
+    },
+    "VRTX": {
+      "industry": "Biotecnología",
+      "sector": "Salud"
+    },
+    "VST": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "VTEX": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "VTI": {
+      "industry": "ETF Mercado Total US",
+      "sector": "Diversificado"
+    },
+    "VTIP": {
+      "industry": "ETF Bonos Corto Plazo Inflación",
+      "sector": "Renta Fija"
+    },
+    "VTR": {
+      "industry": "REIT Salud",
+      "sector": "Bienes Raíces"
+    },
+    "VTRS": {
+      "industry": "Farmacéutica",
+      "sector": "Salud"
+    },
+    "VTV": {
+      "industry": "ETF Valor",
+      "sector": "Diversificado"
+    },
+    "VUG": {
+      "industry": "ETF Crecimiento",
+      "sector": "Diversificado"
+    },
+    "VWO": {
+      "industry": "ETF Mercados Emergentes",
+      "sector": "Diversificado"
+    },
+    "VXUS": {
+      "industry": "ETF Internacional Total",
+      "sector": "Diversificado"
+    },
+    "VYM": {
+      "industry": "ETF Alto Dividendo",
+      "sector": "Diversificado"
+    },
+    "VZ": {
+      "industry": "Telecomunicaciones",
+      "sector": "Comunicaciones"
+    },
+    "WAB": {
+      "industry": "Maquinaria de Construcción",
+      "sector": "Industria"
+    },
+    "WAT": {
+      "industry": "Ciencias de la Vida",
+      "sector": "Salud"
+    },
+    "WBD": {
+      "industry": "Radiodifusión",
+      "sector": "Comunicaciones"
+    },
+    "WCLD": {
+      "industry": "ETF Cloud Computing",
+      "sector": "Tecnología"
+    },
+    "WDAY": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "WDC": {
+      "industry": "Hardware y Periféricos",
+      "sector": "Tecnología"
+    },
+    "WEAT": {
+      "industry": "ETF Trigo",
+      "sector": "Commodities"
+    },
+    "WEC": {
+      "industry": "Electricidad",
+      "sector": "Servicios Básicos"
+    },
+    "WELL": {
+      "industry": "REIT Salud",
+      "sector": "Bienes Raíces"
+    },
+    "WFC": {
+      "industry": "Bancos Diversificados",
+      "sector": "Finanzas"
+    },
+    "WM": {
+      "industry": "Servicios Ambientales",
+      "sector": "Industria"
+    },
+    "WMB": {
+      "industry": "Almacenamiento de Petróleo y Gas",
+      "sector": "Energía"
+    },
+    "WMT": {
+      "industry": "Comercio de Consumo Básico",
+      "sector": "Consumo Básico"
+    },
+    "WRB": {
+      "industry": "Seguros de Propiedad",
+      "sector": "Finanzas"
+    },
+    "WSM": {
+      "industry": "Homefurnishing Retail",
+      "sector": "Consumo Discrecional"
+    },
+    "WST": {
+      "industry": "Suministros de Salud",
+      "sector": "Salud"
+    },
+    "WTW": {
+      "industry": "Corredores de Seguros",
+      "sector": "Finanzas"
+    },
+    "WY": {
+      "industry": "REIT Maderero",
+      "sector": "Bienes Raíces"
+    },
+    "WYNN": {
+      "industry": "Casinos y Juegos",
+      "sector": "Consumo Discrecional"
+    },
+    "XBI": {
+      "industry": "ETF Biotecnología",
+      "sector": "Salud"
+    },
+    "XEL": {
+      "industry": "Servicios Múltiples",
+      "sector": "Servicios Básicos"
+    },
+    "XLB": {
+      "industry": "ETF Materiales",
+      "sector": "Materiales"
+    },
+    "XLC": {
+      "industry": "ETF Comunicaciones",
+      "sector": "Comunicaciones"
+    },
+    "XLE": {
+      "industry": "ETF Energía",
+      "sector": "Energía"
+    },
+    "XLF": {
+      "industry": "ETF Financiero",
+      "sector": "Finanzas"
+    },
+    "XLI": {
+      "industry": "ETF Industrial",
+      "sector": "Industria"
+    },
+    "XLK": {
+      "industry": "ETF Tecnología",
+      "sector": "Tecnología"
+    },
+    "XLP": {
+      "industry": "ETF Consumo Básico",
+      "sector": "Consumo Básico"
+    },
+    "XLRE": {
+      "industry": "ETF Bienes Raíces",
+      "sector": "Bienes Raíces"
+    },
+    "XLU": {
+      "industry": "ETF Servicios Básicos",
+      "sector": "Servicios Básicos"
+    },
+    "XLV": {
+      "industry": "ETF Salud",
+      "sector": "Salud"
+    },
+    "XLY": {
+      "industry": "ETF Consumo Discrecional",
+      "sector": "Consumo Discrecional"
+    },
+    "XOM": {
+      "industry": "Petróleo y Gas Integrado",
+      "sector": "Energía"
+    },
+    "XOP": {
+      "industry": "ETF Exploración y Producción",
+      "sector": "Energía"
+    },
+    "XYL": {
+      "industry": "Maquinaria Industrial",
+      "sector": "Industria"
+    },
+    "XYZ": {
+      "industry": "Procesamiento de Pagos",
+      "sector": "Finanzas"
+    },
+    "YUM": {
+      "industry": "Restaurantes",
+      "sector": "Consumo Discrecional"
+    },
+    "ZBH": {
+      "industry": "Equipos de Salud",
+      "sector": "Salud"
+    },
+    "ZBRA": {
+      "industry": "Equipos Electrónicos",
+      "sector": "Tecnología"
+    },
+    "ZI": {
+      "industry": "Software de Aplicaciones",
+      "sector": "Tecnología"
+    },
+    "ZS": {
+      "industry": "Software de Sistemas",
+      "sector": "Tecnología"
+    },
+    "ZTS": {
+      "industry": "Farmacéutica",
+      "sector": "Salud"
+    }
+  }

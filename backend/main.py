@@ -1,0 +1,919 @@
+from __future__ import annotations
+
+import asyncio
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load backend/.env when uvicorn cwd is project root or backend/
+_env_file = Path(__file__).resolve().parent / ".env"
+if _env_file.is_file():
+    load_dotenv(_env_file)
+else:
+    load_dotenv()
+import json
+import logging
+from datetime import date, datetime, time, timedelta
+from typing import AsyncGenerator, Literal
+
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from sse_starlette.sse import EventSourceResponse
+from sqlalchemy import func, text
+from sqlalchemy.orm import Session
+
+from activity_service import distinct_transaction_tipos, monthly_movements, query_transactions
+from chart_goal_fondos import augment_chart_rows_with_fintual_goal_balance
+from database import Base, SessionLocal, engine, get_db
+from exchange_service import (
+    ensure_exchange_history,
+    get_latest_rate,
+    get_previous_rate,
+    get_rate_for_date,
+    store_today_rate,
+)
+from fintual_goals_dashboard import fetch_active_goal_cards
+from fintual_client import fintual_configured, get_asset_details
+from stock_assets import get_stock_display_from_db, upsert_stock_asset
+from history import (
+    cache_needs_sync,
+    ensure_cache,
+    full_recompute,
+    get_first_transaction_date,
+    get_last_cached_date,
+    get_last_trading_day,
+    get_tickers_from_transactions,
+    recompute_from_transaction_date,
+)
+from market_data import build_portfolio_history, get_current_prices
+from models import (
+    ExchangeRateHistory,
+    ManualAsset,
+    ManualAssetHistory,
+    PortfolioValueCache,
+    Transaction,
+    UnsupportedTicker,
+)
+from portfolio_metrics import (
+    get_open_tickers,
+    holdings_with_metrics,
+    market_price,
+    portfolio_summary,
+    sector_distribution,
+    sp500_change_pct,
+)
+from schemas import (
+    ChartRow,
+    DashboardInitialOut,
+    DistinctTiposOut,
+    ExchangeRateHistoryRow,
+    FintualGoalCardOut,
+    ExchangeRateOut,
+    HoldingOut,
+    ManualAssetCreate,
+    ManualAssetOut,
+    ManualSnapshotCreate,
+    MarketIndicatorsOut,
+    MonthlyMovementRow,
+    PortfolioOut,
+    SectorDistributionOut,
+    SectorSlice,
+    SyncStatus,
+    TransactionCreate,
+    TransactionListOut,
+    TransactionOut,
+    TransactionUpdate,
+)
+from stock_logos import ensure_logo, is_valid_ticker_for_logo
+from transaction_validation import validate_state_after_delete, validate_state_after_update
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def _exchange_rate_payload(db: Session) -> ExchangeRateOut:
+    row = db.query(ExchangeRateHistory).order_by(ExchangeRateHistory.date.desc()).first()
+    prev = get_previous_rate(db)
+    if not row:
+        r = get_latest_rate(db)
+        return ExchangeRateOut(rate=r or 950.0, updated_at=None, source=None, previous_rate=prev)
+    return ExchangeRateOut(
+        rate=float(row.usd_to_clp),
+        updated_at=row.updated_at,
+        source=row.source or None,
+        previous_rate=prev,
+    )
+
+
+def _migrate_db() -> None:
+    with engine.connect() as conn:
+        r = conn.execute(text("PRAGMA table_info(transactions)"))
+        cols = {row[1] for row in r.fetchall()}
+        if "categoria" not in cols:
+            conn.execute(text("ALTER TABLE transactions ADD COLUMN categoria VARCHAR(32) DEFAULT 'Acciones'"))
+        if "currency" not in cols:
+            conn.execute(text("ALTER TABLE transactions ADD COLUMN currency VARCHAR(8) DEFAULT 'USD'"))
+        if "nombre_activo" not in cols:
+            conn.execute(text("ALTER TABLE transactions ADD COLUMN nombre_activo TEXT"))
+        if "source" not in cols:
+            conn.execute(text("ALTER TABLE transactions ADD COLUMN source VARCHAR(16) DEFAULT 'manual'"))
+        if "external_id" not in cols:
+            conn.execute(text("ALTER TABLE transactions ADD COLUMN external_id VARCHAR(128)"))
+        if "occurred_at" not in cols:
+            conn.execute(text("ALTER TABLE transactions ADD COLUMN occurred_at DATETIME"))
+        conn.commit()
+
+    with engine.connect() as conn:
+        r = conn.execute(text("PRAGMA table_info(fintual_positions)"))
+        fcols = {row[1] for row in r.fetchall()}
+        if "sector" not in fcols:
+            conn.execute(text("ALTER TABLE fintual_positions ADD COLUMN sector TEXT"))
+        if "industry" not in fcols:
+            conn.execute(text("ALTER TABLE fintual_positions ADD COLUMN industry TEXT"))
+        conn.commit()
+
+    db_backfill = SessionLocal()
+    try:
+        from models import FintualPosition, StockAsset
+
+        for t in db_backfill.query(Transaction).filter(Transaction.occurred_at.is_(None)).all():
+            t.occurred_at = datetime.combine(t.fecha, time(12, 0, 0))
+
+        for p in db_backfill.query(FintualPosition).all():
+            if not p.name or not p.name.strip():
+                continue
+            sym_p = (p.symbol or "").strip().upper()
+            na_p = p.name.strip()
+            if na_p.upper() == sym_p:
+                continue
+            if db_backfill.query(StockAsset).filter(StockAsset.symbol == sym_p).first():
+                continue
+            upsert_stock_asset(db_backfill, sym_p, na_p, fintual_asset_id=p.fintual_asset_id)
+
+        for t in db_backfill.query(Transaction).filter(
+            Transaction.source == "fintual",
+            Transaction.categoria == "Acciones",
+        ).all():
+            sym = (t.activo or "").strip().upper()
+            if not sym:
+                continue
+            if db_backfill.query(StockAsset).filter(StockAsset.symbol == sym).first():
+                continue
+            na = (t.nombre_activo or "").strip()
+            if not na or na.upper() == sym:
+                continue
+            low = na.lower()
+            if low.startswith("dividend ") or low in (
+                "dividendo en efectivo",
+                "reinversión de dividendo",
+                "reinversion de dividendo",
+            ):
+                continue
+            if low.startswith("fintual ·"):
+                continue
+            upsert_stock_asset(db_backfill, sym, na)
+
+        db_backfill.commit()
+    finally:
+        db_backfill.close()
+
+
+app = FastAPI(title="Portfolio Tracker API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/stock-logos/{symbol}.png")
+def stock_logo_png(symbol: str) -> FileResponse:
+    """
+    Sirve el logo desde caché local (`backend/data/logos`). Si no existe, intenta descargarlo
+    (Fintual GCS → FMP → Clearbit); ver `stock_logos.py`.
+    """
+    sym = symbol.upper().strip()
+    if not is_valid_ticker_for_logo(sym):
+        raise HTTPException(status_code=404, detail="Invalid symbol")
+    path = ensure_logo(sym)
+    if path is None or not path.is_file():
+        raise HTTPException(status_code=404, detail="Logo not found")
+    return FileResponse(path, media_type="image/png")
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Lightweight probe — responds as soon as the process is accepting requests."""
+    return {"status": "ok"}
+
+
+def _seed_if_empty() -> None:
+    db = SessionLocal()
+    try:
+        n = db.query(func.count(Transaction.id)).scalar() or 0
+        if n == 0:
+            seed_txs = [
+                Transaction(
+                    fecha=date(2024, 2, 1),
+                    tipo="compra",
+                    activo="FONDO_BCH",
+                    acciones=1.0,
+                    precio_unitario=1_000_000.0,
+                    monto_total=1_000_000.0,
+                    categoria="Fondos",
+                    currency="CLP",
+                    nombre_activo="Fondo Banchile Acciones",
+                    occurred_at=datetime.combine(date(2024, 2, 1), time(12, 0, 0)),
+                ),
+                Transaction(
+                    fecha=date(2024, 5, 1),
+                    tipo="compra",
+                    activo="AFP_HAB",
+                    acciones=1.0,
+                    precio_unitario=500_000.0,
+                    monto_total=500_000.0,
+                    categoria="AFP",
+                    currency="CLP",
+                    nombre_activo="AFP Habitat Fondo A",
+                    occurred_at=datetime.combine(date(2024, 5, 1), time(12, 0, 0)),
+                ),
+                Transaction(
+                    fecha=date(2024, 8, 1),
+                    tipo="compra",
+                    activo="FONDO_BCH",
+                    acciones=1.0,
+                    precio_unitario=1_050_000.0,
+                    monto_total=1_050_000.0,
+                    categoria="Fondos",
+                    currency="CLP",
+                    nombre_activo="Fondo Banchile Acciones",
+                    occurred_at=datetime.combine(date(2024, 8, 1), time(12, 0, 0)),
+                ),
+            ]
+            for t in seed_txs:
+                db.add(t)
+
+            ma_bch = ManualAsset(
+                nombre="Fondo Banchile Acciones",
+                categoria="Fondos",
+                moneda="CLP",
+                descripcion="FONDO_BCH",
+            )
+            db.add(ma_bch)
+            ma_afp = ManualAsset(
+                nombre="AFP Habitat Fondo A",
+                categoria="AFP",
+                moneda="CLP",
+                descripcion="AFP_HAB",
+            )
+            db.add(ma_afp)
+            db.flush()
+            for fd, val in [
+                (date(2024, 2, 1), 1_000_000.0),
+                (date(2024, 6, 1), 1_120_000.0),
+                (date(2024, 12, 1), 1_300_000.0),
+            ]:
+                db.add(ManualAssetHistory(asset_id=ma_bch.id, fecha=fd, valor=val))
+            for fd, val in [
+                (date(2024, 5, 1), 500_000.0),
+                (date(2024, 9, 1), 540_000.0),
+                (date(2024, 12, 1), 580_000.0),
+            ]:
+                db.add(ManualAssetHistory(asset_id=ma_afp.id, fecha=fd, valor=val))
+
+            db.commit()
+            logger.info("Seed data inserted.")
+    finally:
+        db.close()
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    Base.metadata.create_all(bind=engine)
+    _migrate_db()
+    _seed_if_empty()
+
+
+def _period_start(period: str, last_day: date) -> date:
+    if period == "1M":
+        return last_day - timedelta(days=30)
+    if period == "3M":
+        return last_day - timedelta(days=90)
+    if period == "6M":
+        return last_day - timedelta(days=180)
+    if period == "1Y":
+        return last_day - timedelta(days=365)
+    if period == "3Y":
+        return last_day - timedelta(days=365 * 3)
+    if period == "YTD":
+        return date(last_day.year, 1, 1)
+    # ALL — caller clamps to first transaction
+    return date(1970, 1, 1)
+
+
+def _subsample_chart_rows(rows: list[ChartRow], period: str, max_points: int = 400) -> list[ChartRow]:
+    """Long windows: reduce points for the client (daily cache → sampled series)."""
+    if period not in ("3Y", "ALL") or len(rows) <= max_points:
+        return rows
+    n = len(rows)
+    indices = [int(round(i * (n - 1) / (max_points - 1))) for i in range(max_points)]
+    out: list[ChartRow] = []
+    prev = -1
+    for idx in indices:
+        if idx != prev:
+            out.append(rows[idx])
+            prev = idx
+    return out
+
+
+@app.get("/sync-status", response_model=SyncStatus)
+def sync_status(db: Session = Depends(get_db)) -> SyncStatus:
+    tickers = get_tickers_from_transactions(db)
+    lu = get_last_cached_date(db)
+    return SyncStatus(
+        needs_sync=cache_needs_sync(db),
+        last_updated=lu,
+        tickers=tickers,
+    )
+
+
+@app.delete("/unsupported-tickers")
+def clear_unsupported_tickers(
+    ticker: str | None = Query(None, description="If set, only remove this symbol; otherwise clear all flags."),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """
+    Remove Alpha Vantage 'unsupported' flags so live quotes are attempted again.
+    Use after rate limits mistakenly marked tickers, or to fix bad data.
+    """
+    if ticker:
+        sym = ticker.upper().strip()
+        row = db.query(UnsupportedTicker).filter(UnsupportedTicker.ticker == sym).first()
+        if not row:
+            return {"deleted": 0}
+        db.delete(row)
+        db.commit()
+        return {"deleted": 1}
+    rows = db.query(UnsupportedTicker).all()
+    n = len(rows)
+    for r in rows:
+        db.delete(r)
+    db.commit()
+    return {"deleted": n}
+
+
+async def _sse_sync(tickers: list[str], force: bool) -> AsyncGenerator[dict, None]:
+    n = max(len(tickers), 1)
+    yield {
+        "event": "message",
+        "data": json.dumps({"event": "batch_start", "total": n, "progress_pct": 0}),
+    }
+
+    db = SessionLocal()
+    try:
+        yield {
+            "event": "message",
+            "data": json.dumps(
+                {"event": "message", "message": "Sincronizando Fintual (posiciones, precios, movimientos)…", "progress_pct": 8},
+            ),
+        }
+        from market_data import sync_pipeline_prices_and_portfolio
+
+        await sync_pipeline_prices_and_portfolio(db, force)
+        yield {
+            "event": "message",
+            "data": json.dumps(
+                {
+                    "event": "computing",
+                    "message": "Calculando historial del portafolio…",
+                    "progress_pct": 90,
+                },
+            ),
+        }
+        await asyncio.to_thread(build_portfolio_history, "ALL")
+    finally:
+        db.close()
+
+    yield {
+        "event": "message",
+        "data": json.dumps({"status": "complete", "event": "complete", "progress_pct": 100}),
+    }
+
+
+@app.get("/sync")
+async def sync_stream(force: bool = Query(False)):
+    db = SessionLocal()
+    try:
+        tickers = list(dict.fromkeys(get_tickers_from_transactions(db)))
+    finally:
+        db.close()
+
+    async def gen():
+        async for ev in _sse_sync(tickers, force):
+            yield ev
+
+    return EventSourceResponse(gen())
+
+
+@app.get("/dashboard-initial", response_model=DashboardInitialOut)
+def dashboard_initial(db: Session = Depends(get_db)) -> DashboardInitialOut:
+    """Carga inicial: portafolio y holdings usando precios en cache (Fintual)."""
+    ensure_cache(db, force=False)
+    try:
+        ensure_exchange_history(db)
+    except Exception as e:
+        logger.warning("ensure_exchange_history: %s", e)
+    syms = get_open_tickers(db)
+    prices = asyncio.run(get_current_prices(db, syms)) if syms else {}
+    p = portfolio_summary(db, prices=prices)
+    rows = holdings_with_metrics(db, prices=prices)
+    slices_raw = sector_distribution(db, prices=prices)
+    holdings_out: list[HoldingOut] = []
+    for m in rows:
+        holdings_out.append(
+            HoldingOut(
+                ticker=m["ticker"],
+                nombre=m["nombre"],
+                total_shares=m["total_shares"],
+                avg_buy_price=m["avg_buy_price"],
+                capital_invertido=m["capital_invertido"],
+                capital_inicial_total=m["capital_inicial_total"],
+                current_price=m["current_price"],
+                current_value=m["current_value"],
+                ganancia_realizada=m["ganancia_realizada"],
+                ganancia_no_realizada=m["ganancia_no_realizada"],
+                dividendos=m["dividendos"],
+                ganancia_total=m["ganancia_total"],
+                rentabilidad_realizada_pct=m["rentabilidad_realizada_pct"],
+                rentabilidad_no_realizada_pct=m["rentabilidad_no_realizada_pct"],
+                rentabilidad_total_pct=m["rentabilidad_total_pct"],
+                peso_portafolio_pct=m["peso_portafolio_pct"],
+                sector=m.get("sector"),
+                price_unavailable=bool(m.get("price_unavailable")),
+                logo_url=m.get("logo_url"),
+            )
+        )
+    manual_out: list[ManualAssetOut] = []
+    for a in db.query(ManualAsset).order_by(ManualAsset.id).all():
+        h = (
+            db.query(ManualAssetHistory)
+            .filter(ManualAssetHistory.asset_id == a.id)
+            .order_by(ManualAssetHistory.fecha.desc())
+            .first()
+        )
+        manual_out.append(
+            ManualAssetOut(
+                id=a.id,
+                nombre=a.nombre,
+                categoria=a.categoria,
+                moneda=a.moneda,
+                descripcion=a.descripcion,
+                ultimo_valor=float(h.valor) if h else None,
+                ultima_fecha=h.fecha if h else None,
+            )
+        )
+    goal_cards = fetch_active_goal_cards(db)
+    goals_out = [FintualGoalCardOut(**x) for x in goal_cards]
+    return DashboardInitialOut(
+        portfolio=PortfolioOut(**p),
+        holdings=holdings_out,
+        sectors=SectorDistributionOut(slices=[SectorSlice(**s) for s in slices_raw]),
+        manual_assets=manual_out,
+        fintual_goals=goals_out,
+    )
+
+
+@app.get("/portfolio", response_model=PortfolioOut)
+def get_portfolio(db: Session = Depends(get_db)) -> PortfolioOut:
+    p = portfolio_summary(db)
+    return PortfolioOut(**p)
+
+
+@app.get("/holdings", response_model=list[HoldingOut])
+def get_holdings(db: Session = Depends(get_db)) -> list[HoldingOut]:
+    rows = holdings_with_metrics(db)
+    out: list[HoldingOut] = []
+    for m in rows:
+        out.append(
+            HoldingOut(
+                ticker=m["ticker"],
+                nombre=m["nombre"],
+                total_shares=m["total_shares"],
+                avg_buy_price=m["avg_buy_price"],
+                capital_invertido=m["capital_invertido"],
+                capital_inicial_total=m["capital_inicial_total"],
+                current_price=m["current_price"],
+                current_value=m["current_value"],
+                ganancia_realizada=m["ganancia_realizada"],
+                ganancia_no_realizada=m["ganancia_no_realizada"],
+                dividendos=m["dividendos"],
+                ganancia_total=m["ganancia_total"],
+                rentabilidad_realizada_pct=m["rentabilidad_realizada_pct"],
+                rentabilidad_no_realizada_pct=m["rentabilidad_no_realizada_pct"],
+                rentabilidad_total_pct=m["rentabilidad_total_pct"],
+                peso_portafolio_pct=m["peso_portafolio_pct"],
+                sector=m.get("sector"),
+                price_unavailable=bool(m.get("price_unavailable")),
+                logo_url=m.get("logo_url"),
+            )
+        )
+    return out
+
+
+@app.get("/chart-data", response_model=list[ChartRow])
+def chart_data(
+    period: Literal["1M", "3M", "6M", "1Y", "3Y", "YTD", "ALL"] = "ALL",
+    db: Session = Depends(get_db),
+) -> list[ChartRow]:
+    ensure_cache(db, force=False)
+    last_day = get_last_cached_date(db) or get_last_trading_day()
+    first_tx = get_first_transaction_date(db)
+    start = _period_start(period, last_day)
+    if period == "ALL" and first_tx is not None:
+        start = first_tx
+    elif first_tx is not None:
+        start = max(start, first_tx)
+
+    rows = (
+        db.query(PortfolioValueCache)
+        .filter(PortfolioValueCache.fecha >= start, PortfolioValueCache.fecha <= last_day)
+        .order_by(PortfolioValueCache.fecha)
+        .all()
+    )
+    by_date: dict[date, dict[str, PortfolioValueCache]] = {}
+    for r in rows:
+        by_date.setdefault(r.fecha, {})[r.categoria] = r
+    out: list[ChartRow] = []
+    for d in sorted(by_date.keys()):
+        m = by_date[d]
+        acc = m.get("acciones")
+        fondos = m.get("fondos")
+        afp = m.get("afp")
+        man = m.get("manuales")
+        tot = m.get("total")
+        tv = tot.valor if tot else 0.0
+        ti = tot.invertido if tot else 0.0
+        rate = float(get_rate_for_date(db, d))
+        if rate <= 0:
+            rate = 950.0
+        out.append(
+            ChartRow(
+                date=d,
+                acciones_valor=acc.valor if acc else 0.0,
+                acciones_invertido=acc.invertido if acc else 0.0,
+                fondos_valor=fondos.valor if fondos else 0.0,
+                fondos_invertido=fondos.invertido if fondos else 0.0,
+                afp_valor=afp.valor if afp else 0.0,
+                afp_invertido=afp.invertido if afp else 0.0,
+                manuales_valor=man.valor if man else 0.0,
+                total_valor=tv,
+                total_invertido=ti,
+                total_valor_clp=tv * rate,
+                total_invertido_clp=ti * rate,
+                fx_usd_clp=rate,
+            )
+        )
+    out = augment_chart_rows_with_fintual_goal_balance(db, out)
+    return _subsample_chart_rows(out, period)
+
+
+@app.get("/market-price/{ticker}")
+def get_market_price(ticker: str, db: Session = Depends(get_db)) -> dict[str, float | None]:
+    px = market_price(db, ticker.upper())
+    return {"ticker": ticker.upper(), "price": px}
+
+
+@app.get("/stocks/{symbol}/display")
+def stock_display_name(symbol: str, db: Session = Depends(get_db)) -> dict[str, str | None]:
+    """Nombre legible del activo: primero tabla local `stock_assets` (rellenada en sync), luego Fintual una vez."""
+    sym = symbol.strip().upper()
+    if not sym:
+        raise HTTPException(status_code=400, detail="symbol required")
+    cached = get_stock_display_from_db(db, sym)
+    if cached:
+        return cached
+    if not fintual_configured():
+        return {"symbol": sym, "name": None}
+    try:
+        d = get_asset_details(sym)
+        name = (d.get("name") or "").strip() or None
+        if name and name.upper() == sym:
+            name = None
+        out_sym = d.get("symbol") or sym
+        if isinstance(out_sym, str):
+            out_sym = out_sym.strip().upper()
+        else:
+            out_sym = sym
+        if name:
+            upsert_stock_asset(db, out_sym, name, fintual_asset_id=str(d.get("id") or "") or None)
+            db.commit()
+        return {"symbol": out_sym, "name": name}
+    except Exception:
+        logger.exception("stock_display_name failed for %s", sym)
+        return {"symbol": sym, "name": None}
+
+
+@app.get("/sector-distribution", response_model=SectorDistributionOut)
+def get_sector_distribution(db: Session = Depends(get_db)) -> SectorDistributionOut:
+    slices = [SectorSlice(**s) for s in sector_distribution(db)]
+    return SectorDistributionOut(slices=slices)
+
+
+@app.get("/transactions", response_model=TransactionListOut)
+def list_transactions(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=10_000),
+    tipo: str | None = Query(None),
+    categoria: str | None = Query(None),
+    currency: str | None = Query(None),
+    q: str | None = Query(None),
+    activo_exact: str | None = Query(
+        None,
+        description="Símbolo del activo (coincidencia exacta, p. ej. historial por ticker)",
+    ),
+    db: Session = Depends(get_db),
+) -> TransactionListOut:
+    rows, total = query_transactions(
+        db,
+        page=page,
+        page_size=page_size,
+        tipo=tipo,
+        categoria=categoria,
+        currency=currency,
+        q=q,
+        activo_exact=activo_exact,
+    )
+    items: list[TransactionOut] = []
+    for r in rows:
+        rd = dict(r)
+        rd.pop("_src", None)
+        if "source" not in rd:
+            rd["source"] = None
+        items.append(TransactionOut.model_validate(rd))
+    return TransactionListOut(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@app.get("/transactions/distinct-tipos", response_model=DistinctTiposOut)
+def list_distinct_transaction_tipos(
+    categoria: str | None = Query(None),
+    currency: str | None = Query(None),
+    q: str | None = Query(None),
+    db: Session = Depends(get_db),
+) -> DistinctTiposOut:
+    tipos = distinct_transaction_tipos(db, categoria=categoria, currency=currency, q=q)
+    return DistinctTiposOut(tipos=tipos)
+
+
+@app.get("/exchange-rate", response_model=ExchangeRateOut)
+def get_exchange_rate(db: Session = Depends(get_db)) -> ExchangeRateOut:
+    return _exchange_rate_payload(db)
+
+
+@app.post("/exchange-rate/refresh", response_model=ExchangeRateOut)
+def post_exchange_rate_refresh(db: Session = Depends(get_db)) -> ExchangeRateOut:
+    try:
+        store_today_rate(db)
+    except Exception as e:
+        logger.warning("exchange-rate/refresh: %s", e)
+    return _exchange_rate_payload(db)
+
+
+@app.get("/exchange-rate/history", response_model=list[ExchangeRateHistoryRow])
+def exchange_rate_history(db: Session = Depends(get_db)) -> list[ExchangeRateHistoryRow]:
+    rows = db.query(ExchangeRateHistory).order_by(ExchangeRateHistory.date.asc()).all()
+    return [
+        ExchangeRateHistoryRow(date=r.date, rate=float(r.usd_to_clp), source=r.source or "")
+        for r in rows
+    ]
+
+
+@app.get("/activity/monthly-movements", response_model=list[MonthlyMovementRow])
+def activity_monthly_movements(
+    currency: Literal["USD", "CLP", "all"] = "USD",
+    scope: Literal["wallet", "stocks", "all", "fondos"] = Query(
+        "stocks",
+        description="wallet: billetera USD; stocks: compras/ventas acciones US; all: consolidado; fondos: depósitos/retiros CLP (metas Fintual)",
+    ),
+    db: Session = Depends(get_db),
+) -> list[MonthlyMovementRow]:
+    raw = monthly_movements(db, currency, scope)
+    return [MonthlyMovementRow(**row) for row in raw]
+
+
+@app.get("/market-indicators", response_model=MarketIndicatorsOut)
+def market_indicators(db: Session = Depends(get_db)) -> MarketIndicatorsOut:
+    return MarketIndicatorsOut(sp500_change_pct=sp500_change_pct(db))
+
+
+def _bg_recompute(fecha: date) -> None:
+    db = SessionLocal()
+    try:
+
+        async def _refresh() -> None:
+            from market_data import sync_pipeline_prices_and_portfolio
+
+            await sync_pipeline_prices_and_portfolio(db, False)
+
+        asyncio.run(_refresh())
+        recompute_from_transaction_date(db, fecha)
+    finally:
+        db.close()
+
+
+def _bg_full_recompute() -> None:
+    db = SessionLocal()
+    try:
+        full_recompute(db)
+    finally:
+        db.close()
+
+
+@app.post("/transactions", response_model=TransactionOut)
+def create_transaction(
+    body: TransactionCreate,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> TransactionOut:
+    if (body.categoria or "Acciones") == "Acciones":
+        raise HTTPException(
+            status_code=400,
+            detail="Las acciones US se sincronizan desde Fintual. Solo podés registrar Fondos o AFP manualmente.",
+        )
+    sym = body.activo.upper().strip()
+
+    row = Transaction(
+        fecha=body.fecha,
+        tipo=body.tipo,
+        activo=sym,
+        acciones=body.acciones,
+        precio_unitario=body.precio_unitario,
+        monto_total=body.monto_total,
+        categoria=body.categoria,
+        currency=body.currency,
+        nombre_activo=body.nombre_activo,
+        source="manual",
+        occurred_at=datetime.combine(body.fecha, time(12, 0, 0)),
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    background.add_task(_bg_recompute, row.fecha)
+    return row
+
+
+@app.put("/transactions/{tx_id}", response_model=TransactionOut)
+def update_transaction(
+    tx_id: int,
+    body: TransactionUpdate,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> TransactionOut:
+    old = db.query(Transaction).filter(Transaction.id == tx_id).first()
+    if not old:
+        raise HTTPException(status_code=404, detail="Transacción no encontrada")
+    if getattr(old, "source", None) == "fintual" or (old.categoria or "Acciones") == "Acciones":
+        raise HTTPException(status_code=400, detail="No se pueden editar movimientos de acciones (Fintual).")
+    if (body.categoria or "Acciones") == "Acciones":
+        raise HTTPException(status_code=400, detail="No se pueden registrar acciones manualmente.")
+
+    validate_state_after_update(db, tx_id, body)
+
+    prev_fecha = old.fecha
+    sym = body.activo.upper().strip()
+    old.fecha = body.fecha
+    old.tipo = body.tipo
+    old.activo = sym
+    old.acciones = body.acciones
+    old.precio_unitario = body.precio_unitario
+    old.monto_total = body.monto_total
+    old.categoria = body.categoria
+    old.currency = body.currency
+    old.nombre_activo = body.nombre_activo
+    old.occurred_at = datetime.combine(body.fecha, time(12, 0, 0))
+    db.commit()
+    db.refresh(old)
+
+    background.add_task(_bg_recompute, min(prev_fecha, body.fecha))
+    return old
+
+
+@app.delete("/transactions/{tx_id}")
+def delete_transaction(
+    tx_id: int,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    old = db.query(Transaction).filter(Transaction.id == tx_id).first()
+    if not old:
+        raise HTTPException(status_code=404, detail="Transacción no encontrada")
+    if getattr(old, "source", None) == "fintual" or (old.categoria or "Acciones") == "Acciones":
+        raise HTTPException(status_code=400, detail="No se pueden eliminar movimientos de acciones (Fintual).")
+
+    validate_state_after_delete(db, tx_id)
+
+    fecha = old.fecha
+    db.delete(old)
+    db.commit()
+    background.add_task(_bg_recompute, fecha)
+    return {"status": "ok"}
+
+
+@app.get("/manual-assets", response_model=list[ManualAssetOut])
+def list_manual_assets(db: Session = Depends(get_db)) -> list[ManualAssetOut]:
+    assets = db.query(ManualAsset).order_by(ManualAsset.id).all()
+    out: list[ManualAssetOut] = []
+    for a in assets:
+        h = (
+            db.query(ManualAssetHistory)
+            .filter(ManualAssetHistory.asset_id == a.id)
+            .order_by(ManualAssetHistory.fecha.desc())
+            .first()
+        )
+        out.append(
+            ManualAssetOut(
+                id=a.id,
+                nombre=a.nombre,
+                categoria=a.categoria,
+                moneda=a.moneda,
+                descripcion=a.descripcion,
+                ultimo_valor=float(h.valor) if h else None,
+                ultima_fecha=h.fecha if h else None,
+            )
+        )
+    return out
+
+
+@app.post("/manual-assets", response_model=ManualAssetOut)
+def create_manual_asset(body: ManualAssetCreate, db: Session = Depends(get_db)) -> ManualAssetOut:
+    a = ManualAsset(
+        nombre=body.nombre,
+        categoria=body.categoria,
+        moneda=body.moneda,
+        descripcion=body.descripcion,
+    )
+    db.add(a)
+    db.commit()
+    db.refresh(a)
+    return ManualAssetOut(
+        id=a.id,
+        nombre=a.nombre,
+        categoria=a.categoria,
+        moneda=a.moneda,
+        descripcion=a.descripcion,
+        ultimo_valor=None,
+        ultima_fecha=None,
+    )
+
+
+@app.post("/manual-assets/{asset_id}/snapshot", response_model=ManualAssetOut)
+def add_snapshot(
+    asset_id: int,
+    body: ManualSnapshotCreate,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> ManualAssetOut:
+    a = db.query(ManualAsset).filter(ManualAsset.id == asset_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Activo no encontrado")
+    db.add(ManualAssetHistory(asset_id=a.id, fecha=body.fecha, valor=body.valor))
+    db.commit()
+    background.add_task(_bg_recompute, body.fecha)
+    h = (
+        db.query(ManualAssetHistory)
+        .filter(ManualAssetHistory.asset_id == a.id)
+        .order_by(ManualAssetHistory.fecha.desc())
+        .first()
+    )
+    return ManualAssetOut(
+        id=a.id,
+        nombre=a.nombre,
+        categoria=a.categoria,
+        moneda=a.moneda,
+        descripcion=a.descripcion,
+        ultimo_valor=float(h.valor) if h else None,
+        ultima_fecha=h.fecha if h else None,
+    )
+
+
+@app.delete("/manual-assets/{asset_id}")
+def delete_manual_asset(
+    asset_id: int,
+    background: BackgroundTasks,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    a = db.query(ManualAsset).filter(ManualAsset.id == asset_id).first()
+    if not a:
+        raise HTTPException(status_code=404, detail="Activo no encontrado")
+    db.delete(a)
+    db.commit()
+    background.add_task(_bg_full_recompute)
+    return {"status": "ok"}
+
