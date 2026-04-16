@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
+import json
+
 from dotenv import load_dotenv
 
 # Load backend/.env when uvicorn cwd is project root or backend/
@@ -11,12 +13,11 @@ if _env_file.is_file():
     load_dotenv(_env_file)
 else:
     load_dotenv()
-import json
 import logging
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from typing import AsyncGenerator, Literal
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sse_starlette.sse import EventSourceResponse
@@ -25,6 +26,18 @@ from sqlalchemy.orm import Session
 
 from activity_service import distinct_transaction_tipos, monthly_movements, query_transactions
 from chart_goal_fondos import augment_chart_rows_with_fintual_goal_balance
+from auth import (
+    SERVICE_INVESTMENTS,
+    CurrentUser,
+    InvestmentsUser,
+    InvestmentsUserSSE,
+    create_access_token,
+    default_services,
+    get_user_by_email,
+    hash_password,
+    user_services,
+    verify_password,
+)
 from database import Base, SessionLocal, engine, get_db
 from exchange_service import (
     ensure_exchange_history,
@@ -34,7 +47,7 @@ from exchange_service import (
     store_today_rate,
 )
 from fintual_goals_dashboard import fetch_active_goal_cards
-from fintual_client import fintual_configured, get_asset_details
+from fintual_client import fintual_configured, get_asset_details, use_fintual_credentials
 from stock_assets import get_stock_display_from_db, upsert_stock_asset
 from history import (
     cache_needs_sync,
@@ -54,7 +67,9 @@ from models import (
     PortfolioValueCache,
     Transaction,
     UnsupportedTicker,
+    User,
 )
+from multiuser_migration import run_multiuser_migration
 from portfolio_metrics import (
     get_open_tickers,
     holdings_with_metrics,
@@ -67,6 +82,7 @@ from schemas import (
     ChartRow,
     DashboardInitialOut,
     DistinctTiposOut,
+    FintualCredentialsIn,
     ExchangeRateHistoryRow,
     FintualGoalCardOut,
     ExchangeRateOut,
@@ -80,16 +96,48 @@ from schemas import (
     SectorDistributionOut,
     SectorSlice,
     SyncStatus,
+    TokenOut,
     TransactionCreate,
     TransactionListOut,
     TransactionOut,
     TransactionUpdate,
+    UserLogin,
+    UserOut,
+    PasswordChange,
+    UserProfilePatch,
+    UserRegister,
 )
 from stock_logos import ensure_logo, is_valid_ticker_for_logo
 from transaction_validation import validate_state_after_delete, validate_state_after_update
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _fintual_needs_setup(user: User) -> bool:
+    """Modal de conexión / reconexión Fintual."""
+    if not user_services(user).get(SERVICE_INVESTMENTS, False):
+        return False
+    if getattr(user, "fintual_reconnect_required", False):
+        return True
+    if (user.fintual_session or "").strip():
+        return False
+    return True
+
+
+def _user_out(user: User) -> UserOut:
+    recon = bool(getattr(user, "fintual_reconnect_required", False))
+    fs = (user.fintual_session or "").strip()
+    fu = (user.fintual_uid or "").strip()
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        services=user_services(user),
+        fintual_needs_setup=_fintual_needs_setup(user),
+        fintual_reconnect_required=recon,
+        fintual_session_cookie=fs or None,
+        fintual_uid=fu or None,
+    )
 
 
 def _exchange_rate_payload(db: Session) -> ExchangeRateOut:
@@ -133,6 +181,9 @@ def _migrate_db() -> None:
             conn.execute(text("ALTER TABLE fintual_positions ADD COLUMN industry TEXT"))
         conn.commit()
 
+
+def _migrate_db_backfill() -> None:
+    """Tras `user_id` en tablas: rellena occurred_at y stock_assets (requiere migración multiusuario)."""
     db_backfill = SessionLocal()
     try:
         from models import FintualPosition, StockAsset
@@ -210,6 +261,82 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.post("/auth/register", response_model=TokenOut)
+def auth_register(body: UserRegister, db: Session = Depends(get_db)) -> TokenOut:
+    email = body.email.strip().lower()
+    if get_user_by_email(db, email):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email ya registrado")
+    u = User(
+        email=email,
+        password_hash=hash_password(body.password),
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        services_json=json.dumps(default_services()),
+    )
+    db.add(u)
+    db.commit()
+    db.refresh(u)
+    return TokenOut(access_token=create_access_token(user_id=u.id, email=u.email))
+
+
+@app.post("/auth/login", response_model=TokenOut)
+def auth_login(body: UserLogin, db: Session = Depends(get_db)) -> TokenOut:
+    u = get_user_by_email(db, body.email.strip().lower())
+    if not u or not verify_password(body.password, u.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
+    return TokenOut(access_token=create_access_token(user_id=u.id, email=u.email))
+
+
+@app.get("/auth/me", response_model=UserOut)
+def auth_me(user: CurrentUser) -> UserOut:
+    return _user_out(user)
+
+
+@app.patch("/auth/me", response_model=UserOut)
+def auth_patch_me(
+    body: UserProfilePatch,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> UserOut:
+    svc = user_services(user)
+    if body.investments is not None:
+        svc[SERVICE_INVESTMENTS] = body.investments
+    user.services_json = json.dumps(svc)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return _user_out(user)
+
+
+@app.patch("/auth/me/fintual", response_model=UserOut)
+def auth_patch_fintual(
+    body: FintualCredentialsIn,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> UserOut:
+    user.fintual_session = body.session_cookie.strip()
+    uid = (body.uid or "").strip()
+    user.fintual_uid = uid if uid else None
+    user.fintual_reconnect_required = False
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return _user_out(user)
+
+
+@app.post("/auth/change-password")
+def auth_change_password(
+    body: PasswordChange,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    if not verify_password(body.current_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La contraseña actual no es correcta")
+    user.password_hash = hash_password(body.new_password)
+    db.add(user)
+    db.commit()
+    return {"status": "ok"}
+
+
 def _seed_if_empty() -> None:
     db = SessionLocal()
     try:
@@ -217,6 +344,7 @@ def _seed_if_empty() -> None:
         if n == 0:
             seed_txs = [
                 Transaction(
+                    user_id=1,
                     fecha=date(2024, 2, 1),
                     tipo="compra",
                     activo="FONDO_BCH",
@@ -229,6 +357,7 @@ def _seed_if_empty() -> None:
                     occurred_at=datetime.combine(date(2024, 2, 1), time(12, 0, 0)),
                 ),
                 Transaction(
+                    user_id=1,
                     fecha=date(2024, 5, 1),
                     tipo="compra",
                     activo="AFP_HAB",
@@ -241,6 +370,7 @@ def _seed_if_empty() -> None:
                     occurred_at=datetime.combine(date(2024, 5, 1), time(12, 0, 0)),
                 ),
                 Transaction(
+                    user_id=1,
                     fecha=date(2024, 8, 1),
                     tipo="compra",
                     activo="FONDO_BCH",
@@ -257,6 +387,7 @@ def _seed_if_empty() -> None:
                 db.add(t)
 
             ma_bch = ManualAsset(
+                user_id=1,
                 nombre="Fondo Banchile Acciones",
                 categoria="Fondos",
                 moneda="CLP",
@@ -264,6 +395,7 @@ def _seed_if_empty() -> None:
             )
             db.add(ma_bch)
             ma_afp = ManualAsset(
+                user_id=1,
                 nombre="AFP Habitat Fondo A",
                 categoria="AFP",
                 moneda="CLP",
@@ -294,6 +426,8 @@ def _seed_if_empty() -> None:
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
     _migrate_db()
+    run_multiuser_migration(engine)
+    _migrate_db_backfill()
     _seed_if_empty()
 
 
@@ -330,11 +464,12 @@ def _subsample_chart_rows(rows: list[ChartRow], period: str, max_points: int = 4
 
 
 @app.get("/sync-status", response_model=SyncStatus)
-def sync_status(db: Session = Depends(get_db)) -> SyncStatus:
-    tickers = get_tickers_from_transactions(db)
-    lu = get_last_cached_date(db)
+def sync_status(user: InvestmentsUser, db: Session = Depends(get_db)) -> SyncStatus:
+    uid = user.id
+    tickers = get_tickers_from_transactions(db, uid)
+    lu = get_last_cached_date(db, uid)
     return SyncStatus(
-        needs_sync=cache_needs_sync(db),
+        needs_sync=cache_needs_sync(db, uid),
         last_updated=lu,
         tickers=tickers,
     )
@@ -342,6 +477,7 @@ def sync_status(db: Session = Depends(get_db)) -> SyncStatus:
 
 @app.delete("/unsupported-tickers")
 def clear_unsupported_tickers(
+    user: InvestmentsUser,
     ticker: str | None = Query(None, description="If set, only remove this symbol; otherwise clear all flags."),
     db: Session = Depends(get_db),
 ) -> dict[str, int]:
@@ -365,7 +501,7 @@ def clear_unsupported_tickers(
     return {"deleted": n}
 
 
-async def _sse_sync(tickers: list[str], force: bool) -> AsyncGenerator[dict, None]:
+async def _sse_sync(user: User, tickers: list[str], force: bool) -> AsyncGenerator[dict, None]:
     n = max(len(tickers), 1)
     yield {
         "event": "message",
@@ -380,20 +516,43 @@ async def _sse_sync(tickers: list[str], force: bool) -> AsyncGenerator[dict, Non
                 {"event": "message", "message": "Sincronizando Fintual (posiciones, precios, movimientos)…", "progress_pct": 8},
             ),
         }
+        from fintual_auth_state import is_likely_fintual_auth_error
         from market_data import sync_pipeline_prices_and_portfolio
 
-        await sync_pipeline_prices_and_portfolio(db, force)
-        yield {
-            "event": "message",
-            "data": json.dumps(
-                {
-                    "event": "computing",
-                    "message": "Calculando historial del portafolio…",
-                    "progress_pct": 90,
-                },
-            ),
-        }
-        await asyncio.to_thread(build_portfolio_history, "ALL")
+        try:
+            with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+                await sync_pipeline_prices_and_portfolio(db, force, user.id)
+            yield {
+                "event": "message",
+                "data": json.dumps(
+                    {
+                        "event": "computing",
+                        "message": "Calculando historial del portafolio…",
+                        "progress_pct": 90,
+                    },
+                ),
+            }
+            uid_local = user.id
+            await asyncio.to_thread(build_portfolio_history, "ALL", uid_local)
+        except Exception as e:
+            logger.exception("SSE sync falló")
+            auth_fail = is_likely_fintual_auth_error(e)
+            msg = (
+                "Tu sesión con Fintual expiró o dejó de ser válida. Volvé a pegar la cookie en el panel de conexión."
+                if auth_fail
+                else "No se pudo completar la sincronización. Reintentá más tarde."
+            )
+            yield {
+                "event": "message",
+                "data": json.dumps(
+                    {
+                        "status": "fintual_auth_error" if auth_fail else "sync_error",
+                        "message": msg,
+                        "progress_pct": 0,
+                    },
+                ),
+            }
+            return
     finally:
         db.close()
 
@@ -404,33 +563,39 @@ async def _sse_sync(tickers: list[str], force: bool) -> AsyncGenerator[dict, Non
 
 
 @app.get("/sync")
-async def sync_stream(force: bool = Query(False)):
+async def sync_stream(
+    user: InvestmentsUserSSE,
+    force: bool = Query(False),
+):
     db = SessionLocal()
     try:
-        tickers = list(dict.fromkeys(get_tickers_from_transactions(db)))
+        tickers = list(dict.fromkeys(get_tickers_from_transactions(db, user.id)))
     finally:
         db.close()
 
     async def gen():
-        async for ev in _sse_sync(tickers, force):
+        async for ev in _sse_sync(user, tickers, force):
             yield ev
 
     return EventSourceResponse(gen())
 
 
 @app.get("/dashboard-initial", response_model=DashboardInitialOut)
-def dashboard_initial(db: Session = Depends(get_db)) -> DashboardInitialOut:
+def dashboard_initial(user: InvestmentsUser, db: Session = Depends(get_db)) -> DashboardInitialOut:
     """Carga inicial: portafolio y holdings usando precios en cache (Fintual)."""
-    ensure_cache(db, force=False)
+    uid = user.id
+    with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+        ensure_cache(db, uid, force=False)
     try:
-        ensure_exchange_history(db)
+        ensure_exchange_history(db, uid)
     except Exception as e:
         logger.warning("ensure_exchange_history: %s", e)
-    syms = get_open_tickers(db)
-    prices = asyncio.run(get_current_prices(db, syms)) if syms else {}
-    p = portfolio_summary(db, prices=prices)
-    rows = holdings_with_metrics(db, prices=prices)
-    slices_raw = sector_distribution(db, prices=prices)
+    with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+        syms = get_open_tickers(db, uid)
+        prices = asyncio.run(get_current_prices(db, syms, user_id=uid)) if syms else {}
+        p = portfolio_summary(db, uid, prices=prices)
+        rows = holdings_with_metrics(db, uid, prices=prices)
+        slices_raw = sector_distribution(db, uid, prices=prices)
     holdings_out: list[HoldingOut] = []
     for m in rows:
         holdings_out.append(
@@ -457,7 +622,7 @@ def dashboard_initial(db: Session = Depends(get_db)) -> DashboardInitialOut:
             )
         )
     manual_out: list[ManualAssetOut] = []
-    for a in db.query(ManualAsset).order_by(ManualAsset.id).all():
+    for a in db.query(ManualAsset).filter(ManualAsset.user_id == uid).order_by(ManualAsset.id).all():
         h = (
             db.query(ManualAssetHistory)
             .filter(ManualAssetHistory.asset_id == a.id)
@@ -475,7 +640,8 @@ def dashboard_initial(db: Session = Depends(get_db)) -> DashboardInitialOut:
                 ultima_fecha=h.fecha if h else None,
             )
         )
-    goal_cards = fetch_active_goal_cards(db)
+    with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+        goal_cards = fetch_active_goal_cards(db, user_id=uid)
     goals_out = [FintualGoalCardOut(**x) for x in goal_cards]
     return DashboardInitialOut(
         portfolio=PortfolioOut(**p),
@@ -487,14 +653,16 @@ def dashboard_initial(db: Session = Depends(get_db)) -> DashboardInitialOut:
 
 
 @app.get("/portfolio", response_model=PortfolioOut)
-def get_portfolio(db: Session = Depends(get_db)) -> PortfolioOut:
-    p = portfolio_summary(db)
+def get_portfolio(user: InvestmentsUser, db: Session = Depends(get_db)) -> PortfolioOut:
+    with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+        p = portfolio_summary(db, user.id)
     return PortfolioOut(**p)
 
 
 @app.get("/holdings", response_model=list[HoldingOut])
-def get_holdings(db: Session = Depends(get_db)) -> list[HoldingOut]:
-    rows = holdings_with_metrics(db)
+def get_holdings(user: InvestmentsUser, db: Session = Depends(get_db)) -> list[HoldingOut]:
+    with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+        rows = holdings_with_metrics(db, user.id)
     out: list[HoldingOut] = []
     for m in rows:
         out.append(
@@ -525,12 +693,14 @@ def get_holdings(db: Session = Depends(get_db)) -> list[HoldingOut]:
 
 @app.get("/chart-data", response_model=list[ChartRow])
 def chart_data(
+    user: InvestmentsUser,
     period: Literal["1M", "3M", "6M", "1Y", "3Y", "YTD", "ALL"] = "ALL",
     db: Session = Depends(get_db),
 ) -> list[ChartRow]:
-    ensure_cache(db, force=False)
-    last_day = get_last_cached_date(db) or get_last_trading_day()
-    first_tx = get_first_transaction_date(db)
+    uid = user.id
+    ensure_cache(db, uid, force=False)
+    last_day = get_last_cached_date(db, uid) or get_last_trading_day()
+    first_tx = get_first_transaction_date(db, uid)
     start = _period_start(period, last_day)
     if period == "ALL" and first_tx is not None:
         start = first_tx
@@ -539,7 +709,11 @@ def chart_data(
 
     rows = (
         db.query(PortfolioValueCache)
-        .filter(PortfolioValueCache.fecha >= start, PortfolioValueCache.fecha <= last_day)
+        .filter(
+            PortfolioValueCache.user_id == uid,
+            PortfolioValueCache.fecha >= start,
+            PortfolioValueCache.fecha <= last_day,
+        )
         .order_by(PortfolioValueCache.fecha)
         .all()
     )
@@ -576,18 +750,24 @@ def chart_data(
                 fx_usd_clp=rate,
             )
         )
-    out = augment_chart_rows_with_fintual_goal_balance(db, out)
+    with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+        out = augment_chart_rows_with_fintual_goal_balance(db, out, uid)
     return _subsample_chart_rows(out, period)
 
 
 @app.get("/market-price/{ticker}")
-def get_market_price(ticker: str, db: Session = Depends(get_db)) -> dict[str, float | None]:
-    px = market_price(db, ticker.upper())
+def get_market_price(
+    ticker: str, user: InvestmentsUser, db: Session = Depends(get_db)
+) -> dict[str, float | None]:
+    with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+        px = market_price(db, ticker.upper(), user.id)
     return {"ticker": ticker.upper(), "price": px}
 
 
 @app.get("/stocks/{symbol}/display")
-def stock_display_name(symbol: str, db: Session = Depends(get_db)) -> dict[str, str | None]:
+def stock_display_name(
+    symbol: str, user: InvestmentsUser, db: Session = Depends(get_db)
+) -> dict[str, str | None]:
     """Nombre legible del activo: primero tabla local `stock_assets` (rellenada en sync), luego Fintual una vez."""
     sym = symbol.strip().upper()
     if not sym:
@@ -595,10 +775,13 @@ def stock_display_name(symbol: str, db: Session = Depends(get_db)) -> dict[str, 
     cached = get_stock_display_from_db(db, sym)
     if cached:
         return cached
-    if not fintual_configured():
+    with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+        configured = fintual_configured()
+    if not configured:
         return {"symbol": sym, "name": None}
     try:
-        d = get_asset_details(sym)
+        with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+            d = get_asset_details(sym)
         name = (d.get("name") or "").strip() or None
         if name and name.upper() == sym:
             name = None
@@ -617,13 +800,15 @@ def stock_display_name(symbol: str, db: Session = Depends(get_db)) -> dict[str, 
 
 
 @app.get("/sector-distribution", response_model=SectorDistributionOut)
-def get_sector_distribution(db: Session = Depends(get_db)) -> SectorDistributionOut:
-    slices = [SectorSlice(**s) for s in sector_distribution(db)]
+def get_sector_distribution(user: InvestmentsUser, db: Session = Depends(get_db)) -> SectorDistributionOut:
+    with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+        slices = [SectorSlice(**s) for s in sector_distribution(db, user.id)]
     return SectorDistributionOut(slices=slices)
 
 
 @app.get("/transactions", response_model=TransactionListOut)
 def list_transactions(
+    user: InvestmentsUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=10_000),
     tipo: str | None = Query(None),
@@ -638,6 +823,7 @@ def list_transactions(
 ) -> TransactionListOut:
     rows, total = query_transactions(
         db,
+        user.id,
         page=page,
         page_size=page_size,
         tipo=tipo,
@@ -663,12 +849,15 @@ def list_transactions(
 
 @app.get("/transactions/distinct-tipos", response_model=DistinctTiposOut)
 def list_distinct_transaction_tipos(
+    user: InvestmentsUser,
     categoria: str | None = Query(None),
     currency: str | None = Query(None),
     q: str | None = Query(None),
     db: Session = Depends(get_db),
 ) -> DistinctTiposOut:
-    tipos = distinct_transaction_tipos(db, categoria=categoria, currency=currency, q=q)
+    tipos = distinct_transaction_tipos(
+        db, user.id, categoria=categoria, currency=currency, q=q
+    )
     return DistinctTiposOut(tipos=tipos)
 
 
@@ -697,6 +886,7 @@ def exchange_rate_history(db: Session = Depends(get_db)) -> list[ExchangeRateHis
 
 @app.get("/activity/monthly-movements", response_model=list[MonthlyMovementRow])
 def activity_monthly_movements(
+    user: InvestmentsUser,
     currency: Literal["USD", "CLP", "all"] = "USD",
     scope: Literal["wallet", "stocks", "all", "fondos"] = Query(
         "stocks",
@@ -704,34 +894,38 @@ def activity_monthly_movements(
     ),
     db: Session = Depends(get_db),
 ) -> list[MonthlyMovementRow]:
-    raw = monthly_movements(db, currency, scope)
+    raw = monthly_movements(db, user.id, currency, scope)
     return [MonthlyMovementRow(**row) for row in raw]
 
 
 @app.get("/market-indicators", response_model=MarketIndicatorsOut)
-def market_indicators(db: Session = Depends(get_db)) -> MarketIndicatorsOut:
+def market_indicators(user: InvestmentsUser, db: Session = Depends(get_db)) -> MarketIndicatorsOut:
     return MarketIndicatorsOut(sp500_change_pct=sp500_change_pct(db))
 
 
-def _bg_recompute(fecha: date) -> None:
+def _bg_recompute(fecha: date, user_id: int) -> None:
     db = SessionLocal()
     try:
+        u = db.query(User).filter(User.id == user_id).first()
+        if not u:
+            return
 
         async def _refresh() -> None:
             from market_data import sync_pipeline_prices_and_portfolio
 
-            await sync_pipeline_prices_and_portfolio(db, False)
+            with use_fintual_credentials(u.fintual_session, u.fintual_uid):
+                await sync_pipeline_prices_and_portfolio(db, False, user_id)
 
         asyncio.run(_refresh())
-        recompute_from_transaction_date(db, fecha)
+        recompute_from_transaction_date(db, fecha, user_id)
     finally:
         db.close()
 
 
-def _bg_full_recompute() -> None:
+def _bg_full_recompute(user_id: int) -> None:
     db = SessionLocal()
     try:
-        full_recompute(db)
+        full_recompute(db, user_id)
     finally:
         db.close()
 
@@ -740,6 +934,7 @@ def _bg_full_recompute() -> None:
 def create_transaction(
     body: TransactionCreate,
     background: BackgroundTasks,
+    user: InvestmentsUser,
     db: Session = Depends(get_db),
 ) -> TransactionOut:
     if (body.categoria or "Acciones") == "Acciones":
@@ -750,6 +945,7 @@ def create_transaction(
     sym = body.activo.upper().strip()
 
     row = Transaction(
+        user_id=user.id,
         fecha=body.fecha,
         tipo=body.tipo,
         activo=sym,
@@ -765,7 +961,7 @@ def create_transaction(
     db.add(row)
     db.commit()
     db.refresh(row)
-    background.add_task(_bg_recompute, row.fecha)
+    background.add_task(_bg_recompute, row.fecha, user.id)
     return row
 
 
@@ -774,9 +970,14 @@ def update_transaction(
     tx_id: int,
     body: TransactionUpdate,
     background: BackgroundTasks,
+    user: InvestmentsUser,
     db: Session = Depends(get_db),
 ) -> TransactionOut:
-    old = db.query(Transaction).filter(Transaction.id == tx_id).first()
+    old = (
+        db.query(Transaction)
+        .filter(Transaction.user_id == user.id, Transaction.id == tx_id)
+        .first()
+    )
     if not old:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
     if getattr(old, "source", None) == "fintual" or (old.categoria or "Acciones") == "Acciones":
@@ -784,7 +985,7 @@ def update_transaction(
     if (body.categoria or "Acciones") == "Acciones":
         raise HTTPException(status_code=400, detail="No se pueden registrar acciones manualmente.")
 
-    validate_state_after_update(db, tx_id, body)
+    validate_state_after_update(db, tx_id, body, user.id)
 
     prev_fecha = old.fecha
     sym = body.activo.upper().strip()
@@ -801,7 +1002,7 @@ def update_transaction(
     db.commit()
     db.refresh(old)
 
-    background.add_task(_bg_recompute, min(prev_fecha, body.fecha))
+    background.add_task(_bg_recompute, min(prev_fecha, body.fecha), user.id)
     return old
 
 
@@ -809,26 +1010,36 @@ def update_transaction(
 def delete_transaction(
     tx_id: int,
     background: BackgroundTasks,
+    user: InvestmentsUser,
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
-    old = db.query(Transaction).filter(Transaction.id == tx_id).first()
+    old = (
+        db.query(Transaction)
+        .filter(Transaction.user_id == user.id, Transaction.id == tx_id)
+        .first()
+    )
     if not old:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
     if getattr(old, "source", None) == "fintual" or (old.categoria or "Acciones") == "Acciones":
         raise HTTPException(status_code=400, detail="No se pueden eliminar movimientos de acciones (Fintual).")
 
-    validate_state_after_delete(db, tx_id)
+    validate_state_after_delete(db, tx_id, user.id)
 
     fecha = old.fecha
     db.delete(old)
     db.commit()
-    background.add_task(_bg_recompute, fecha)
+    background.add_task(_bg_recompute, fecha, user.id)
     return {"status": "ok"}
 
 
 @app.get("/manual-assets", response_model=list[ManualAssetOut])
-def list_manual_assets(db: Session = Depends(get_db)) -> list[ManualAssetOut]:
-    assets = db.query(ManualAsset).order_by(ManualAsset.id).all()
+def list_manual_assets(user: InvestmentsUser, db: Session = Depends(get_db)) -> list[ManualAssetOut]:
+    assets = (
+        db.query(ManualAsset)
+        .filter(ManualAsset.user_id == user.id)
+        .order_by(ManualAsset.id)
+        .all()
+    )
     out: list[ManualAssetOut] = []
     for a in assets:
         h = (
@@ -852,8 +1063,11 @@ def list_manual_assets(db: Session = Depends(get_db)) -> list[ManualAssetOut]:
 
 
 @app.post("/manual-assets", response_model=ManualAssetOut)
-def create_manual_asset(body: ManualAssetCreate, db: Session = Depends(get_db)) -> ManualAssetOut:
+def create_manual_asset(
+    body: ManualAssetCreate, user: InvestmentsUser, db: Session = Depends(get_db)
+) -> ManualAssetOut:
     a = ManualAsset(
+        user_id=user.id,
         nombre=body.nombre,
         categoria=body.categoria,
         moneda=body.moneda,
@@ -878,14 +1092,19 @@ def add_snapshot(
     asset_id: int,
     body: ManualSnapshotCreate,
     background: BackgroundTasks,
+    user: InvestmentsUser,
     db: Session = Depends(get_db),
 ) -> ManualAssetOut:
-    a = db.query(ManualAsset).filter(ManualAsset.id == asset_id).first()
+    a = (
+        db.query(ManualAsset)
+        .filter(ManualAsset.user_id == user.id, ManualAsset.id == asset_id)
+        .first()
+    )
     if not a:
         raise HTTPException(status_code=404, detail="Activo no encontrado")
     db.add(ManualAssetHistory(asset_id=a.id, fecha=body.fecha, valor=body.valor))
     db.commit()
-    background.add_task(_bg_recompute, body.fecha)
+    background.add_task(_bg_recompute, body.fecha, user.id)
     h = (
         db.query(ManualAssetHistory)
         .filter(ManualAssetHistory.asset_id == a.id)
@@ -907,13 +1126,18 @@ def add_snapshot(
 def delete_manual_asset(
     asset_id: int,
     background: BackgroundTasks,
+    user: InvestmentsUser,
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
-    a = db.query(ManualAsset).filter(ManualAsset.id == asset_id).first()
+    a = (
+        db.query(ManualAsset)
+        .filter(ManualAsset.user_id == user.id, ManualAsset.id == asset_id)
+        .first()
+    )
     if not a:
         raise HTTPException(status_code=404, detail="Activo no encontrado")
     db.delete(a)
     db.commit()
-    background.add_task(_bg_full_recompute)
+    background.add_task(_bg_full_recompute, user.id)
     return {"status": "ok"}
 

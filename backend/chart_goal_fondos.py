@@ -55,9 +55,9 @@ def _dedupe_goal_points_to_series(pts: list[dict[str, Any]]) -> list[tuple[date,
     return [(d, a, b) for d, (a, b) in sorted(by_d.items())]
 
 
-def _goal_balance_series_list(db: Session) -> list[list[tuple[date, float, float]]]:
+def _goal_balance_series_list(db: Session, user_id: int) -> list[list[tuple[date, float, float]]]:
     """Una serie ordenada por meta; cada una con forward-fill independiente antes de sumar."""
-    cards = fetch_active_goal_cards(db)
+    cards = fetch_active_goal_cards(db, user_id=user_id)
     out: list[list[tuple[date, float, float]]] = []
     for c in cards:
         gid = str(c.get("id") or "").strip()
@@ -91,10 +91,12 @@ def _forward_fill_val_cost(
     return v, c
 
 
-def augment_chart_rows_with_fintual_goal_balance(db: Session, rows: list[ChartRow]) -> list[ChartRow]:
+def augment_chart_rows_with_fintual_goal_balance(
+    db: Session, rows: list[ChartRow], user_id: int
+) -> list[ChartRow]:
     if not fintual_configured() or not rows:
         return rows
-    per_goal = _goal_balance_series_list(db)
+    per_goal = _goal_balance_series_list(db, user_id)
     if not per_goal:
         return rows
 

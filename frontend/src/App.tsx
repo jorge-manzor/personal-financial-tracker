@@ -1,31 +1,33 @@
 import { useCallback, useEffect, useState } from "react";
-import { Route, Routes, useLocation } from "react-router-dom";
-import { API_BASE } from "./config";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { apiFetch, fetchJson } from "./api";
+import { clearToken, getToken } from "./auth";
+import { Login } from "./Login";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 import { ActivitySection } from "./ActivitySection";
 import { Dashboard } from "./Dashboard";
 import { ManualSnapshotModal } from "./ManualModals";
+import { FintualConnectModal } from "./FintualConnectModal";
+import { NoServicesPage } from "./NoServicesPage";
+import { Profile } from "./Profile";
 import { runSync, SyncOverlay, type TickerUiState } from "./SyncOverlay";
 import { TransactionModal } from "./TransactionModal";
-import type {
-  ChartCurrency,
-  ChartRow,
-  FintualGoalCard,
-  Holding,
-  ManualAsset,
-  Period,
-  Portfolio,
-  SectorSlice,
-  SyncStatus,
-  TransactionRow,
+import {
+  hasAnyActiveService,
+  normalizeUserMe,
+  type ChartCurrency,
+  type ChartRow,
+  type FintualGoalCard,
+  type Holding,
+  type ManualAsset,
+  type Period,
+  type Portfolio,
+  type SectorSlice,
+  type SyncStatus,
+  type TransactionRow,
+  type UserMe,
 } from "./types";
-
-async function fetchJson<T>(path: string): Promise<T> {
-  const r = await fetch(`${API_BASE}${path}`);
-  if (!r.ok) throw new Error(`${path} ${r.status}`);
-  return r.json() as Promise<T>;
-}
 
 function BootLoader({ message }: { message: string }) {
   return (
@@ -45,7 +47,9 @@ function BootLoader({ message }: { message: string }) {
           Conectamos con el servidor y, si hace falta, con Fintual para posiciones, movimientos y precios. La primera
           sincronización puede tardar un poco más.
         </p>
-        <p className="mt-3 break-all font-mono text-[10px] text-[#484f58]">{API_BASE}</p>
+        <p className="mt-3 break-all font-mono text-[10px] text-[#484f58]">
+          {import.meta.env.VITE_API_BASE ?? "http://localhost:8000"}
+        </p>
         <div className="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-[#21262d]">
           <div className="boot-bar h-full w-1/3 rounded-full bg-[#22c55e]" />
         </div>
@@ -55,11 +59,13 @@ function BootLoader({ message }: { message: string }) {
 }
 
 export default function App() {
+  const [authed, setAuthed] = useState(() => !!getToken());
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
   const [overlay, setOverlay] = useState(false);
   const [headerSync, setHeaderSync] = useState(false);
   const [headerSyncStartedAt, setHeaderSyncStartedAt] = useState<number | null>(null);
   const [progressPct, setProgressPct] = useState(0);
+  const [syncDetailMessage, setSyncDetailMessage] = useState<string | null>(null);
   const [tickerStates, setTickerStates] = useState<Record<string, TickerUiState>>({});
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -78,8 +84,11 @@ export default function App() {
   const [dataVersion, setDataVersion] = useState(0);
   const [bootHint, setBootHint] = useState("Conectando con el servidor…");
   const [initError, setInitError] = useState<string | null>(null);
+  const apiBaseHint = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
   const [bootRetry, setBootRetry] = useState(0);
   const [fxRefreshNonce, setFxRefreshNonce] = useState(0);
+  const [me, setMe] = useState<UserMe | null>(null);
+  const [fintualModalFromProfile, setFintualModalFromProfile] = useState(false);
 
   const loadAll = useCallback(async () => {
     const d = await fetchJson<{
@@ -99,7 +108,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !me?.services.investments) return;
     let cancelled = false;
     setChartLoading(true);
     fetchJson<ChartRow[]>(`/chart-data?period=${period}`)
@@ -113,7 +122,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [period, ready, dataVersion]);
+  }, [period, ready, dataVersion, me?.services.investments]);
 
   const beginSync = useCallback((force: boolean, fullScreen = true) => {
     fetchJson<SyncStatus>("/sync-status").then((st) => {
@@ -125,6 +134,7 @@ export default function App() {
       });
       setTickerStates(init);
       setProgressPct(0);
+      setSyncDetailMessage(null);
       if (fullScreen) {
         setOverlay(true);
       } else {
@@ -136,6 +146,9 @@ export default function App() {
         force,
         (pct, data) => {
           setProgressPct(pct);
+          if (typeof data.message === "string" && data.message.trim()) {
+            setSyncDetailMessage(data.message.trim());
+          }
           const t = data.ticker as string | undefined;
           const stt = data.status as string | undefined;
           if (t && stt === "downloading") {
@@ -163,17 +176,83 @@ export default function App() {
             setHeaderSyncStartedAt(null);
           }
         },
+        async () => {
+          if (fullScreen) setOverlay(false);
+          else {
+            setHeaderSync(false);
+            setHeaderSyncStartedAt(null);
+          }
+          try {
+            const raw = await fetchJson<{
+              id: number;
+              email: string;
+              services: Record<string, boolean>;
+              fintual_needs_setup?: boolean;
+              fintual_reconnect_required?: boolean;
+            }>("/auth/me");
+            setMe(normalizeUserMe(raw));
+            setToast("Tu sesión con Fintual expiró o dejó de ser válida. Actualizá la cookie en el panel de conexión.");
+          } catch {
+            setToast("No se pudo verificar el perfil. Revisá la cookie de Fintual en Perfil.");
+          }
+        },
       );
     });
   }, [loadAll]);
 
+  const handleProfileUpdated = useCallback((next: UserMe) => {
+    setMe(normalizeUserMe(next));
+    if (next.services?.investments) {
+      setReady(false);
+      setInitError(null);
+      setBootRetry((n) => n + 1);
+    } else {
+      setPortfolio(null);
+      setHoldings([]);
+      setChart([]);
+      setSectors([]);
+      setManualAssets([]);
+      setFintualGoals([]);
+      setSyncStatus(null);
+      setOverlay(false);
+      setHeaderSync(false);
+      setReady(true);
+    }
+  }, []);
+
+  const handleFintualConnected = useCallback((next: UserMe) => {
+    setFintualModalFromProfile(false);
+    setMe(normalizeUserMe(next));
+    setReady(false);
+    setInitError(null);
+    setBootRetry((n) => n + 1);
+  }, []);
+
   useEffect(() => {
+    if (!authed) return;
     let cancelled = false;
     setInitError(null);
     setReady(false);
     setBootHint("Conectando con el servidor…");
     void (async () => {
       try {
+        const raw = await fetchJson<{
+          id: number;
+          email: string;
+          services: Record<string, boolean>;
+          fintual_needs_setup?: boolean;
+        }>("/auth/me");
+        if (cancelled) return;
+        const profile = normalizeUserMe(raw);
+        setMe(profile);
+        if (!profile.services.investments) {
+          setReady(true);
+          return;
+        }
+        if (profile.fintual_needs_setup) {
+          setReady(true);
+          return;
+        }
         const st = await fetchJson<SyncStatus>("/sync-status");
         if (cancelled) return;
         setSyncStatus(st);
@@ -188,7 +267,7 @@ export default function App() {
         console.error(e);
         if (!cancelled) {
           setInitError(
-            `Sin respuesta del servidor (${API_BASE}). Tras reiniciar el backend puede tardar unos segundos; reintentá o comprobá que uvicorn esté en marcha.`,
+            `Sin respuesta del servidor (${apiBaseHint}). Tras reiniciar el backend puede tardar unos segundos; reintentá o comprobá que uvicorn esté en marcha.`,
           );
         }
       }
@@ -196,7 +275,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [bootRetry, beginSync, loadAll]);
+  }, [authed, bootRetry, beginSync, loadAll]);
 
   useEffect(() => {
     if (!toast) return;
@@ -204,18 +283,32 @@ export default function App() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const showMain = ready && !overlay && !initError;
+  if (!authed) {
+    return <Login onSuccess={() => setAuthed(true)} />;
+  }
+
+  const showMain = ready && !overlay && !initError && me !== null;
   const syncBusy = overlay || headerSync;
+  const investmentsOn = !!me?.services.investments;
+  const needsFintualConnection = investmentsOn && !!me?.fintual_needs_setup;
+  const showFintualSetupModal = showMain && (needsFintualConnection || fintualModalFromProfile);
 
   return (
     <div className="min-h-full bg-[#0d1117]">
-      <AppSidebar />
+      <AppSidebar
+        onLogout={() => {
+          clearToken();
+          window.location.reload();
+        }}
+        investmentsEnabled={investmentsOn}
+      />
       <AppHeader
         onRefreshPrices={() => beginSync(true, false)}
         headerSyncing={headerSync}
         headerSyncStartedAt={headerSync ? headerSyncStartedAt : null}
-        syncDisabled={syncBusy}
+        syncDisabled={syncBusy || needsFintualConnection}
         fxRefreshNonce={fxRefreshNonce}
+        investmentsEnabled={investmentsOn}
       />
 
       {syncStatus && overlay && (
@@ -224,72 +317,93 @@ export default function App() {
           progressPct={progressPct}
           tickerStates={tickerStates}
           order={syncStatus.tickers}
+          detailMessage={syncDetailMessage}
         />
       )}
 
-      <main className="pt-14 pl-14">
+      <main className="pt-14 pl-16">
         {showMain ? (
           <Routes>
             <Route
+              path="/profile"
+              element={
+                <Profile
+                  me={me!}
+                  onUpdated={handleProfileUpdated}
+                  onRequestFintualConnect={() => setFintualModalFromProfile(true)}
+                />
+              }
+            />
+            <Route
               path="/"
               element={
-                <Dashboard
-                  portfolio={portfolio}
-                  holdings={holdings}
-                  chart={chart}
-                  chartLoading={chartLoading}
-                  period={period}
-                  onPeriod={setPeriod}
-                  chartCurrency={chartCurrency}
-                  onChartCurrency={setChartCurrency}
-                  sectors={sectors}
-                  manualAssets={manualAssets}
-                  fintualGoals={fintualGoals}
-                  onManualSnapshot={(a) => setSnapshotAsset(a)}
-                  onDeleteManual={async (m) => {
-                    if (
-                      !confirm(
-                        `¿Eliminar "${m.nombre}"? Se borrarán también sus valores históricos. Esta acción no se puede deshacer.`,
-                      )
-                    ) {
-                      return;
-                    }
-                    try {
-                      const r = await fetch(`${API_BASE}/manual-assets/${m.id}`, {
-                        method: "DELETE",
-                      });
-                      if (!r.ok) {
-                        setToast("No se pudo eliminar el activo");
+                !hasAnyActiveService(me!.services) ? (
+                  <NoServicesPage />
+                ) : investmentsOn ? (
+                  <Dashboard
+                    portfolio={portfolio}
+                    holdings={holdings}
+                    chart={chart}
+                    chartLoading={chartLoading}
+                    period={period}
+                    onPeriod={setPeriod}
+                    chartCurrency={chartCurrency}
+                    onChartCurrency={setChartCurrency}
+                    sectors={sectors}
+                    manualAssets={manualAssets}
+                    fintualGoals={fintualGoals}
+                    onManualSnapshot={(a) => setSnapshotAsset(a)}
+                    onDeleteManual={async (m) => {
+                      if (
+                        !confirm(
+                          `¿Eliminar "${m.nombre}"? Se borrarán también sus valores históricos. Esta acción no se puede deshacer.`,
+                        )
+                      ) {
                         return;
                       }
-                      setToast("Activo eliminado");
-                      await loadAll();
-                    } catch {
-                      setToast("No se pudo eliminar el activo");
-                    }
-                  }}
-                  dataVersion={dataVersion}
-                  onEditTransaction={(tx) => {
-                    setEditingTx(tx);
-                    setTxOpen(true);
-                  }}
-                  onToast={setToast}
-                  onMutate={loadAll}
-                />
+                      try {
+                        const r = await apiFetch(`/manual-assets/${m.id}`, {
+                          method: "DELETE",
+                        });
+                        if (!r.ok) {
+                          setToast("No se pudo eliminar el activo");
+                          return;
+                        }
+                        setToast("Activo eliminado");
+                        await loadAll();
+                      } catch {
+                        setToast("No se pudo eliminar el activo");
+                      }
+                    }}
+                    dataVersion={dataVersion}
+                    onEditTransaction={(tx) => {
+                      setEditingTx(tx);
+                      setTxOpen(true);
+                    }}
+                    onToast={setToast}
+                    onMutate={loadAll}
+                  />
+                ) : (
+                  <NoServicesPage />
+                )
               }
             />
             <Route
               path="/transactions"
               element={
-                <TransactionsRoute
-                  dataVersion={dataVersion}
-                  onEdit={(tx) => {
-                    setEditingTx(tx);
-                    setTxOpen(true);
-                  }}
-                  onToast={setToast}
-                  onMutate={loadAll}
-                />
+                investmentsOn ? (
+                  <TransactionsRoute
+                    dataVersion={dataVersion}
+                    onEdit={(tx) => {
+                      setEditingTx(tx);
+                      setTxOpen(true);
+                    }}
+                    onToast={setToast}
+                    onMutate={loadAll}
+                  />
+                ) : (
+                  <Navigate to="/" replace />
+                )
               }
             />
           </Routes>
@@ -311,6 +425,7 @@ export default function App() {
 
       <FabAndModal
         showMain={showMain}
+        investmentsEnabled={investmentsOn}
         txOpen={txOpen}
         setTxOpen={setTxOpen}
         editingTx={editingTx}
@@ -332,6 +447,15 @@ export default function App() {
         <div className="fixed bottom-24 left-1/2 z-[70] -translate-x-1/2 rounded-lg border border-[#30363d] bg-[#161b22] px-4 py-2 text-sm text-white shadow-xl">
           {toast}
         </div>
+      )}
+
+      {showFintualSetupModal && (
+        <FintualConnectModal
+          onConnected={handleFintualConnected}
+          onDismiss={() => setFintualModalFromProfile(false)}
+          allowDismiss={fintualModalFromProfile}
+          reconnectMode={!!me?.fintual_reconnect_required}
+        />
       )}
     </div>
   );
@@ -363,6 +487,7 @@ function TransactionsRoute({
 
 function FabAndModal({
   showMain,
+  investmentsEnabled,
   txOpen,
   setTxOpen,
   editingTx,
@@ -371,6 +496,7 @@ function FabAndModal({
   setToast,
 }: {
   showMain: boolean;
+  investmentsEnabled: boolean;
   txOpen: boolean;
   setTxOpen: (v: boolean) => void;
   editingTx: TransactionRow | null;
@@ -379,7 +505,7 @@ function FabAndModal({
   setToast: (s: string | null) => void;
 }) {
   const location = useLocation();
-  const showFab = showMain && location.pathname === "/";
+  const showFab = showMain && investmentsEnabled && location.pathname === "/";
 
   return (
     <>

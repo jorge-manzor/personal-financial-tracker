@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { API_BASE } from "./config";
+import { apiFetch } from "./api";
 import { formatClpDots, formatTxSignedAmount } from "./format";
 import type { FintualGoalCard, TransactionRow } from "./types";
 
@@ -83,7 +83,7 @@ export function GoalMovementsModal({ goal, onClose, dataVersion }: Props) {
           params.set("page_size", String(TX_CHUNK));
           params.set("categoria", "Fondos");
           params.set("activo_exact", gid);
-          const r = await fetch(`${API_BASE}/transactions?${params}`);
+          const r = await apiFetch(`/transactions?${params}`);
           if (!r.ok) throw new Error(String(r.status));
           const res = (await r.json()) as {
             items: TransactionRow[];

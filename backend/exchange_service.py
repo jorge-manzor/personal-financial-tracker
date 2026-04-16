@@ -64,10 +64,11 @@ def store_today_rate(db: Session) -> ExchangeRateHistory | None:
     return row
 
 
-def ensure_exchange_history(db: Session) -> None:
+def ensure_exchange_history(db: Session, user_id: int) -> None:
     """
     Rellena huecos en exchange_rate_history usando CMF (histórico oficial).
     No llama a DolarAPI — el spot lo resuelve store_today_rate / POST refresh.
+    `user_id` define desde cuándo tiene sentido el backfill según el portafolio de ese usuario.
     """
     from history import get_first_transaction_date
 
@@ -75,7 +76,7 @@ def ensure_exchange_history(db: Session) -> None:
         logger.debug("CMF_API_KEY ausente — omitiendo backfill histórico USD/CLP")
         return
 
-    first_tx = get_first_transaction_date(db)
+    first_tx = get_first_transaction_date(db, user_id)
     default_start = date(2020, 1, 1)
     if first_tx:
         start = max(default_start, first_tx - timedelta(days=90))

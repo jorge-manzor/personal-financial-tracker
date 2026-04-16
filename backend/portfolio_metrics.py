@@ -23,7 +23,7 @@ from exchange_service import get_latest_rate
 logger = logging.getLogger(__name__)
 
 
-def _replay_symbol_usd(db: Session, sym: str) -> tuple[float, float, float, float, float]:
+def _replay_symbol_usd(db: Session, sym: str, user_id: int) -> tuple[float, float, float, float, float]:
     """
     Desde transacciones Acciones USD + splits (`stock_splits`): (shares, cost_basis, realized_pnl, dividendos, sum_compras).
     """
@@ -31,6 +31,7 @@ def _replay_symbol_usd(db: Session, sym: str) -> tuple[float, float, float, floa
     txs = sorted(
         db.query(Transaction)
         .filter(
+            Transaction.user_id == user_id,
             func.upper(func.trim(Transaction.activo)) == su,
             Transaction.categoria == "Acciones",
             Transaction.currency == "USD",
@@ -40,7 +41,7 @@ def _replay_symbol_usd(db: Session, sym: str) -> tuple[float, float, float, floa
     )
     splits = (
         db.query(StockSplit)
-        .filter(StockSplit.symbol == su)
+        .filter(StockSplit.user_id == user_id, StockSplit.symbol == su)
         .order_by(StockSplit.split_date, StockSplit.id)
         .all()
     )
@@ -109,10 +110,10 @@ def _resolved_price_and_unavailable(
     return 0.0, True
 
 
-def market_price(db: Session, ticker: str) -> float | None:
+def market_price(db: Session, ticker: str, user_id: int) -> float | None:
     sym = ticker.upper().strip()
     try:
-        out = asyncio.run(get_current_prices(db, [sym]))
+        out = asyncio.run(get_current_prices(db, [sym], user_id=user_id))
         return out.get(sym)
     except Exception:
         row = (
@@ -133,12 +134,17 @@ def compute_ticker_metrics(
     db: Session,
     ticker: str,
     current_price: float,
+    user_id: int,
     *,
     price_unavailable: bool = False,
 ) -> dict:
     sym = ticker.upper().strip()
-    pos = db.query(FintualPosition).filter(FintualPosition.symbol == sym).first()
-    shares_replay, cost_basis, realized, dividendos, sum_compras = _replay_symbol_usd(db, sym)
+    pos = (
+        db.query(FintualPosition)
+        .filter(FintualPosition.user_id == user_id, FintualPosition.symbol == sym)
+        .first()
+    )
+    shares_replay, cost_basis, realized, dividendos, sum_compras = _replay_symbol_usd(db, sym, user_id)
     if shares_replay > 1e-12:
         total_shares = shares_replay
     elif pos:
@@ -200,42 +206,42 @@ def compute_ticker_metrics(
     }
 
 
-def get_open_tickers(db: Session) -> list[str]:
-    return get_tickers_from_transactions(db)
+def get_open_tickers(db: Session, user_id: int) -> list[str]:
+    return get_tickers_from_transactions(db, user_id)
 
 
-def portfolio_total_value(db: Session) -> float:
-    syms = get_open_tickers(db)
-    prices = asyncio.run(get_current_prices(db, syms)) if syms else {}
+def portfolio_total_value(db: Session, user_id: int) -> float:
+    syms = get_open_tickers(db, user_id)
+    prices = asyncio.run(get_current_prices(db, syms, user_id=user_id)) if syms else {}
     total = 0.0
     for sym in syms:
         px, unavail = _resolved_price_and_unavailable(db, sym, prices)
-        m = compute_ticker_metrics(db, sym, px or 0.0, price_unavailable=unavail)
+        m = compute_ticker_metrics(db, sym, px or 0.0, user_id, price_unavailable=unavail)
         total += m["current_value"]
     d = get_last_trading_day()
-    b = manual_breakdown_usd_at_date(db, d)
+    b = manual_breakdown_usd_at_date(db, d, user_id)
     total += b["manual_total_usd"]
     return total
 
 
 def holdings_with_metrics(
-    db: Session, *, prices: dict[str, float] | None = None
+    db: Session, user_id: int, *, prices: dict[str, float] | None = None
 ) -> list[dict]:
-    syms = get_open_tickers(db)
+    syms = get_open_tickers(db, user_id)
     if not syms:
         return []
     if prices is None:
-        prices = asyncio.run(get_current_prices(db, syms))
+        prices = asyncio.run(get_current_prices(db, syms, user_id=user_id))
     out: list[dict] = []
     for sym in syms:
         px, unavail = _resolved_price_and_unavailable(db, sym, prices)
-        m = compute_ticker_metrics(db, sym, px, price_unavailable=unavail)
+        m = compute_ticker_metrics(db, sym, px, user_id, price_unavailable=unavail)
         if m["total_shares"] <= 0:
             continue
         out.append(m)
     total_acc = sum(m["current_value"] for m in out)
     d = get_last_trading_day()
-    mb = manual_breakdown_usd_at_date(db, d)
+    mb = manual_breakdown_usd_at_date(db, d, user_id)
     total_pf = total_acc + mb["manual_total_usd"]
     for m in out:
         m["peso_portafolio_pct"] = (m["current_value"] / total_pf * 100.0) if total_pf > 0 else 0.0
@@ -243,19 +249,19 @@ def holdings_with_metrics(
     return out
 
 
-def portfolio_summary(db: Session, *, prices: dict[str, float] | None = None) -> dict:
-    syms = get_open_tickers(db)
+def portfolio_summary(db: Session, user_id: int, *, prices: dict[str, float] | None = None) -> dict:
+    syms = get_open_tickers(db, user_id)
     if prices is None:
-        prices = asyncio.run(get_current_prices(db, syms)) if syms else {}
+        prices = asyncio.run(get_current_prices(db, syms, user_id=user_id)) if syms else {}
     hs = []
     for sym in syms:
         px, unavail = _resolved_price_and_unavailable(db, sym, prices)
-        m = compute_ticker_metrics(db, sym, px, price_unavailable=unavail)
+        m = compute_ticker_metrics(db, sym, px, user_id, price_unavailable=unavail)
         if m["total_shares"] > 0:
             hs.append(m)
 
     d = get_last_trading_day()
-    mb = manual_breakdown_usd_at_date(db, d)
+    mb = manual_breakdown_usd_at_date(db, d, user_id)
     rate = get_latest_rate(db) or mb.get("exchange_rate_usd_clp") or 950.0
 
     acciones_value = sum(m["current_value"] for m in hs)
@@ -265,7 +271,7 @@ def portfolio_summary(db: Session, *, prices: dict[str, float] | None = None) ->
     total_unrealized = sum(m["ganancia_no_realizada"] for m in hs)
     total_dividends = sum(m["dividendos"] for m in hs)
     invertido_acciones = sum(m["capital_invertido"] for m in hs)
-    invertido_fondos_afp = fondos_afp_invertido_usd_now(db)
+    invertido_fondos_afp = fondos_afp_invertido_usd_now(db, user_id)
     total_invested = invertido_acciones + invertido_fondos_afp
 
     manual_total_usd = mb["manual_total_usd"]
@@ -291,19 +297,19 @@ def portfolio_summary(db: Session, *, prices: dict[str, float] | None = None) ->
     }
 
 
-def sector_distribution(db: Session, *, prices: dict[str, float] | None = None) -> list[dict]:
-    syms = get_open_tickers(db)
+def sector_distribution(db: Session, user_id: int, *, prices: dict[str, float] | None = None) -> list[dict]:
+    syms = get_open_tickers(db, user_id)
     if prices is None:
-        prices = asyncio.run(get_current_prices(db, syms)) if syms else {}
+        prices = asyncio.run(get_current_prices(db, syms, user_id=user_id)) if syms else {}
     hs = []
     for sym in syms:
         px, unavail = _resolved_price_and_unavailable(db, sym, prices)
-        m = compute_ticker_metrics(db, sym, px, price_unavailable=unavail)
+        m = compute_ticker_metrics(db, sym, px, user_id, price_unavailable=unavail)
         if m["total_shares"] > 0:
             hs.append(m)
 
     d = get_last_trading_day()
-    mb = manual_breakdown_usd_at_date(db, d)
+    mb = manual_breakdown_usd_at_date(db, d, user_id)
 
     by_sec: dict[str, dict] = defaultdict(lambda: {"value": 0.0, "tickers": []})
     for m in hs:

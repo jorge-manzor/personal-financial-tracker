@@ -165,7 +165,7 @@ def _badge_from_goal(attr: dict[str, Any]) -> str:
     return "INVERSIÓN"
 
 
-def _cards_from_synced_fondos_tx(db: Session) -> list[dict[str, Any]]:
+def _cards_from_synced_fondos_tx(db: Session, user_id: int) -> list[dict[str, Any]]:
     """
     Tarjetas a partir de movimientos ya guardados (sync Fintual) cuando la REST de goals
     no responde o va vacía — al menos id + nombre + montos aproximados en CLP.
@@ -173,6 +173,7 @@ def _cards_from_synced_fondos_tx(db: Session) -> list[dict[str, Any]]:
     groups = (
         db.query(Transaction.activo, func.max(Transaction.nombre_activo))
         .filter(
+            Transaction.user_id == user_id,
             Transaction.categoria == "Fondos",
             Transaction.source == "fintual",
         )
@@ -187,6 +188,7 @@ def _cards_from_synced_fondos_tx(db: Session) -> list[dict[str, Any]]:
         txs = (
             db.query(Transaction)
             .filter(
+                Transaction.user_id == user_id,
                 Transaction.categoria == "Fondos",
                 Transaction.source == "fintual",
                 Transaction.activo == gid,
@@ -313,7 +315,7 @@ def _enrich_goal_cards_with_portal_balance_graph(cards: list[dict[str, Any]]) ->
             c["profit_pct"] = profit_pct
 
 
-def fetch_active_goal_cards(db: Session | None = None) -> list[dict[str, Any]]:
+def fetch_active_goal_cards(db: Session | None = None, user_id: int | None = None) -> list[dict[str, Any]]:
     """
     Metas para el dashboard: primero API de goals (NAV real); si falta algo, rellena con
     metas vistas solo en el sync de movimientos (mismo `activo` = id de meta).
@@ -322,8 +324,8 @@ def fetch_active_goal_cards(db: Session | None = None) -> list[dict[str, Any]]:
     for c in _cards_from_goals_api():
         by_id[c["id"]] = c
 
-    if db is not None:
-        for c in _cards_from_synced_fondos_tx(db):
+    if db is not None and user_id is not None:
+        for c in _cards_from_synced_fondos_tx(db, user_id):
             if c["id"] not in by_id:
                 by_id[c["id"]] = c
                 logger.debug("Meta %s desde tarjetas solo-DB (sync movimientos)", c["id"])

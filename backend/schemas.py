@@ -209,3 +209,58 @@ class MonthlyMovementRow(BaseModel):
 
 class MarketIndicatorsOut(BaseModel):
     sp500_change_pct: float | None
+
+
+class UserRegister(BaseModel):
+    email: str = Field(..., min_length=3)
+    password: str = Field(..., min_length=6)
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UserOut(BaseModel):
+    id: int
+    email: str
+    services: dict[str, bool]
+    fintual_needs_setup: bool = Field(
+        default=False,
+        description="True si hay que abrir el panel de Fintual: sin cookie, o sesión inválida/expirada.",
+    )
+    fintual_reconnect_required: bool = Field(
+        default=False,
+        description="True si la última sync detectó sesión Fintual inválida (p. ej. cookie caducada ~30 días).",
+    )
+    fintual_session_cookie: str | None = Field(
+        default=None,
+        description="Valor guardado de _fintual_session_cookie (solo el dueño autenticado).",
+    )
+    fintual_uid: str | None = Field(
+        default=None,
+        description="Valor guardado de la cookie uid en Fintual, si existe.",
+    )
+
+
+class UserProfilePatch(BaseModel):
+    """Actualización parcial de preferencias; solo se aplican campos enviados."""
+
+    investments: bool | None = None
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=6)
+
+
+class FintualCredentialsIn(BaseModel):
+    """Valores copiados de las cookies del navegador en fintual.cl (DevTools → Application → Cookies)."""
+
+    session_cookie: str = Field(..., min_length=1, description="Valor de _fintual_session_cookie")
+    uid: str | None = Field(None, description="Valor de la cookie uid (recomendado)")

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { API_BASE } from "./config";
+import { apiFetch } from "./api";
 import { formatMoneyCLP, formatMoneyUSDLabel } from "./format";
 import type { CategoriaType, CurrencyType, TransactionRow, TransactionType } from "./types";
 
@@ -95,8 +95,8 @@ export function TransactionModal({ open, editing, onClose, onSaved }: Props) {
     setSaving(true);
     try {
       const isEdit = editing != null;
-      const url = isEdit ? `${API_BASE}/transactions/${editing.id}` : `${API_BASE}/transactions`;
-      const r = await fetch(url, {
+      const url = isEdit ? `/transactions/${editing.id}` : `/transactions`;
+      const r = await apiFetch(url, {
         method: isEdit ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
