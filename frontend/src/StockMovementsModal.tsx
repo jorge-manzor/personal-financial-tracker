@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { API_BASE } from "./config";
+import { apiFetch } from "./api";
 import {
   formatMoney,
   formatSharesExact,
@@ -122,7 +122,7 @@ export function StockMovementsModal({ holding, onClose, dataVersion }: Props) {
           params.set("page_size", String(TX_CHUNK));
           params.set("categoria", "Acciones");
           params.set("activo_exact", sym);
-          const r = await fetch(`${API_BASE}/transactions?${params}`);
+          const r = await apiFetch(`/transactions?${params}`);
           if (!r.ok) throw new Error(String(r.status));
           const res = (await r.json()) as {
             items: TransactionRow[];

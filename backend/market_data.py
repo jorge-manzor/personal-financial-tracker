@@ -60,7 +60,7 @@ def _current_price_row_fresh(db: Session, ticker: str) -> tuple[float | None, bo
 
 
 async def get_current_prices(
-    db: Session, tickers: list[str], *, force: bool = False
+    db: Session, tickers: list[str], *, user_id: int, force: bool = False
 ) -> dict[str, float]:
     """Precios actuales vía Fintual (si hay sesión) y cache local."""
     from fintual_client import fintual_configured
@@ -76,9 +76,13 @@ async def get_current_prices(
                 break
     if fintual_configured() and syms and need_fetch:
         try:
-            sync_current_prices_batch(db, syms)
+            sync_current_prices_batch(db, syms, user_id)
         except Exception as e:
             logger.warning("Fintual current prices: %s", e)
+            from fintual_auth_state import is_likely_fintual_auth_error, mark_fintual_reconnect_required
+
+            if is_likely_fintual_auth_error(e):
+                mark_fintual_reconnect_required(user_id)
 
     out: dict[str, float] = {}
     for sym in syms:
@@ -94,7 +98,12 @@ async def get_current_prices(
 
 
 async def get_historical_prices(
-    db: Session, ticker: str, _period: str = "ALL", *, force: bool = False
+    db: Session,
+    ticker: str,
+    user_id: int,
+    _period: str = "ALL",
+    *,
+    force: bool = False,
 ) -> list[dict]:
     """No-op: el histórico lo llena `fintual_sync`. Devuelve serie desde cache."""
     from fintual_sync import sync_historical_prices_for_symbol
@@ -103,7 +112,7 @@ async def get_historical_prices(
     if not sym:
         return []
     if force:
-        sync_historical_prices_for_symbol(db, sym, force=True)
+        sync_historical_prices_for_symbol(db, sym, user_id=user_id, force=True)
     rows = (
         db.query(PriceCache)
         .filter(PriceCache.ticker == sym)
@@ -113,26 +122,27 @@ async def get_historical_prices(
     return [{"date": r.date.isoformat(), "price": float(r.close_price)} for r in rows]
 
 
-async def get_all_historical_for_portfolio(db: Session, period: str) -> dict[str, list]:
-    tickers = get_tickers_from_transactions(db)
+async def get_all_historical_for_portfolio(db: Session, period: str, user_id: int) -> dict[str, list]:
+    tickers = get_tickers_from_transactions(db, user_id)
     result: dict[str, list] = {}
     for sym in tickers:
-        rows = await get_historical_prices(db, sym, period)
+        rows = await get_historical_prices(db, sym, user_id, period)
         result[sym] = rows
     return result
 
 
-def build_portfolio_history(period: str) -> list[dict]:
+def build_portfolio_history(period: str, user_id: int) -> list[dict]:
     db = SessionLocal()
     try:
-        ensure_cache(db, force=True)
+        ensure_cache(db, user_id, force=True)
         last_day = get_last_trading_day()
-        first_tx = get_first_transaction_date(db)
+        first_tx = get_first_transaction_date(db, user_id)
         start = first_tx or last_day
         by_date: dict[date, dict] = {}
         for r in (
             db.query(PortfolioValueCache)
             .filter(
+                PortfolioValueCache.user_id == user_id,
                 PortfolioValueCache.fecha >= start,
                 PortfolioValueCache.fecha <= last_day,
             )
@@ -164,16 +174,21 @@ def build_portfolio_history(period: str) -> list[dict]:
         db.close()
 
 
-def sync_get_current_prices(tickers: list[str]) -> dict[str, float]:
+def sync_get_current_prices(tickers: list[str], user_id: int) -> dict[str, float]:
     db = SessionLocal()
     try:
-        return asyncio.run(get_current_prices(db, tickers))
+        return asyncio.run(get_current_prices(db, tickers, user_id=user_id))
     finally:
         db.close()
 
 
-async def sync_pipeline_prices_and_portfolio(db: Session, force: bool) -> None:
+async def sync_pipeline_prices_and_portfolio(db: Session, force: bool, user_id: int) -> None:
     from exchange_service import store_today_rate
+    from fintual_auth_state import (
+        clear_fintual_reconnect_required,
+        is_likely_fintual_auth_error,
+        mark_fintual_reconnect_required,
+    )
     from fintual_sync import sync_all_fintual
 
     try:
@@ -182,5 +197,11 @@ async def sync_pipeline_prices_and_portfolio(db: Session, force: bool) -> None:
         logger.warning("exchange rate fetch: %s", e)
         db.rollback()
 
-    sync_all_fintual(db, force_prices=force)
-    ensure_cache(db, force=force)
+    try:
+        sync_all_fintual(db, user_id, force_prices=force)
+        ensure_cache(db, user_id, force=force)
+        clear_fintual_reconnect_required(db, user_id)
+    except Exception as e:
+        if is_likely_fintual_auth_error(e):
+            mark_fintual_reconnect_required(user_id)
+        raise

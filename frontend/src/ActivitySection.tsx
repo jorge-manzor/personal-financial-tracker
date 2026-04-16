@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { API_BASE } from "./config";
+import { apiFetch, fetchJson } from "./api";
 import {
   formatAxisMoney,
   formatMonthlyTooltipValue,
@@ -10,12 +10,6 @@ import {
 import { TransactionDetailModal } from "./TransactionDetailModal";
 import type { MonthlyChartPoint, MonthlyMovementRow, TransactionRow } from "./types";
 import { TxAvatar, badgeLabel, badgeStyleForTx, txDisplayName } from "./transactionUi";
-
-async function fetchJson<T>(path: string): Promise<T> {
-  const r = await fetch(`${API_BASE}${path}`);
-  if (!r.ok) throw new Error(String(r.status));
-  return r.json() as Promise<T>;
-}
 
 type CurFilter = "USD" | "CLP";
 /** Vista del gráfico mensual: billetera, acciones US, fondos CLP o consolidado. */
@@ -414,7 +408,7 @@ export function ActivitySection({
                   if (!ok) return;
                   setDeletingId(tx.id);
                   try {
-                    const r = await fetch(`${API_BASE}/transactions/${tx.id}`, { method: "DELETE" });
+                    const r = await apiFetch(`/transactions/${tx.id}`, { method: "DELETE" });
                     if (!r.ok) {
                       const d = await r.json().catch(() => ({}));
                       onToast(typeof d.detail === "string" ? d.detail : "No se pudo eliminar.");

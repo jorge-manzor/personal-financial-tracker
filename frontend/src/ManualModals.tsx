@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { API_BASE } from "./config";
+import { apiFetch } from "./api";
 import type { ManualAsset } from "./types";
 
 interface SnapshotProps {
@@ -35,7 +35,7 @@ export function ManualSnapshotModal({ asset, open, onClose, onSaved }: SnapshotP
     }
     setSaving(true);
     try {
-      const r = await fetch(`${API_BASE}/manual-assets/${asset.id}/snapshot`, {
+      const r = await apiFetch(`/manual-assets/${asset.id}/snapshot`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ fecha, valor: v }),
@@ -128,7 +128,7 @@ export function ManualCreateModal({ open, onClose, onSaved }: CreateProps) {
     }
     setSaving(true);
     try {
-      const r = await fetch(`${API_BASE}/manual-assets`, {
+      const r = await apiFetch(`/manual-assets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

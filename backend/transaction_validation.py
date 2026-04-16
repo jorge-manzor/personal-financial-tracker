@@ -31,14 +31,22 @@ def replay_validate_rows(rows: list[Transaction]) -> None:
             sh -= float(tx.acciones)
 
 
-def all_tx_for_ticker(db: Session, sym: str) -> list[Transaction]:
-    rows = db.query(Transaction).filter(Transaction.activo == sym.upper()).all()
+def all_tx_for_ticker(db: Session, sym: str, user_id: int) -> list[Transaction]:
+    rows = (
+        db.query(Transaction)
+        .filter(Transaction.user_id == user_id, Transaction.activo == sym.upper())
+        .all()
+    )
     rows.sort(key=lambda t: (transaction_occurred_at(t), t.id))
     return rows
 
 
-def validate_state_after_update(db: Session, tx_id: int, body) -> None:
-    old = db.query(Transaction).filter(Transaction.id == tx_id).first()
+def validate_state_after_update(db: Session, tx_id: int, body, user_id: int) -> None:
+    old = (
+        db.query(Transaction)
+        .filter(Transaction.user_id == user_id, Transaction.id == tx_id)
+        .first()
+    )
     if not old:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
 
@@ -47,11 +55,12 @@ def validate_state_after_update(db: Session, tx_id: int, body) -> None:
     syms = {old_sym, new_sym}
 
     for sym in syms:
-        base = [t for t in all_tx_for_ticker(db, sym) if t.id != tx_id]
+        base = [t for t in all_tx_for_ticker(db, sym, user_id) if t.id != tx_id]
         if sym == new_sym:
             oa = datetime.combine(body.fecha, time(12, 0, 0))
             base.append(
                 Transaction(
+                    user_id=user_id,
                     id=tx_id,
                     fecha=body.fecha,
                     tipo=body.tipo,
@@ -68,11 +77,15 @@ def validate_state_after_update(db: Session, tx_id: int, body) -> None:
         replay_validate_rows(base)
 
 
-def validate_state_after_delete(db: Session, tx_id: int) -> None:
-    old = db.query(Transaction).filter(Transaction.id == tx_id).first()
+def validate_state_after_delete(db: Session, tx_id: int, user_id: int) -> None:
+    old = (
+        db.query(Transaction)
+        .filter(Transaction.user_id == user_id, Transaction.id == tx_id)
+        .first()
+    )
     if not old:
         raise HTTPException(status_code=404, detail="Transacción no encontrada")
 
     sym = old.activo.upper()
-    base = [t for t in all_tx_for_ticker(db, sym) if t.id != tx_id]
+    base = [t for t in all_tx_for_ticker(db, sym, user_id) if t.id != tx_id]
     replay_validate_rows(base)

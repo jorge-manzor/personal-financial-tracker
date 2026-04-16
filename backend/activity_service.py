@@ -143,6 +143,7 @@ def _wallet_flow_amount(w: WalletMovement, target: Literal["USD", "CLP"], db: Se
 
 def monthly_movements(
     db: Session,
+    user_id: int,
     currency: Literal["USD", "CLP", "all"],
     scope: Literal["wallet", "stocks", "all", "fondos"] = "stocks",
 ) -> list[dict]:
@@ -174,7 +175,12 @@ def monthly_movements(
 
     buckets: dict[tuple[int, int], dict[str, float]] = defaultdict(empty_breakdown)
 
-    for w in db.query(WalletMovement).order_by(WalletMovement.occurred_at).all():
+    for w in (
+        db.query(WalletMovement)
+        .filter(WalletMovement.user_id == user_id)
+        .order_by(WalletMovement.occurred_at)
+        .all()
+    ):
         oc = w.occurred_at
         if isinstance(oc, datetime) and oc.tzinfo is not None:
             oc = oc.replace(tzinfo=None)
@@ -192,6 +198,7 @@ def monthly_movements(
     for tx in (
         db.query(Transaction)
         .filter(
+            Transaction.user_id == user_id,
             Transaction.source == "fintual",
             Transaction.categoria == "Acciones",
             Transaction.tipo.in_(["compra", "reinversion", "venta"]),
@@ -211,6 +218,7 @@ def monthly_movements(
     for tx in (
         db.query(Transaction)
         .filter(
+            Transaction.user_id == user_id,
             Transaction.categoria == "Fondos",
             Transaction.tipo.in_(["deposito", "retiro"]),
         )
@@ -278,7 +286,7 @@ def _month_label(y: int, m: int) -> str:
 _DIVIDEND_DEDUP_EPS_USD = 0.02
 
 
-def _fintual_dividend_signatures(db: Session) -> list[tuple[str, date, float]]:
+def _fintual_dividend_signatures(db: Session, user_id: int) -> list[tuple[str, date, float]]:
     """
     Firmas de dividendos ya traídos por sync por símbolo (`Transaction` source=fintual).
     Sirve para no duplicar el mismo cobro en la lista cuando también existe en `WalletMovement`.
@@ -287,6 +295,7 @@ def _fintual_dividend_signatures(db: Session) -> list[tuple[str, date, float]]:
     for t in (
         db.query(Transaction)
         .filter(
+            Transaction.user_id == user_id,
             Transaction.source == "fintual",
             Transaction.tipo == "dividendo",
             Transaction.categoria == "Acciones",
@@ -320,23 +329,33 @@ def _wallet_dividend_dup_of_fintual(
     return False
 
 
-def _all_combined_rows(db: Session) -> list[dict[str, Any]]:
+def _all_combined_rows(db: Session, user_id: int) -> list[dict[str, Any]]:
     combined: list[dict[str, Any]] = []
-    div_sigs = _fintual_dividend_signatures(db)
-    for w in db.query(WalletMovement).order_by(WalletMovement.occurred_at.desc()).all():
+    div_sigs = _fintual_dividend_signatures(db, user_id)
+    for w in (
+        db.query(WalletMovement)
+        .filter(WalletMovement.user_id == user_id)
+        .order_by(WalletMovement.occurred_at.desc())
+        .all()
+    ):
         if _wallet_dividend_dup_of_fintual(w, div_sigs):
             continue
         combined.append(_wallet_to_row(w))
     for t in (
         db.query(Transaction)
         .filter(
+            Transaction.user_id == user_id,
             Transaction.categoria.in_(["Fondos", "AFP"]),
             Transaction.source != "fintual",
         )
         .all()
     ):
         combined.append(_manual_to_row(t))
-    for t in db.query(Transaction).filter(Transaction.source == "fintual").all():
+    for t in (
+        db.query(Transaction)
+        .filter(Transaction.user_id == user_id, Transaction.source == "fintual")
+        .all()
+    ):
         combined.append(_fintual_stock_row(t))
     combined.sort(key=lambda x: (x["_sort_at"], x["id"]), reverse=True)
     return combined
@@ -418,13 +437,14 @@ _TIPO_ORDER = [
 
 def distinct_transaction_tipos(
     db: Session,
+    user_id: int,
     *,
     categoria: str | None = None,
     currency: str | None = None,
     q: str | None = None,
 ) -> list[str]:
     """Tipos presentes en datos filtrados por categoría/moneda/búsqueda (sin filtro por tipo)."""
-    combined = _all_combined_rows(db)
+    combined = _all_combined_rows(db, user_id)
     filtered = _filter_combined_rows(
         combined, tipo=None, categoria=categoria, currency=currency, q=q
     )
@@ -436,6 +456,7 @@ def distinct_transaction_tipos(
 
 def query_transactions(
     db: Session,
+    user_id: int,
     *,
     page: int = 1,
     page_size: int = 50,
@@ -445,7 +466,7 @@ def query_transactions(
     q: str | None = None,
     activo_exact: str | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
-    combined = _all_combined_rows(db)
+    combined = _all_combined_rows(db, user_id)
     combined = _filter_combined_rows(
         combined,
         tipo=tipo,

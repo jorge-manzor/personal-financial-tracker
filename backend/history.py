@@ -4,7 +4,8 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
-from sqlalchemy import delete, func
+
+from sqlalchemy import and_, delete, func
 from sqlalchemy.orm import Session
 
 from models import (
@@ -60,11 +61,12 @@ def first_trading_day_strictly_after(last: date, end: date) -> date | None:
     return tds[0] if tds else None
 
 
-def get_tickers_from_transactions(db: Session) -> list[str]:
+def get_tickers_from_transactions(db: Session, user_id: int) -> list[str]:
     """Símbolos con historial de acciones USD (transacciones y/o posición abierta)."""
     rows = (
         db.query(Transaction.activo)
         .filter(
+            Transaction.user_id == user_id,
             func.coalesce(Transaction.categoria, "Acciones") == "Acciones",
             func.coalesce(Transaction.currency, "USD") == "USD",
         )
@@ -72,42 +74,62 @@ def get_tickers_from_transactions(db: Session) -> list[str]:
         .all()
     )
     syms = {r[0].upper().strip() for r in rows if r[0]}
-    for p in db.query(FintualPosition).filter(FintualPosition.shares > 1e-12).all():
+    for p in (
+        db.query(FintualPosition)
+        .filter(FintualPosition.user_id == user_id, FintualPosition.shares > 1e-12)
+        .all()
+    ):
         if p.symbol:
             syms.add(p.symbol.upper().strip())
     return sorted(syms)
 
 
-def get_first_transaction_date(db: Session) -> date | None:
+def get_first_transaction_date(db: Session, user_id: int) -> date | None:
     """Primera fecha relevante al portafolio (manual, Fintual, precios)."""
     candidates: list[date] = []
-    r = db.query(func.min(Transaction.fecha)).scalar()
+    r = db.query(func.min(Transaction.fecha)).filter(Transaction.user_id == user_id).scalar()
     if r:
         candidates.append(r)
-    wm = db.query(func.min(WalletMovement.occurred_at)).scalar()
+    wm = (
+        db.query(func.min(WalletMovement.occurred_at))
+        .filter(WalletMovement.user_id == user_id)
+        .scalar()
+    )
     if wm:
         candidates.append(wm.date() if isinstance(wm, datetime) else wm)
-    pc = db.query(func.min(PriceCache.date)).scalar()
-    if pc:
-        candidates.append(pc)
-    mh = db.query(func.min(ManualAssetHistory.fecha)).scalar()
+    mh = (
+        db.query(func.min(ManualAssetHistory.fecha))
+        .join(ManualAsset, ManualAssetHistory.asset_id == ManualAsset.id)
+        .filter(ManualAsset.user_id == user_id)
+        .scalar()
+    )
     if mh:
         candidates.append(mh)
     return min(candidates) if candidates else None
 
 
-def get_last_cached_date(db: Session) -> date | None:
+def get_last_cached_date(db: Session, user_id: int) -> date | None:
     row = (
         db.query(PortfolioValueCache.fecha)
-        .filter(PortfolioValueCache.categoria == "total")
+        .filter(
+            PortfolioValueCache.user_id == user_id,
+            PortfolioValueCache.categoria == "total",
+        )
         .order_by(PortfolioValueCache.fecha.desc())
         .first()
     )
     return row[0] if row else None
 
 
-def delete_cache_from(db: Session, from_date: date) -> None:
-    db.execute(delete(PortfolioValueCache).where(PortfolioValueCache.fecha >= from_date))
+def delete_cache_from(db: Session, from_date: date, user_id: int) -> None:
+    db.execute(
+        delete(PortfolioValueCache).where(
+            and_(
+                PortfolioValueCache.user_id == user_id,
+                PortfolioValueCache.fecha >= from_date,
+            )
+        )
+    )
     db.commit()
 
 
@@ -126,14 +148,14 @@ def _interpolate_series(dates: list[date], vals: list[float], d: date) -> float:
     return vals[-1]
 
 
-def manual_breakdown_usd_at_date(db: Session, d: date) -> dict[str, float]:
+def manual_breakdown_usd_at_date(db: Session, d: date, user_id: int) -> dict[str, float]:
     from exchange_service import get_rate_for_date
 
     rate = get_rate_for_date(db, d)
     fondos_clp = 0.0
     afp_clp = 0.0
     manuales_usd = 0.0
-    for a in db.query(ManualAsset).all():
+    for a in db.query(ManualAsset).filter(ManualAsset.user_id == user_id).all():
         hist = (
             db.query(ManualAssetHistory)
             .filter(ManualAssetHistory.asset_id == a.id)
@@ -165,13 +187,9 @@ def manual_breakdown_usd_at_date(db: Session, d: date) -> dict[str, float]:
     }
 
 
-def manual_value_usd_on_date(db: Session, d: date) -> float:
-    b = manual_breakdown_usd_at_date(db, d)
+def manual_value_usd_on_date(db: Session, d: date, user_id: int) -> float:
+    b = manual_breakdown_usd_at_date(db, d, user_id)
     return float(b["manual_total_usd"])
-
-
-def _manual_value_on_date(db: Session, d: date) -> float:
-    return manual_value_usd_on_date(db, d)
 
 
 def is_stock_transaction(tx: Transaction) -> bool:
@@ -248,11 +266,11 @@ class ReplayState:
                 st.cost_basis = 0.0
 
 
-def fondos_afp_invertido_usd_now(db: Session) -> float:
+def fondos_afp_invertido_usd_now(db: Session, user_id: int) -> float:
     """Neto aportado solo en categorías Fondos + AFP (USD); no incluye Acciones ni Wallet USD."""
     st = FondosAfpSplitState()
     for tx in sorted(
-        db.query(Transaction).all(),
+        db.query(Transaction).filter(Transaction.user_id == user_id).all(),
         key=lambda t: (transaction_occurred_at(t), t.id),
     ):
         st.apply(tx, db)
@@ -265,13 +283,6 @@ def _load_close_prices_from_cache(
     _replay_start: date,
     end: date,
 ) -> dict[str, dict[date, float]]:
-    """
-    Map ticker -> {date -> close_price} from price_cache.
-
-    No lower bound on date: we need every prior close up to `end` so that for each
-    replay day `d`, "last close on or before d" can resolve to an earlier trading day
-    (e.g. Friday before Monday). Filtering only >= replay_start dropped that history.
-    """
     if not tickers:
         return {}
     rows = (
@@ -319,11 +330,6 @@ def _price_on_or_before(series: dict[date, float], d: date) -> float | None:
 
 
 def _mark_to_market_price(series: dict[date, float], d: date) -> float | None:
-    """
-    Mark-to-market close for date d: last cached close on or before d.
-    If d is before the first bar (e.g. sparse sync), use the earliest bar we have
-    (backward fill) so the line is not stuck at zero.
-    """
     if not series:
         return None
     px = _price_on_or_before(series, d)
@@ -333,9 +339,9 @@ def _mark_to_market_price(series: dict[date, float], d: date) -> float | None:
     return series[earliest_d]
 
 
-def _tx_by_date(db: Session) -> dict[date, list[Transaction]]:
+def _tx_by_date(db: Session, user_id: int) -> dict[date, list[Transaction]]:
     txs = sorted(
-        db.query(Transaction).all(),
+        db.query(Transaction).filter(Transaction.user_id == user_id).all(),
         key=lambda t: (transaction_occurred_at(t), t.id),
     )
     by_d: dict[date, list[Transaction]] = defaultdict(list)
@@ -344,26 +350,31 @@ def _tx_by_date(db: Session) -> dict[date, list[Transaction]]:
     return by_d
 
 
-def compute_portfolio_history(db: Session, from_date: date, to_date: date) -> None:
+def compute_portfolio_history(db: Session, from_date: date, to_date: date, user_id: int) -> None:
     """
     Replay from first transaction through `to_date`, but only persist rows for
     dates >= from_date and <= to_date.
     """
-    first_tx = get_first_transaction_date(db)
+    first_tx = get_first_transaction_date(db, user_id)
     replay_start = first_tx if first_tx else from_date
     replay_start = min(replay_start, from_date)
 
-    tickers = get_tickers_from_transactions(db)
+    tickers = get_tickers_from_transactions(db, user_id)
     trading_days = trading_days_between(replay_start, to_date)
     if not trading_days:
         return
 
     close_by_ticker = _load_close_prices_from_cache(db, tickers, replay_start, to_date)
     latest_close_by_ticker = _latest_close_by_ticker(db, tickers)
-    tx_by_date = _tx_by_date(db)
+    tx_by_date = _tx_by_date(db, user_id)
 
     splits_by_date: dict[date, list[StockSplit]] = defaultdict(list)
-    for sp in db.query(StockSplit).order_by(StockSplit.split_date, StockSplit.id).all():
+    for sp in (
+        db.query(StockSplit)
+        .filter(StockSplit.user_id == user_id)
+        .order_by(StockSplit.split_date, StockSplit.id)
+        .all()
+    ):
         splits_by_date[sp.split_date].append(sp)
 
     fondos_afp_state = FondosAfpSplitState()
@@ -372,8 +383,11 @@ def compute_portfolio_history(db: Session, from_date: date, to_date: date) -> No
 
     db.execute(
         delete(PortfolioValueCache).where(
-            PortfolioValueCache.fecha >= from_date,
-            PortfolioValueCache.fecha <= to_date,
+            and_(
+                PortfolioValueCache.user_id == user_id,
+                PortfolioValueCache.fecha >= from_date,
+                PortfolioValueCache.fecha <= to_date,
+            )
         )
     )
 
@@ -418,7 +432,7 @@ def compute_portfolio_history(db: Session, from_date: date, to_date: date) -> No
                 acciones_valor += st.shares * px
             acciones_invertido += st.cost_basis
 
-        b = manual_breakdown_usd_at_date(db, d)
+        b = manual_breakdown_usd_at_date(db, d, user_id)
         fondos_valor = float(b["fondos_usd_equiv"])
         afp_valor = float(b["afp_usd_equiv"])
         manuales_valor = float(b["manuales_usd"])
@@ -436,6 +450,7 @@ def compute_portfolio_history(db: Session, from_date: date, to_date: date) -> No
         ):
             db.add(
                 PortfolioValueCache(
+                    user_id=user_id,
                     fecha=d,
                     categoria=cat,
                     valor=float(valor),
@@ -446,31 +461,48 @@ def compute_portfolio_history(db: Session, from_date: date, to_date: date) -> No
     db.commit()
 
 
-def ensure_cache(db: Session, force: bool = False) -> tuple[bool, date | None]:
-    """
-    Returns (did_compute, last_trading_day).
-    """
+def ensure_cache(db: Session, user_id: int, force: bool = False) -> tuple[bool, date | None]:
+    """Returns (did_compute, last_trading_day)."""
     last_td = get_last_trading_day()
-    first_tx = get_first_transaction_date(db)
-    has_manual = db.query(ManualAssetHistory).first() is not None
+    first_tx = get_first_transaction_date(db, user_id)
+    has_manual = (
+        db.query(ManualAssetHistory)
+        .join(ManualAsset, ManualAssetHistory.asset_id == ManualAsset.id)
+        .filter(ManualAsset.user_id == user_id)
+        .first()
+        is not None
+    )
     if not first_tx and not has_manual:
         return False, last_td
 
-    has_rows = db.query(PortfolioValueCache.id).first() is not None
+    has_rows = (
+        db.query(PortfolioValueCache.id).filter(PortfolioValueCache.user_id == user_id).first()
+        is not None
+    )
     has_fondos_cat = (
-        db.query(PortfolioValueCache.id).filter(PortfolioValueCache.categoria == "fondos").first()
+        db.query(PortfolioValueCache.id)
+        .filter(
+            PortfolioValueCache.user_id == user_id,
+            PortfolioValueCache.categoria == "fondos",
+        )
+        .first()
         is not None
     )
     has_afp_cat = (
-        db.query(PortfolioValueCache.id).filter(PortfolioValueCache.categoria == "afp").first()
+        db.query(PortfolioValueCache.id)
+        .filter(
+            PortfolioValueCache.user_id == user_id,
+            PortfolioValueCache.categoria == "afp",
+        )
+        .first()
         is not None
     )
     if has_rows and (not has_fondos_cat or not has_afp_cat):
-        db.execute(delete(PortfolioValueCache))
+        db.execute(delete(PortfolioValueCache).where(PortfolioValueCache.user_id == user_id))
         db.commit()
         force = True
 
-    last_cached = get_last_cached_date(db)
+    last_cached = get_last_cached_date(db, user_id)
 
     if not force and last_cached and last_cached >= last_td:
         return False, last_td
@@ -481,46 +513,52 @@ def ensure_cache(db: Session, force: bool = False) -> tuple[bool, date | None]:
         start_compute = first_tx
 
     if force:
-        db.execute(delete(PortfolioValueCache))
+        db.execute(delete(PortfolioValueCache).where(PortfolioValueCache.user_id == user_id))
         db.commit()
         from_d = start_compute
-        compute_portfolio_history(db, from_d, last_td)
+        compute_portfolio_history(db, from_d, last_td, user_id)
         return True, last_td
 
     if last_cached is None:
         from_d = start_compute
-        delete_cache_from(db, from_d)
+        delete_cache_from(db, from_d, user_id)
     else:
         nxt = first_trading_day_strictly_after(last_cached, last_td)
         if nxt is None or nxt > last_td:
             return False, last_td
         from_d = nxt
-        delete_cache_from(db, from_d)
+        delete_cache_from(db, from_d, user_id)
 
-    compute_portfolio_history(db, from_d, last_td)
+    compute_portfolio_history(db, from_d, last_td, user_id)
     return True, last_td
 
 
-def recompute_from_transaction_date(db: Session, tx_fecha: date) -> None:
+def recompute_from_transaction_date(db: Session, tx_fecha: date, user_id: int) -> None:
     last_td = get_last_trading_day()
-    delete_cache_from(db, tx_fecha)
-    compute_portfolio_history(db, tx_fecha, last_td)
+    delete_cache_from(db, tx_fecha, user_id)
+    compute_portfolio_history(db, tx_fecha, last_td, user_id)
 
 
-def full_recompute(db: Session) -> None:
-    first_tx = get_first_transaction_date(db)
+def full_recompute(db: Session, user_id: int) -> None:
+    first_tx = get_first_transaction_date(db, user_id)
     last_td = get_last_trading_day()
-    if not first_tx and not db.query(ManualAssetHistory).first():
+    has_m = (
+        db.query(ManualAssetHistory)
+        .join(ManualAsset, ManualAssetHistory.asset_id == ManualAsset.id)
+        .filter(ManualAsset.user_id == user_id)
+        .first()
+    )
+    if not first_tx and not has_m:
         return
     start = first_tx or last_td
-    db.execute(delete(PortfolioValueCache))
+    db.execute(delete(PortfolioValueCache).where(PortfolioValueCache.user_id == user_id))
     db.commit()
-    compute_portfolio_history(db, start, last_td)
+    compute_portfolio_history(db, start, last_td, user_id)
 
 
-def cache_needs_sync(db: Session) -> bool:
+def cache_needs_sync(db: Session, user_id: int) -> bool:
     last_td = get_last_trading_day()
-    last_cached = get_last_cached_date(db)
+    last_cached = get_last_cached_date(db, user_id)
     if last_cached is None:
         return True
     return last_cached < last_td

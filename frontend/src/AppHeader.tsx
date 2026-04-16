@@ -1,16 +1,10 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { API_BASE } from "./config";
+import { apiFetch, fetchJson } from "./api";
 import type { ExchangeRateInfo } from "./types";
 
-async function fetchJson<T>(path: string): Promise<T> {
-  const r = await fetch(`${API_BASE}${path}`);
-  if (!r.ok) throw new Error(String(r.status));
-  return r.json() as Promise<T>;
-}
-
 async function postExchangeRefresh(): Promise<ExchangeRateInfo> {
-  const r = await fetch(`${API_BASE}/exchange-rate/refresh`, { method: "POST" });
+  const r = await apiFetch("/exchange-rate/refresh", { method: "POST" });
   if (!r.ok) throw new Error(String(r.status));
   return r.json() as Promise<ExchangeRateInfo>;
 }
@@ -60,10 +54,14 @@ interface AppHeaderProps {
   syncDisabled: boolean;
   /** Se incrementa al terminar “Actualizar”; relee el TC ya guardado por el sync. */
   fxRefreshNonce: number;
+  /** Si es false, se ocultan tipo de cambio y botón de sincronizar (sin servicio de inversiones). */
+  investmentsEnabled: boolean;
 }
 
-function headerSubtitle(pathname: string): string {
+function headerSubtitle(pathname: string, investmentsEnabled: boolean): string {
+  if (pathname.startsWith("/profile")) return "Servicios y preferencias";
   if (pathname.startsWith("/transactions")) return "Movimientos y actividad";
+  if (!investmentsEnabled && pathname === "/") return "Inicio";
   return "Resumen del portafolio";
 }
 
@@ -73,22 +71,28 @@ export function AppHeader({
   headerSyncStartedAt,
   syncDisabled,
   fxRefreshNonce,
+  investmentsEnabled,
 }: AppHeaderProps) {
   const { pathname } = useLocation();
   const [ex, setEx] = useState<ExchangeRateInfo | null>(null);
 
   useEffect(() => {
+    if (!investmentsEnabled) {
+      setEx(null);
+      return;
+    }
     postExchangeRefresh()
       .then(setEx)
       .catch(() => setEx(null));
-  }, []);
+  }, [investmentsEnabled]);
 
   useEffect(() => {
+    if (!investmentsEnabled) return;
     if (fxRefreshNonce === 0) return;
     fetchJson<ExchangeRateInfo>("/exchange-rate")
       .then(setEx)
       .catch(() => setEx(null));
-  }, [fxRefreshNonce]);
+  }, [fxRefreshNonce, investmentsEnabled]);
 
   const rateText =
     ex != null
@@ -97,7 +101,7 @@ export function AppHeader({
 
   return (
     <header
-      className="fixed left-14 right-0 top-0 z-[45] flex h-14 items-center border-b border-[#30363d] bg-[#0d0f14] px-3 md:px-5"
+      className="fixed left-16 right-0 top-0 z-[45] flex h-14 items-center border-b border-[#30363d] bg-[#0d0f14] px-3 md:px-5"
       style={{ height: 56 }}
     >
       <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center justify-between gap-2">
@@ -106,34 +110,40 @@ export function AppHeader({
             <span className="text-[#3b82f6]">Moni</span>
             <span className="text-white">tro</span>
           </h1>
-          <p className="truncate text-[11px] font-medium text-[#8b949e] md:text-xs">{headerSubtitle(pathname)}</p>
+          <p className="truncate text-[11px] font-medium text-[#8b949e] md:text-xs">
+            {headerSubtitle(pathname, investmentsEnabled)}
+          </p>
         </div>
 
         <div className="flex flex-shrink-0 items-center justify-end gap-3 md:gap-4">
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xs text-[#8b949e]">USD/CLP</span>
-            <span className="text-sm font-semibold tabular-nums text-white">{rateText}</span>
-          </div>
+          {investmentsEnabled && (
+            <>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xs text-[#8b949e]">USD/CLP</span>
+                <span className="text-sm font-semibold tabular-nums text-white">{rateText}</span>
+              </div>
 
-          {headerSyncing ? (
-            <div className="flex items-center gap-2 rounded-lg border border-[#30363d] px-3 py-1.5 text-xs text-[#8b949e]">
-              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#8b949e] border-t-transparent" />
-              {headerSyncStartedAt != null ? (
-                <HeaderSyncElapsed startedAt={headerSyncStartedAt} />
+              {headerSyncing ? (
+                <div className="flex items-center gap-2 rounded-lg border border-[#30363d] px-3 py-1.5 text-xs text-[#8b949e]">
+                  <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#8b949e] border-t-transparent" />
+                  {headerSyncStartedAt != null ? (
+                    <HeaderSyncElapsed startedAt={headerSyncStartedAt} />
+                  ) : (
+                    <span className="text-[#e6edf3]">Actualizando…</span>
+                  )}
+                </div>
               ) : (
-                <span className="text-[#e6edf3]">Actualizando…</span>
+                <button
+                  type="button"
+                  disabled={syncDisabled}
+                  onClick={onRefreshPrices}
+                  className="flex items-center gap-2 rounded-lg border border-[#3d444d] bg-transparent px-3 py-1.5 text-sm font-normal text-white transition-colors hover:border-[#6e7681] hover:bg-[#161b22] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <RefreshIcon className="shrink-0 text-white" />
+                  Actualizar
+                </button>
               )}
-            </div>
-          ) : (
-            <button
-              type="button"
-              disabled={syncDisabled}
-              onClick={onRefreshPrices}
-              className="flex items-center gap-2 rounded-lg border border-[#3d444d] bg-transparent px-3 py-1.5 text-sm font-normal text-white transition-colors hover:border-[#6e7681] hover:bg-[#161b22] disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <RefreshIcon className="shrink-0 text-white" />
-              Actualizar
-            </button>
+            </>
           )}
         </div>
       </div>

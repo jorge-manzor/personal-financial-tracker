@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -18,8 +20,8 @@ import httpx
 logger = logging.getLogger(__name__)
 
 FINTUAL_GQL = "https://fintual.cl/gql/"
-# Movimientos de metas/fondos: el esquema `clGoalMovementsActivity` suele estar en rutaboard.
-FINTUAL_GQL_GOALS = (os.environ.get("FINTUAL_GQL_GOALS") or "https://rutaboard.vercel.app/gql").strip()
+# Movimientos de metas/fondos (mismo host que el GQL principal; override con FINTUAL_GQL_GOALS si hiciera falta).
+FINTUAL_GQL_GOALS = (os.environ.get("FINTUAL_GQL_GOALS") or "https://fintual.cl/gql/").strip()
 FINTUAL_JWT_URL = "https://fintual.cl/auth/jwt"
 FINTUAL_PRICING_HISTORICAL = "https://fintual.cl/stocks-pricing-cl/historical-prices"
 FINTUAL_PRICING_CURRENT = "https://fintual.cl/stocks-pricing-cl/current-prices"
@@ -255,16 +257,48 @@ def sector_industry_for_symbol(symbol: str) -> tuple[str | None, str | None]:
     return m.get("sector"), m.get("industry")
 
 
+_fintual_override: ContextVar[tuple[str, str] | None] = ContextVar("_fintual_override", default=None)
+
+
 def fintual_session() -> str:
+    o = _fintual_override.get()
+    if o is not None:
+        return o[0]
     return (os.environ.get("FINTUAL_SESSION") or "").strip()
 
 
 def fintual_uid() -> str:
+    o = _fintual_override.get()
+    if o is not None:
+        return o[1]
     return (os.environ.get("FINTUAL_UID") or "").strip()
 
 
 def fintual_configured() -> bool:
-    return bool(fintual_session() and fintual_uid())
+    """Hay cookie de sesión usable (y opcionalmente uid); basta la sesión para la mayoría de llamadas."""
+    return bool(fintual_session())
+
+
+@contextmanager
+def use_fintual_credentials(session: str | None, uid: str | None):
+    """
+    Credenciales Fintual por usuario (DB). Si hay sesión en DB, se usa (uid puede ir vacío).
+    Si no hay sesión en DB, no se cae a FINTUAL_* del entorno (evita mezclar cuentas en servidor multiusuario).
+    """
+    s = (session or "").strip()
+    u = (uid or "").strip()
+    if s:
+        tok = _fintual_override.set((s, u))
+        try:
+            yield
+        finally:
+            _fintual_override.reset(tok)
+    else:
+        tok = _fintual_override.set(("", ""))
+        try:
+            yield
+        finally:
+            _fintual_override.reset(tok)
 
 
 def _cookie_dict() -> dict[str, str]:
@@ -315,7 +349,7 @@ query GoalMovementsActivity($goalId: ID!, $page: Int!, $pageSize: Int!) {
 
 
 def _post_gql_goals(operation: str, variables: dict[str, Any], query: str) -> dict[str, Any]:
-    """GraphQL de metas (rutaboard): headers x-fintual-* + cookies."""
+    """GraphQL de metas: headers x-fintual-* + cookies (mismo origen que FINTUAL_GQL por defecto)."""
     headers = {
         **_gql_headers(),
         "x-fintual-session": fintual_session(),

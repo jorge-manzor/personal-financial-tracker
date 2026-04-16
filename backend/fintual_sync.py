@@ -305,7 +305,7 @@ def _fetch_asset_details_safe(sym: str, fallback_id: str) -> dict[str, Any]:
         return {"id": fallback_id, "name": sym, "symbol": sym}
 
 
-def sync_positions(db: Session) -> int:
+def sync_positions(db: Session, user_id: int) -> int:
     raw = get_stock_positions_raw()
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     seen: set[str] = set()
@@ -344,7 +344,11 @@ def sync_positions(db: Session) -> int:
         sec, ind = sector_industry_for_symbol(sym)
         fid = str(details.get("id") or p.get("id") or "")
         name = (details.get("name") or sym).strip()
-        row = db.query(FintualPosition).filter(FintualPosition.symbol == sym).first()
+        row = (
+            db.query(FintualPosition)
+            .filter(FintualPosition.user_id == user_id, FintualPosition.symbol == sym)
+            .first()
+        )
         if row:
             row.name = name
             row.fintual_asset_id = fid
@@ -355,6 +359,7 @@ def sync_positions(db: Session) -> int:
         else:
             db.add(
                 FintualPosition(
+                    user_id=user_id,
                     symbol=sym,
                     name=name,
                     fintual_asset_id=fid,
@@ -367,7 +372,7 @@ def sync_positions(db: Session) -> int:
         upsert_stock_asset(db, sym, name, fintual_asset_id=fid or None)
         n += 1
 
-    for row in db.query(FintualPosition).all():
+    for row in db.query(FintualPosition).filter(FintualPosition.user_id == user_id).all():
         if row.symbol not in seen:
             db.delete(row)
 
@@ -406,9 +411,9 @@ def _shares_exact_str(n: float) -> str:
     return s if s else "0"
 
 
-def _replace_stock_splits(db: Session, sym: str, splits: list[dict[str, Any]]) -> None:
+def _replace_stock_splits(db: Session, sym: str, splits: list[dict[str, Any]], user_id: int) -> None:
     su = sym.upper().strip()
-    db.query(StockSplit).filter(StockSplit.symbol == su).delete()
+    db.query(StockSplit).filter(StockSplit.user_id == user_id, StockSplit.symbol == su).delete()
     for s in splits or []:
         sid = str(s.get("id") or "").strip()
         fd = _parse_iso_date(s.get("date"))
@@ -418,7 +423,9 @@ def _replace_stock_splits(db: Session, sym: str, splits: list[dict[str, Any]]) -
             continue
         if not sid or fd is None or rate <= 0:
             continue
-        db.add(StockSplit(symbol=su, split_date=fd, rate=rate, fintual_id=sid))
+        db.add(
+            StockSplit(user_id=user_id, symbol=su, split_date=fd, rate=rate, fintual_id=sid)
+        )
 
 
 def _split_display_rows_for_symbol(
@@ -507,10 +514,14 @@ def _sell_sort_ts(sell: dict[str, Any]) -> datetime:
     return datetime(1970, 1, 1)
 
 
-def _collect_symbols(db: Session, position_symbols: list[str]) -> list[str]:
+def _collect_symbols(db: Session, position_symbols: list[str], user_id: int) -> list[str]:
     prev = (
         db.query(Transaction.activo)
-        .filter(Transaction.source == "fintual", Transaction.categoria == "Acciones")
+        .filter(
+            Transaction.user_id == user_id,
+            Transaction.source == "fintual",
+            Transaction.categoria == "Acciones",
+        )
         .distinct()
         .all()
     )
@@ -519,11 +530,12 @@ def _collect_symbols(db: Session, position_symbols: list[str]) -> list[str]:
     return sorted(s)
 
 
-def sync_fintual_stock_transactions(db: Session, symbols: list[str]) -> int:
+def sync_fintual_stock_transactions(db: Session, symbols: list[str], user_id: int) -> int:
     """Reemplaza movimientos de acciones desde Fintual (compras, ventas, divs, divisiones)."""
     db.execute(
         delete(Transaction).where(
             and_(
+                Transaction.user_id == user_id,
                 Transaction.source == "fintual",
                 or_(
                     Transaction.categoria == "Acciones",
@@ -668,7 +680,7 @@ def sync_fintual_stock_transactions(db: Session, symbols: list[str]) -> int:
 
         pending.extend(sym_rows)
         pending.extend(_split_display_rows_for_symbol(sym, sym_rows, pack.get("splits") or []))
-        _replace_stock_splits(db, sym, pack.get("splits") or [])
+        _replace_stock_splits(db, sym, pack.get("splits") or [], user_id)
 
     pending.sort(key=lambda r: (r["_sort_at"], r["external_id"]))
 
@@ -677,6 +689,7 @@ def sync_fintual_stock_transactions(db: Session, symbols: list[str]) -> int:
         ext = row.pop("external_id")
         db.add(
             Transaction(
+                user_id=user_id,
                 fecha=row["fecha"],
                 tipo=row["tipo"],
                 activo=row["activo"],
@@ -703,13 +716,19 @@ _GOAL_DEPOSIT_WITHDRAW_TYPES = frozenset(
 )
 
 
-def sync_fintual_goal_transactions(db: Session) -> int:
+def sync_fintual_goal_transactions(db: Session, user_id: int) -> int:
     """Depósitos y retiros en CLP de fondos/metas Fintual (`categoria=Fondos`, nombre = meta)."""
     if not fintual_configured():
         return 0
 
     db.execute(
-        delete(Transaction).where(and_(Transaction.source == "fintual", Transaction.categoria == "Fondos"))
+        delete(Transaction).where(
+            and_(
+                Transaction.user_id == user_id,
+                Transaction.source == "fintual",
+                Transaction.categoria == "Fondos",
+            )
+        )
     )
     db.commit()
 
@@ -775,6 +794,7 @@ def sync_fintual_goal_transactions(db: Session) -> int:
         ext = row.pop("external_id")
         db.add(
             Transaction(
+                user_id=user_id,
                 fecha=row["fecha"],
                 tipo=row["tipo"],
                 activo=row["activo"],
@@ -793,14 +813,18 @@ def sync_fintual_goal_transactions(db: Session) -> int:
     return len(pending)
 
 
-def sync_wallet_movements(db: Session, wallet_raw: dict[str, Any] | None = None) -> int:
+def sync_wallet_movements(db: Session, user_id: int, wallet_raw: dict[str, Any] | None = None) -> int:
     raw = wallet_raw if wallet_raw is not None else fetch_wallet_graphql_all_pages()
     events = normalize_wallet_events(raw)
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     n = 0
     for e in events:
         key = e["external_key"]
-        row = db.query(WalletMovement).filter(WalletMovement.external_key == key).first()
+        row = (
+            db.query(WalletMovement)
+            .filter(WalletMovement.user_id == user_id, WalletMovement.external_key == key)
+            .first()
+        )
         oc = e["occurred_at"]
         if oc.tzinfo is not None:
             oc = oc.replace(tzinfo=None)
@@ -818,6 +842,7 @@ def sync_wallet_movements(db: Session, wallet_raw: dict[str, Any] | None = None)
         else:
             db.add(
                 WalletMovement(
+                    user_id=user_id,
                     external_key=key,
                     event_type=e["event_type"],
                     occurred_at=oc,
@@ -866,11 +891,12 @@ def _upsert_prices(db: Session, symbol: str, prices: list[dict]) -> int:
     return count
 
 
-def _first_event_date_for_symbol(db: Session, symbol: str) -> date | None:
+def _first_event_date_for_symbol(db: Session, symbol: str, user_id: int) -> date | None:
     sym = symbol.upper().strip()
     r = (
         db.query(Transaction.fecha)
         .filter(
+            Transaction.user_id == user_id,
             Transaction.source == "fintual",
             Transaction.activo == sym,
             Transaction.categoria == "Acciones",
@@ -886,21 +912,26 @@ def _date_to_start_iso(d: date) -> str:
 
 
 def sync_historical_prices_for_symbol(
-    db: Session, symbol: str, *, force: bool = False, start_date: date | None = None
+    db: Session,
+    symbol: str,
+    *,
+    user_id: int,
+    force: bool = False,
+    start_date: date | None = None,
 ) -> int:
     sym = symbol.upper().strip()
     if force:
         db.query(PriceCache).filter(PriceCache.ticker == sym).delete()
         db.commit()
 
-    fd = start_date or _first_event_date_for_symbol(db, sym)
+    fd = start_date or _first_event_date_for_symbol(db, sym, user_id)
     start_iso = _date_to_start_iso(fd) if fd else DEFAULT_HIST_START
     jwt = refresh_pricing_jwt()
     raw = get_historical_prices_raw(sym, start=start_iso, jwt=jwt)
     return _upsert_prices(db, sym, raw)
 
 
-def sync_current_prices_batch(db: Session, symbols: list[str]) -> int:
+def sync_current_prices_batch(db: Session, symbols: list[str], _user_id: int) -> int:
     if not symbols:
         return 0
     try:
@@ -945,29 +976,29 @@ def _latest_price_cache_date(db: Session, symbol: str) -> date | None:
     return db.query(func.max(PriceCache.date)).filter(PriceCache.ticker == sym).scalar()
 
 
-def sync_all_fintual(db: Session, *, force_prices: bool = False) -> dict[str, int]:
+def sync_all_fintual(db: Session, user_id: int, *, force_prices: bool = False) -> dict[str, int]:
     if not fintual_configured():
         logger.warning("Fintual no configurado (FINTUAL_SESSION / FINTUAL_UID)")
         return {"positions": 0, "wallet": 0, "stock_tx": 0, "goal_tx": 0, "price_rows": 0, "current_prices": 0}
 
-    n_pos = sync_positions(db)
-    pos_syms = [r.symbol for r in db.query(FintualPosition).all()]
+    n_pos = sync_positions(db, user_id)
+    pos_syms = [r.symbol for r in db.query(FintualPosition).filter(FintualPosition.user_id == user_id).all()]
     wallet_raw = fetch_wallet_graphql_all_pages()
     extra_syms = wallet_stock_symbols_from_raw(wallet_raw)
-    base_syms = set(_collect_symbols(db, pos_syms))
+    base_syms = set(_collect_symbols(db, pos_syms, user_id))
     if extra_syms - base_syms:
         logger.info(
             "tickers en historial de wallet sin posición actual: %s",
             sorted(extra_syms - base_syms),
         )
     symbols = sorted(base_syms | extra_syms)
-    n_tx = sync_fintual_stock_transactions(db, symbols) if symbols else 0
-    n_goals = sync_fintual_goal_transactions(db)
-    n_wm = sync_wallet_movements(db, wallet_raw=wallet_raw)
+    n_tx = sync_fintual_stock_transactions(db, symbols, user_id) if symbols else 0
+    n_goals = sync_fintual_goal_transactions(db, user_id)
+    n_wm = sync_wallet_movements(db, user_id, wallet_raw=wallet_raw)
 
     from history import get_last_trading_day, get_tickers_from_transactions
 
-    tickers = get_tickers_from_transactions(db)
+    tickers = get_tickers_from_transactions(db, user_id)
     total_prices = 0
     last_td = get_last_trading_day()
     jwt = refresh_pricing_jwt()
@@ -977,7 +1008,7 @@ def sync_all_fintual(db: Session, *, force_prices: bool = False) -> dict[str, in
                 latest = _latest_price_cache_date(db, sym)
                 if latest is not None and latest >= last_td:
                     continue
-            fd = _first_event_date_for_symbol(db, sym)
+            fd = _first_event_date_for_symbol(db, sym, user_id)
             start_iso = _date_to_start_iso(fd) if fd else DEFAULT_HIST_START
             if force_prices:
                 db.query(PriceCache).filter(PriceCache.ticker == sym.upper()).delete()
@@ -987,7 +1018,7 @@ def sync_all_fintual(db: Session, *, force_prices: bool = False) -> dict[str, in
         except Exception as e:
             logger.warning("histórico Fintual %s: %s", sym, e)
 
-    n_cur = sync_current_prices_batch(db, tickers)
+    n_cur = sync_current_prices_batch(db, tickers, user_id)
 
     return {
         "positions": n_pos,

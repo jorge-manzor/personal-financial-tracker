@@ -1,3 +1,46 @@
+/** Preferencias de servicios (extensible: nuevas claves en el futuro). */
+export interface UserServices {
+  investments: boolean;
+}
+
+export interface UserMe {
+  id: number;
+  email: string;
+  services: UserServices;
+  /** True si falta cookie guardada o hay que reconectar Fintual. */
+  fintual_needs_setup: boolean;
+  /** True si una sync falló por sesión inválida (p. ej. cookie caducada ~30 días). */
+  fintual_reconnect_required: boolean;
+  /** Credenciales Fintual guardadas (mostrar enmascaradas en Perfil). */
+  fintual_session_cookie: string | null;
+  fintual_uid: string | null;
+}
+
+export function normalizeUserMe(raw: {
+  id: number;
+  email: string;
+  services?: Record<string, boolean> | UserServices;
+  fintual_needs_setup?: boolean;
+  fintual_reconnect_required?: boolean;
+  fintual_session_cookie?: string | null;
+  fintual_uid?: string | null;
+}): UserMe {
+  const inv = raw.services && "investments" in raw.services ? raw.services.investments : undefined;
+  return {
+    id: raw.id,
+    email: raw.email,
+    services: { investments: inv ?? false },
+    fintual_needs_setup: raw.fintual_needs_setup ?? false,
+    fintual_reconnect_required: raw.fintual_reconnect_required ?? false,
+    fintual_session_cookie: raw.fintual_session_cookie ?? null,
+    fintual_uid: raw.fintual_uid ?? null,
+  };
+}
+
+export function hasAnyActiveService(services: UserServices): boolean {
+  return Object.values(services).some(Boolean);
+}
+
 export type Period = "1M" | "3M" | "6M" | "1Y" | "3Y" | "YTD" | "ALL";
 
 /** Moneda de visualización del gráfico principal del portafolio. */

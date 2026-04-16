@@ -9,7 +9,7 @@ import {
   formatTxSignedAmount,
   txDirectionLabel,
 } from "./format";
-import { API_BASE } from "./config";
+import { apiFetch } from "./api";
 import type { TransactionRow } from "./types";
 import {
   TxAvatar,
@@ -72,7 +72,7 @@ export function TransactionDetailModal({ tx, onClose }: Props) {
       return;
     }
     let cancelled = false;
-    fetch(`${API_BASE}/stocks/${encodeURIComponent(sym)}/display`)
+    apiFetch(`/stocks/${encodeURIComponent(sym)}/display`)
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { name?: string | null } | null) => {
         if (cancelled || !d?.name?.trim()) return;

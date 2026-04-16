@@ -1,13 +1,31 @@
-from sqlalchemy import Column, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from database import Base
 
 
-class Transaction(Base):
-    __tablename__ = "transactions"
+class User(Base):
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    password_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    # Credenciales Fintual por usuario; si son null, se usa FINTUAL_* del entorno.
+    fintual_session = Column(Text, nullable=True)
+    fintual_uid = Column(String(64), nullable=True)
+    # JSON: {"investments": bool, ...} — funcionalidades opt-in por usuario.
+    services_json = Column(Text, nullable=True)
+    # True si la última llamada a Fintual indicó sesión inválida (p. ej. cookie expirada).
+    fintual_reconnect_required = Column(Boolean, nullable=False, default=False)
+
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+    __table_args__ = (UniqueConstraint("user_id", "external_id", name="uq_transactions_user_external"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     fecha = Column(Date, nullable=False, index=True)
     tipo = Column(String(20), nullable=False)
     activo = Column(String(32), nullable=False)
@@ -18,7 +36,7 @@ class Transaction(Base):
     currency = Column(String(8), nullable=False, default="USD")
     nombre_activo = Column(Text, nullable=True)
     source = Column(String(16), nullable=False, default="manual")
-    external_id = Column(String(128), nullable=True, unique=True, index=True)
+    external_id = Column(String(128), nullable=True, index=True)
     # Fintual: fulfilledAt / fecha de dividendo; manual: mediodía en fecha contable (orden estable).
     occurred_at = Column(DateTime, nullable=True, index=True)
 
@@ -27,6 +45,7 @@ class ManualAsset(Base):
     __tablename__ = "manual_assets"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     nombre = Column(Text, nullable=False)
     categoria = Column(Text, nullable=False)
     moneda = Column(String(8), nullable=False, default="USD")
@@ -54,6 +73,7 @@ class PortfolioValueCache(Base):
     __tablename__ = "portfolio_value_cache"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     fecha = Column(Date, nullable=False, index=True)
     categoria = Column(String(32), nullable=False)
     valor = Column(Float, nullable=False)
@@ -86,9 +106,11 @@ class FintualPosition(Base):
     """Posición acciones US en Fintual."""
 
     __tablename__ = "fintual_positions"
+    __table_args__ = (UniqueConstraint("user_id", "symbol", name="uq_fintual_positions_user_symbol"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    symbol = Column(String(32), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    symbol = Column(String(32), nullable=False, index=True)
     name = Column(Text, nullable=True)
     fintual_asset_id = Column(String(64), nullable=True)
     shares = Column(Float, nullable=False)
@@ -101,9 +123,11 @@ class WalletMovement(Base):
     """Movimientos billetera acciones Fintual (GraphQL)."""
 
     __tablename__ = "wallet_movements"
+    __table_args__ = (UniqueConstraint("user_id", "external_key", name="uq_wallet_movements_user_ext"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    external_key = Column(String(160), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    external_key = Column(String(160), nullable=False, index=True)
     event_type = Column(String(32), nullable=False, index=True)
     occurred_at = Column(DateTime, nullable=False, index=True)
     symbol = Column(String(32), nullable=True, index=True)
@@ -140,8 +164,10 @@ class StockSplit(Base):
     """Splits desde Fintual (`stocksAssetMovements.splits`) — replay: shares ×= rate; cost basis USD sin cambio."""
 
     __tablename__ = "stock_splits"
+    __table_args__ = (UniqueConstraint("user_id", "fintual_id", name="uq_stock_splits_user_fintual_id"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     symbol = Column(String(32), nullable=False, index=True)
     split_date = Column(Date, nullable=False, index=True)
     rate = Column(Float, nullable=False)
