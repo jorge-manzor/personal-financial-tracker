@@ -18,11 +18,21 @@ export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T>
 }
 
 export async function patchJson<T>(path: string, body: unknown): Promise<T> {
-  return fetchJson<T>(path, {
+  const r = await apiFetch(path, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (r.status === 401) throw new Error("401");
+  if (!r.ok) {
+    const j = (await r.json().catch(() => null)) as { detail?: string | { msg: string }[] } | null;
+    let msg = `Error ${r.status}`;
+    if (j?.detail != null) {
+      msg = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail);
+    }
+    throw new Error(msg);
+  }
+  return r.json() as Promise<T>;
 }
 
 export async function postJson<T>(path: string, body: unknown): Promise<T> {

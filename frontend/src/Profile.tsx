@@ -125,7 +125,7 @@ function FintualCredentialsBlock({
       </div>
 
       {!hasAny && (
-        <p className="mt-2 text-xs text-[#8b949e]">Aún no hay credenciales guardadas. Conectá Fintual cuando la app te lo indique o con el botón de abajo.</p>
+        <p className="mt-2 text-xs text-[#8b949e]">Aún no hay credenciales guardadas. Conecta Fintual cuando la app te lo indique o con el botón de abajo.</p>
       )}
     </div>
   );
@@ -152,6 +152,7 @@ export function Profile({
   const [revealFintualSecrets, setRevealFintualSecrets] = useState(false);
 
   const inv = me.services.investments;
+  const bank = me.services.banking;
 
   async function setInvestments(next: boolean) {
     if (next === inv) return;
@@ -161,7 +162,21 @@ export function Profile({
       const u = await patchJson<UserMe>("/auth/me", { investments: next });
       onUpdated(u);
     } catch {
-      setError("No se pudo guardar. Intentá de nuevo.");
+      setError("No se pudo guardar. Intenta de nuevo.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function setBanking(next: boolean) {
+    if (next === bank) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const u = await patchJson<UserMe>("/auth/me", { banking: next });
+      onUpdated(u);
+    } catch {
+      setError("No se pudo guardar. Intenta de nuevo.");
     } finally {
       setSaving(false);
     }
@@ -200,7 +215,7 @@ export function Profile({
     <div className="mx-auto max-w-[640px] space-y-8 p-4 pb-28 md:p-6">
       <div>
         <h2 className="text-lg font-semibold text-white">Perfil</h2>
-        <p className="mt-1 text-sm text-[#8b949e]">Servicios que podés activar u omitir según lo que uses.</p>
+        <p className="mt-1 text-sm text-[#8b949e]">Servicios que puedes activar u omitir según lo que uses.</p>
       </div>
 
       <div className="rounded-xl border border-[#30363d] bg-[#161b22] p-5">
@@ -213,7 +228,7 @@ export function Profile({
         onSubmit={(e) => void onChangePassword(e)}
       >
         <h3 className="text-sm font-semibold text-white">Contraseña</h3>
-        <p className="mt-1 text-sm text-[#8b949e]">Cambiá tu contraseña de acceso a Monitro.</p>
+        <p className="mt-1 text-sm text-[#8b949e]">Cambia tu contraseña de acceso a Monitro.</p>
 
         <label className="mt-4 block">
           <span className="text-xs text-[#8b949e]">Contraseña actual</span>
@@ -273,53 +288,72 @@ export function Profile({
       <div className="rounded-xl border border-[#30363d] bg-[#161b22] p-5">
         <h3 className="text-sm font-semibold text-white">Servicios</h3>
         <p className="mt-1 text-sm text-[#8b949e]">
-          Activá solo lo que uses. El portafolio de inversiones se conecta a Fintual para movimientos y precios.
+          Activa solo lo que uses. El portafolio de inversiones se conecta a Fintual para movimientos y precios.
         </p>
 
-        <div className="mt-5 rounded-xl border border-[#21262d] bg-[#0d1117] p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-[#e6edf3]">Portafolio de inversiones</p>
-              <p className="mt-1 text-xs leading-relaxed text-[#8b949e]">
-                Panel, transacciones, sincronización y activos manuales ligados al portafolio.
-              </p>
+        <div className="mt-5 space-y-4">
+          <div className="rounded-xl border border-[#21262d] bg-[#0d1117] p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-[#e6edf3]">Portafolio de inversiones</p>
+                <p className="mt-1 text-xs leading-relaxed text-[#8b949e]">
+                  Panel, transacciones, sincronización y activos manuales ligados al portafolio.
+                </p>
+              </div>
+              <ServiceToggle
+                on={inv}
+                disabled={saving}
+                ariaLabel="Activar portafolio de inversiones"
+                onToggle={() => void setInvestments(!inv)}
+              />
             </div>
-            <ServiceToggle
-              on={inv}
-              disabled={saving}
-              ariaLabel="Activar portafolio de inversiones"
-              onToggle={() => void setInvestments(!inv)}
-            />
+
+            {inv && (
+              <div className="mt-5 space-y-4 border-t border-[#21262d] pt-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-medium text-[#8b949e]">Estado Fintual</span>
+                  <FintualConnectionBadge me={me} />
+                </div>
+
+                <FintualCredentialsBlock
+                  me={me}
+                  reveal={revealFintualSecrets}
+                  onToggleReveal={() => setRevealFintualSecrets((v) => !v)}
+                />
+
+                {onRequestFintualConnect && (
+                  <button
+                    type="button"
+                    onClick={onRequestFintualConnect}
+                    className="w-full rounded-lg border border-[#30363d] bg-[#21262d] px-4 py-2.5 text-sm font-medium text-[#e6edf3] transition-colors hover:border-[#58a6ff] hover:bg-[#262c36]"
+                  >
+                    Actualizar cookie / UID de Fintual
+                  </button>
+                )}
+
+                <p className="text-xs leading-relaxed text-[#6e7681]">
+                  Por defecto los valores se muestran ocultos. Solo puedes verlos con la sesión iniciada en Monitro.
+                </p>
+              </div>
+            )}
           </div>
 
-          {inv && (
-            <div className="mt-5 space-y-4 border-t border-[#21262d] pt-5">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-[#8b949e]">Estado Fintual</span>
-                <FintualConnectionBadge me={me} />
+          <div className="rounded-xl border border-[#21262d] bg-[#0d1117] p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-[#e6edf3]">Cuentas y movimientos</p>
+                <p className="mt-1 text-xs leading-relaxed text-[#8b949e]">
+                  Registra cuentas (efectivo, banco) y movimientos con categorías. Independiente del portafolio Fintual.
+                </p>
               </div>
-
-              <FintualCredentialsBlock
-                me={me}
-                reveal={revealFintualSecrets}
-                onToggleReveal={() => setRevealFintualSecrets((v) => !v)}
+              <ServiceToggle
+                on={bank}
+                disabled={saving}
+                ariaLabel="Activar cuentas y movimientos"
+                onToggle={() => void setBanking(!bank)}
               />
-
-              {onRequestFintualConnect && (
-                <button
-                  type="button"
-                  onClick={onRequestFintualConnect}
-                  className="w-full rounded-lg border border-[#30363d] bg-[#21262d] px-4 py-2.5 text-sm font-medium text-[#e6edf3] transition-colors hover:border-[#58a6ff] hover:bg-[#262c36]"
-                >
-                  Actualizar cookie / UID de Fintual
-                </button>
-              )}
-
-              <p className="text-xs leading-relaxed text-[#6e7681]">
-                Por defecto los valores se muestran ocultos. Solo vos podés verlos con la sesión iniciada en Monitro.
-              </p>
             </div>
-          )}
+          </div>
         </div>
 
         {error && <p className="mt-3 text-sm text-[#f85149]">{error}</p>}

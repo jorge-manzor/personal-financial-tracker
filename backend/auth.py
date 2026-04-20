@@ -22,10 +22,11 @@ security = HTTPBearer(auto_error=False)
 
 # Claves de `services_json` / API de perfil (extensible a futuras funcionalidades).
 SERVICE_INVESTMENTS = "investments"
+SERVICE_BANKING = "banking"
 
 
 def default_services() -> dict[str, bool]:
-    return {SERVICE_INVESTMENTS: False}
+    return {SERVICE_INVESTMENTS: False, SERVICE_BANKING: False}
 
 
 def user_services(user: User) -> dict[str, bool]:
@@ -46,6 +47,10 @@ def user_services(user: User) -> dict[str, bool]:
 
 def investments_enabled(user: User) -> bool:
     return bool(user_services(user).get(SERVICE_INVESTMENTS, False))
+
+
+def banking_enabled(user: User) -> bool:
+    return bool(user_services(user).get(SERVICE_BANKING, False))
 
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-insecure-change-in-production")
@@ -168,3 +173,32 @@ def require_investments_user_sse(
 
 InvestmentsUser = Annotated[User, Depends(require_investments_user)]
 InvestmentsUserSSE = Annotated[User, Depends(require_investments_user_sse)]
+
+
+def get_optional_user(
+    db: Annotated[Session, Depends(get_db)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
+) -> User | None:
+    """JWT presente y válido → usuario; si no hay token o es inválido → None (sin error 401)."""
+    if credentials is None or not credentials.credentials:
+        return None
+    try:
+        payload = decode_token(credentials.credentials)
+        uid = int(payload.get("sub", 0))
+    except (JWTError, ValueError, TypeError):
+        return None
+    return get_user_by_id(db, uid)
+
+
+def require_banking_user(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    if not banking_enabled(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Servicio de cuentas y movimientos desactivado",
+        )
+    return user
+
+
+BankingUser = Annotated[User, Depends(require_banking_user)]

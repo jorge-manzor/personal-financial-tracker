@@ -51,6 +51,47 @@ function IconTransactions({ className }: { className?: string }) {
   );
 }
 
+function IconBanking({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+      <path d="M6 15h.01M10 15h4" />
+    </svg>
+  );
+}
+
+function IconBankSettings({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+  );
+}
+
 /** Tooltip al hover: el `title` nativo es poco fiable en enlaces con hijos complejos (React Router). */
 function SidebarTooltip({ label }: { label: string }) {
   return (
@@ -102,9 +143,11 @@ function SidebarNavLink({
 export function AppSidebar({
   onLogout,
   investmentsEnabled,
+  bankingEnabled,
 }: {
   onLogout: () => void;
   investmentsEnabled: boolean;
+  bankingEnabled: boolean;
 }) {
   return (
     <aside
@@ -130,6 +173,16 @@ export function AppSidebar({
             </SidebarNavLink>
             <SidebarNavLink to="/transactions" label="Transacciones">
               <IconTransactions className="shrink-0" />
+            </SidebarNavLink>
+          </>
+        )}
+        {bankingEnabled && (
+          <>
+            <SidebarNavLink to="/banking/transactions" label="Movimientos bancarios">
+              <IconBanking className="shrink-0" />
+            </SidebarNavLink>
+            <SidebarNavLink to="/banking/settings" label="Cuentas bancarias">
+              <IconBankSettings className="shrink-0" />
             </SidebarNavLink>
           </>
         )}

@@ -33,6 +33,13 @@ DEFAULT_LIMIT = 2000
 DIVIDEND_MATCH_TOLERANCE = 0.05
 DIVIDEND_MATCH_DAYS = 30
 
+QUERY_TAILORMADE_EXCHANGE_RATE_USD_CLP = """
+query StocksExchangeRateUsdToClp {
+  getTailormadeExchangeRate(fromCurrency: "usd", toCurrency: "clp")
+}
+"""
+
+
 QUERY_POSITIONS = """
 query StocksPositions {
     stocksPositions {
@@ -329,6 +336,18 @@ def _post_gql(operation: str, variables: dict[str, Any], query: str) -> dict[str
     if body.get("errors"):
         raise RuntimeError(f"[fintual/gql] {operation}: {body['errors']}")
     return body.get("data") or {}
+
+
+def fetch_tailormade_exchange_rate_usd_to_clp() -> float:
+    """
+    USD/CLP según Fintual (`getTailormadeExchangeRate`).
+    Requiere sesión válida (cookies / `use_fintual_credentials` / env `FINTUAL_SESSION`).
+    """
+    data = _post_gql("StocksExchangeRateUsdToClp", {}, QUERY_TAILORMADE_EXCHANGE_RATE_USD_CLP)
+    val = data.get("getTailormadeExchangeRate")
+    if val is None:
+        raise RuntimeError("getTailormadeExchangeRate ausente en la respuesta")
+    return float(val)
 
 
 QUERY_GOAL_MOVEMENTS = """

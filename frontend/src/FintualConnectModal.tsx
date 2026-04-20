@@ -26,7 +26,7 @@ export function FintualConnectModal({
     e.preventDefault();
     const s = sessionCookie.trim();
     if (!s) {
-      setError("Copiá el valor de la cookie de sesión.");
+      setError("Copia el valor de la cookie de sesión.");
       return;
     }
     setSaving(true);
@@ -82,8 +82,8 @@ export function FintualConnectModal({
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-[#8b949e]">
             {reconnectMode
-              ? "Tu sesión con Fintual expiró o dejó de ser válida (suele ocurrir cada ~30 días). Pegá de nuevo la cookie y el uid desde fintual.cl."
-              : "Conectá tu cuenta de Fintual para ver todas tus inversiones."}
+              ? "Tu sesión con Fintual expiró o dejó de ser válida (suele ocurrir cada ~30 días). Pega de nuevo la cookie y el uid desde fintual.cl."
+              : "Conecta tu cuenta de Fintual para ver todas tus inversiones."}
           </p>
 
           <label className="mt-6 block">
@@ -140,18 +140,18 @@ export function FintualConnectModal({
           {instructionsOpen && (
             <div className="rounded-xl border border-[#21262d] bg-[#0d1117] p-4 text-sm text-[#c9d1d9]">
               <ol className="list-decimal space-y-2 pl-5">
-                <li>Iniciá sesión en fintual.cl</li>
+                <li>Inicia sesión en fintual.cl</li>
                 <li>
-                  Abrí las herramientas de desarrollador con <kbd className="rounded bg-[#21262d] px-1.5 py-0.5 font-mono text-xs">F12</kbd> o{" "}
+                  Abre las herramientas de desarrollador con <kbd className="rounded bg-[#21262d] px-1.5 py-0.5 font-mono text-xs">F12</kbd> o{" "}
                   <kbd className="rounded bg-[#21262d] px-1.5 py-0.5 font-mono text-xs">Cmd+Opt+I</kbd> (Mac).
                 </li>
                 <li>
-                  Andá a la pestaña <strong className="text-[#e6edf3]">Application</strong> →{" "}
+                  Ve a la pestaña <strong className="text-[#e6edf3]">Application</strong> →{" "}
                   <strong className="text-[#e6edf3]">Cookies</strong> →{" "}
                   <strong className="text-[#e6edf3]">https://fintual.cl</strong>
                 </li>
                 <li>
-                  Buscá y copiá el valor de:
+                  Busca y copia el valor de:
                   <div className="mt-2 space-y-2 font-mono text-xs text-[#8b949e]">
                     <div className="rounded border border-[#30363d] bg-[#161b22] px-2 py-1.5">
                       <span className="text-[#79c0ff]">_fintual_session_cookie</span>
@@ -166,7 +166,7 @@ export function FintualConnectModal({
               </ol>
               <p className="mt-4 text-xs leading-relaxed text-[#6e7681]">
                 Las credenciales se guardan en tu cuenta de Monitro y solo se usan en el servidor para consultar Fintual.
-                Renová la cookie en Fintual cuando caduque (suele ser alrededor de 30 días).
+                Renueva la cookie en Fintual cuando caduque (suele ser alrededor de 30 días).
               </p>
             </div>
           )}

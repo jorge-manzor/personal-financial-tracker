@@ -1,7 +1,13 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from database import Base
+
+
+def _naive_utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class User(Base):
@@ -172,3 +178,94 @@ class StockSplit(Base):
     split_date = Column(Date, nullable=False, index=True)
     rate = Column(Float, nullable=False)
     fintual_id = Column(String(64), nullable=False)
+
+
+class BankingAccount(Base):
+    """Cuenta bancaria / efectivo del usuario (saldo mantenido con movimientos)."""
+
+    __tablename__ = "banking_accounts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    currency = Column(String(8), nullable=False, default="CLP")
+    # cuenta_corriente | cuenta_vista | cuenta_prepago | tarjeta_credito
+    product_type = Column(String(32), nullable=True)
+    # Código SBIF (bancos_chile.json)
+    bank_sbif = Column(String(8), nullable=True)
+    # Solo tarjeta_credito: cuenta corriente del mismo banco con la que se liquida el pago.
+    linked_checking_account_id = Column(Integer, ForeignKey("banking_accounts.id"), nullable=True, index=True)
+    # Si False, no aparece en selectores de nuevos movimientos (el saldo sigue en backend).
+    enabled = Column(Boolean, nullable=False, default=True)
+    # Saldo del libro: opening_balance + sum(movimientos). Se recalcula tras cada movimiento.
+    opening_balance = Column(Float, nullable=False, default=0.0)
+    balance = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, nullable=False)
+
+
+class BankingCategory(Base):
+    """
+    Categoría de presupuesto por usuario (p. ej. «Vivienda», «Alimentacion»).
+    Se relaciona 1:N con `BankingSubcategory` y con `BankingTransaction.category_id`.
+    """
+
+    __tablename__ = "banking_categories"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    # Id de la categoría en `categorias_banking_default.json` (sincronización).
+    template_cat_id = Column(Integer, nullable=True, index=True)
+    name = Column(String(255), nullable=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    # Hex UI (#RRGGBB); null = asignar desde paleta en API.
+    color = Column(String(16), nullable=True)
+    # Nombres y subcategorías fijados por la plantilla; el usuario solo puede cambiar color (y orden vía API).
+    names_locked = Column(Boolean, nullable=False, default=True)
+    # Si False, la categoría no aparece para nuevos movimientos (salvo que ya tenga movimientos).
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+
+
+class BankingSubcategory(Base):
+    """
+    Subcategoría bajo una `BankingCategory`. `template_sub_id` conserva el id del JSON de seed (opcional).
+    """
+
+    __tablename__ = "banking_subcategories"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    category_id = Column(Integer, ForeignKey("banking_categories.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    template_sub_id = Column(Integer, nullable=True, index=True)
+    enabled = Column(Boolean, nullable=False, default=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+
+
+class BankingTransaction(Base):
+    """Monto con signo: positivo = ingreso, negativo = egreso (respecto de la cuenta)."""
+
+    __tablename__ = "banking_transactions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey("banking_accounts.id"), nullable=False, index=True)
+    fecha = Column(Date, nullable=False, index=True)
+    amount = Column(Float, nullable=False)
+    description = Column(Text, nullable=True)
+    category_id = Column(Integer, ForeignKey("banking_categories.id"), nullable=False)
+    subcategory_id = Column(Integer, ForeignKey("banking_subcategories.id"), nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    # Estado en libro / UI (p. ej. posted); debe coincidir con columnas SQLite existentes.
+    status = Column(String(32), nullable=False, default="posted")
+    # Movimiento personal vs compartido (divide monto entre N personas para reportes futuros).
+    is_shared = Column(Boolean, nullable=False, default=False)
+    split_participants = Column(Integer, nullable=True)
+    shared_expense_settled = Column(Boolean, nullable=False, default=False)
+    # Solo cuenta tarjeta_credito: si el cargo ya fue pagado en el estado de cuenta.
+    credit_card_charge_paid = Column(Boolean, nullable=True)
+    # Primer día del mes contable (filtros / gráficos futuros).
+    accounting_month = Column(Date, nullable=True, index=True)
+    # Movimiento gemelo (transferencia entre cuentas propias): id del otro apunte.
+    peer_transaction_id = Column(Integer, nullable=True, index=True)

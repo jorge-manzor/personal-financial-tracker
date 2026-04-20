@@ -1,0 +1,564 @@
+[
+  {
+    "id": 1,
+    "name": "Vivienda",
+    "subcategories": [
+      {
+        "id": 101,
+        "name": "Arriendo"
+      },
+      {
+        "id": 103,
+        "name": "Gastos comunes"
+      },
+      {
+        "id": 104,
+        "name": "Reparaciones y mantencion"
+      },
+      {
+        "id": 105,
+        "name": "Servicio de aseo"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Servicios Basicos",
+    "subcategories": [
+      {
+        "id": 201,
+        "name": "Agua"
+      },
+      {
+        "id": 202,
+        "name": "Electricidad"
+      },
+      {
+        "id": 203,
+        "name": "Gas"
+      },
+      {
+        "id": 204,
+        "name": "Internet"
+      },
+      {
+        "id": 205,
+        "name": "Telefono fijo"
+      },
+      {
+        "id": 206,
+        "name": "Telefonia movil"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Alimentacion",
+    "subcategories": [
+      {
+        "id": 301,
+        "name": "Supermercado"
+      },
+      {
+        "id": 302,
+        "name": "Almacen / Minimarket"
+      },
+      {
+        "id": 303,
+        "name": "Restaurante"
+      },
+      {
+        "id": 304,
+        "name": "Delivery / Pedidos online"
+      },
+      {
+        "id": 305,
+        "name": "Cafeteria"
+      },
+      {
+        "id": 306,
+        "name": "Panaderia"
+      },
+      {
+        "id": 307,
+        "name": "Feria / Verduleria"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "name": "Transporte",
+    "subcategories": [
+      {
+        "id": 401,
+        "name": "Bencina"
+      },
+      {
+        "id": 402,
+        "name": "Peajes"
+      },
+      {
+        "id": 403,
+        "name": "Estacionamiento"
+      },
+      {
+        "id": 404,
+        "name": "Tag / Autopista"
+      },
+      {
+        "id": 405,
+        "name": "Transporte publico"
+      },
+      {
+        "id": 406,
+        "name": "Taxi / Uber / Cabify"
+      },
+      {
+        "id": 407,
+        "name": "Mantencion vehiculo"
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "name": "Seguros",
+    "subcategories": [
+      {
+        "id": 501,
+        "name": "Seguro hogar"
+      },
+      {
+        "id": 502,
+        "name": "Seguro vehiculo"
+      },
+      {
+        "id": 503,
+        "name": "Seguro de vida"
+      },
+      {
+        "id": 504,
+        "name": "Seguro medico complementario"
+      },
+      {
+        "id": 505,
+        "name": "Seguro cesantia"
+      },
+      {
+        "id": 506,
+        "name": "Otros seguros"
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "name": "Creditos y Prestamos",
+    "subcategories": [
+      {
+        "id": 601,
+        "name": "Credito hipotecario"
+      },
+      {
+        "id": 602,
+        "name": "Credito de consumo"
+      },
+      {
+        "id": 603,
+        "name": "Credito automotriz"
+      },
+      {
+        "id": 604,
+        "name": "Credito educativo"
+      },
+      {
+        "id": 605,
+        "name": "Prestamo personal"
+      },
+      {
+        "id": 606,
+        "name": "Comisiones bancarias"
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "name": "Prevision y AFP",
+    "subcategories": [
+      {
+        "id": 701,
+        "name": "AFP"
+      },
+      {
+        "id": 702,
+        "name": "Isapre / Fonasa"
+      },
+      {
+        "id": 703,
+        "name": "APV"
+      },
+      {
+        "id": 704,
+        "name": "Seguro complementario salud"
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "name": "Salud",
+    "subcategories": [
+      {
+        "id": 801,
+        "name": "Consulta medica"
+      },
+      {
+        "id": 802,
+        "name": "Farmacia / Medicamentos"
+      },
+      {
+        "id": 803,
+        "name": "Examenes y laboratorio"
+      },
+      {
+        "id": 804,
+        "name": "Dental"
+      },
+      {
+        "id": 805,
+        "name": "Optica"
+      },
+      {
+        "id": 806,
+        "name": "Gimnasio / Deporte"
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "name": "Educacion",
+    "subcategories": [
+      {
+        "id": 901,
+        "name": "Colegio / Universidad"
+      },
+      {
+        "id": 902,
+        "name": "Cursos y capacitaciones"
+      },
+      {
+        "id": 903,
+        "name": "Libros y materiales"
+      },
+      {
+        "id": 904,
+        "name": "Utiles escolares"
+      }
+    ]
+  },
+  {
+    "id": 10,
+    "name": "Entretenimiento",
+    "subcategories": [
+      {
+        "id": 1002,
+        "name": "Cine / Teatro / Conciertos"
+      },
+      {
+        "id": 1003,
+        "name": "Videojuegos"
+      },
+      {
+        "id": 1004,
+        "name": "Salidas y eventos"
+      },
+      {
+        "id": 1005,
+        "name": "Vacaciones y viajes"
+      },
+      {
+        "id": 1006,
+        "name": "Hobbies"
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "name": "Ropa y Cuidado Personal",
+    "subcategories": [
+      {
+        "id": 1101,
+        "name": "Ropa y calzado"
+      },
+      {
+        "id": 1102,
+        "name": "Peluqueria / Barberia"
+      },
+      {
+        "id": 1103,
+        "name": "Cosmeticos y cuidado personal"
+      },
+      {
+        "id": 1104,
+        "name": "Lavanderia / Tintoreria"
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "name": "Tecnologia",
+    "subcategories": [
+      {
+        "id": 1201,
+        "name": "Equipos (celular, computador, etc.)"
+      },
+      {
+        "id": 1202,
+        "name": "Accesorios tecnologicos"
+      },
+      {
+        "id": 1203,
+        "name": "Software y aplicaciones"
+      },
+      {
+        "id": 1204,
+        "name": "Reparacion de equipos"
+      }
+    ]
+  },
+  {
+    "id": 13,
+    "name": "Hogar y Muebles",
+    "subcategories": [
+      {
+        "id": 1301,
+        "name": "Muebles y decoracion"
+      },
+      {
+        "id": 1302,
+        "name": "Electrodomesticos"
+      },
+      {
+        "id": 1303,
+        "name": "Articulos de limpieza"
+      },
+      {
+        "id": 1304,
+        "name": "Articulos de cocina"
+      }
+    ]
+  },
+  {
+    "id": 14,
+    "name": "Mascotas",
+    "subcategories": [
+      {
+        "id": 1401,
+        "name": "Alimento mascotas"
+      },
+      {
+        "id": 1402,
+        "name": "Veterinario"
+      },
+      {
+        "id": 1403,
+        "name": "Accesorios mascotas"
+      },
+      {
+        "id": 1404,
+        "name": "Peluqueria mascotas"
+      }
+    ]
+  },
+  {
+    "id": 15,
+    "name": "Regalos y Donaciones",
+    "subcategories": [
+      {
+        "id": 1501,
+        "name": "Regalos"
+      },
+      {
+        "id": 1502,
+        "name": "Donaciones"
+      },
+      {
+        "id": 1503,
+        "name": "Celebraciones (cumpleanos, eventos)"
+      }
+    ]
+  },
+  {
+    "id": 16,
+    "name": "Otros Gastos",
+    "subcategories": [
+      {
+        "id": 1601,
+        "name": "Gastos varios"
+      },
+      {
+        "id": 1602,
+        "name": "Multas y cargos"
+      },
+      {
+        "id": 1603,
+        "name": "Impuestos"
+      },
+      {
+        "id": 1604,
+        "name": "Notaria / Tramites legales"
+      }
+    ]
+  },
+  {
+    "id": 17,
+    "name": "Inversiones",
+    "subcategories": [
+      {
+        "id": 1701,
+        "name": "Fondo mutuo"
+      },
+      {
+        "id": 1702,
+        "name": "Acciones"
+      },
+      {
+        "id": 1703,
+        "name": "Criptomonedas"
+      },
+      {
+        "id": 1704,
+        "name": "Deposito a plazo"
+      },
+      {
+        "id": 1705,
+        "name": "Dividendos"
+      },
+      {
+        "id": 1706,
+        "name": "Interes y rendimientos"
+      },
+      {
+        "id": 1707,
+        "name": "Retiro de inversiones"
+      },
+      {
+        "id": 1708,
+        "name": "Compra de dolares"
+      },
+      {
+        "id": 1709,
+        "name": "Otros"
+      }
+    ]
+  },
+  {
+    "id": 18,
+    "name": "Ahorros",
+    "subcategories": [
+      {
+        "id": 1801,
+        "name": "Deposito a plazo"
+      },
+      {
+        "id": 1802,
+        "name": "Vacaciones"
+      },
+      {
+        "id": 1803,
+        "name": "Reserva"
+      },
+      {
+        "id": 1804,
+        "name": "Otros"
+      }
+    ]
+  },
+  {
+    "id": 19,
+    "name": "Transferencia",
+    "subcategories": [
+      {
+        "id": 1901,
+        "name": "Entre cuentas propias"
+      },
+      {
+        "id": 1902,
+        "name": "Envio a terceros"
+      },
+      {
+        "id": 1903,
+        "name": "Recepcion de terceros"
+      }
+    ]
+  },
+  {
+    "id": 20,
+    "name": "Pago Tarjeta de Credito",
+    "subcategories": [
+      {
+        "id": 2001,
+        "name": "Pago Tarjeta de Credito"
+      }
+    ]
+  },
+  {
+    "id": 21,
+    "name": "Provisiones",
+    "subcategories": [
+      {
+        "id": 2101,
+        "name": "Provisiones"
+      }
+    ]
+  },
+  {
+    "id": 22,
+    "name": "Suscripciones",
+    "subcategories": [
+      {
+        "id": 2201,
+        "name": "Streaming video"
+      },
+      {
+        "id": 2202,
+        "name": "Streaming musica"
+      },
+      {
+        "id": 2203,
+        "name": "Nube y almacenamiento"
+      },
+      {
+        "id": 2204,
+        "name": "Prensa digital"
+      },
+      {
+        "id": 2205,
+        "name": "Otras suscripciones"
+      }
+    ]
+  },
+  {
+    "id": 23,
+    "name": "Remuneracion",
+    "subcategories": [
+      {
+        "id": 2301,
+        "name": "Sueldo"
+      },
+      {
+        "id": 2302,
+        "name": "Bono"
+      },
+      {
+        "id": 2303,
+        "name": "Horas extra"
+      },
+      {
+        "id": 2304,
+        "name": "Aguinaldo"
+      },
+      {
+        "id": 2305,
+        "name": "Liquidacion / Finiquito"
+      }
+    ]
+  }
+]

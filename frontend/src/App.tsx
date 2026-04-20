@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { BankingSettingsPage } from "./BankingSettingsPage";
+import { BankingTransactionsPage } from "./BankingTransactionsPage";
 import { apiFetch, fetchJson } from "./api";
 import { clearToken, getToken } from "./auth";
 import { Login } from "./Login";
@@ -191,9 +193,9 @@ export default function App() {
               fintual_reconnect_required?: boolean;
             }>("/auth/me");
             setMe(normalizeUserMe(raw));
-            setToast("Tu sesión con Fintual expiró o dejó de ser válida. Actualizá la cookie en el panel de conexión.");
+            setToast("Tu sesión con Fintual expiró o dejó de ser válida. Actualiza la cookie en el panel de conexión.");
           } catch {
-            setToast("No se pudo verificar el perfil. Revisá la cookie de Fintual en Perfil.");
+            setToast("No se pudo verificar el perfil. Revisa la cookie de Fintual en Perfil.");
           }
         },
       );
@@ -267,7 +269,7 @@ export default function App() {
         console.error(e);
         if (!cancelled) {
           setInitError(
-            `Sin respuesta del servidor (${apiBaseHint}). Tras reiniciar el backend puede tardar unos segundos; reintentá o comprobá que uvicorn esté en marcha.`,
+            `Sin respuesta del servidor (${apiBaseHint}). Tras reiniciar el backend puede tardar unos segundos; reintenta o comprueba que uvicorn esté en marcha.`,
           );
         }
       }
@@ -290,6 +292,7 @@ export default function App() {
   const showMain = ready && !overlay && !initError && me !== null;
   const syncBusy = overlay || headerSync;
   const investmentsOn = !!me?.services.investments;
+  const bankingOn = !!me?.services.banking;
   const needsFintualConnection = investmentsOn && !!me?.fintual_needs_setup;
   const showFintualSetupModal = showMain && (needsFintualConnection || fintualModalFromProfile);
 
@@ -301,6 +304,7 @@ export default function App() {
           window.location.reload();
         }}
         investmentsEnabled={investmentsOn}
+        bankingEnabled={bankingOn}
       />
       <AppHeader
         onRefreshPrices={() => beginSync(true, false)}
@@ -383,6 +387,8 @@ export default function App() {
                     onToast={setToast}
                     onMutate={loadAll}
                   />
+                ) : bankingOn ? (
+                  <Navigate to="/banking/transactions" replace />
                 ) : (
                   <NoServicesPage />
                 )
@@ -406,6 +412,22 @@ export default function App() {
                 )
               }
             />
+            <Route
+              path="/banking/transactions"
+              element={
+                bankingOn ? (
+                  <BankingTransactionsPage onToast={setToast} />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/banking/settings"
+              element={
+                bankingOn ? <BankingSettingsPage onToast={setToast} /> : <Navigate to="/" replace />
+              }
+            />
           </Routes>
         ) : initError ? (
           <div className="flex min-h-[50vh] flex-col items-center justify-center gap-5 px-6 text-center">
@@ -423,7 +445,7 @@ export default function App() {
         )}
       </main>
 
-      <FabAndModal
+      <TransactionModalLayer
         showMain={showMain}
         investmentsEnabled={investmentsOn}
         txOpen={txOpen}
@@ -444,7 +466,7 @@ export default function App() {
         }}
       />
       {toast && (
-        <div className="fixed bottom-24 left-1/2 z-[70] -translate-x-1/2 rounded-lg border border-[#30363d] bg-[#161b22] px-4 py-2 text-sm text-white shadow-xl">
+        <div className="fixed bottom-8 left-1/2 z-[70] -translate-x-1/2 rounded-lg border border-[#30363d] bg-[#161b22] px-4 py-2 text-sm text-white shadow-xl">
           {toast}
         </div>
       )}
@@ -485,7 +507,8 @@ function TransactionsRoute({
   );
 }
 
-function FabAndModal({
+/** Modal de transacción solo para editar filas existentes (altas vienen de Fintual/sync). */
+function TransactionModalLayer({
   showMain,
   investmentsEnabled,
   txOpen,
@@ -504,38 +527,21 @@ function FabAndModal({
   loadAll: () => Promise<void>;
   setToast: (s: string | null) => void;
 }) {
-  const location = useLocation();
-  const showFab = showMain && investmentsEnabled && location.pathname === "/";
+  if (!showMain || !investmentsEnabled) return null;
 
   return (
-    <>
-      {showFab && (
-        <button
-          type="button"
-          onClick={() => {
-            setEditingTx(null);
-            setTxOpen(true);
-          }}
-          className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#22c55e] text-3xl font-light text-[#0d1117] shadow-lg hover:brightness-110"
-          aria-label="Añadir transacción"
-        >
-          +
-        </button>
-      )}
-
-      <TransactionModal
-        open={txOpen}
-        editing={editingTx}
-        onClose={() => {
-          setTxOpen(false);
-          setEditingTx(null);
-        }}
-        onSaved={() => {
-          const wasEdit = editingTx != null;
-          setToast(wasEdit ? "Transacción actualizada ✅" : "Transacción guardada ✅");
-          void loadAll();
-        }}
-      />
-    </>
+    <TransactionModal
+      open={txOpen}
+      editing={editingTx}
+      onClose={() => {
+        setTxOpen(false);
+        setEditingTx(null);
+      }}
+      onSaved={() => {
+        const wasEdit = editingTx != null;
+        setToast(wasEdit ? "Transacción actualizada ✅" : "Transacción guardada ✅");
+        void loadAll();
+      }}
+    />
   );
 }

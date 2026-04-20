@@ -18,6 +18,12 @@ logger = logging.getLogger(__name__)
 DOLARAPI_URL = "https://cl.dolarapi.com/v1/cotizaciones/usd"
 CMF_BASE_URL = "https://api.cmfchile.cl/api-sbifv3/recursos_api/dolar"
 
+# Evita 403 en algunos proxys/CDN que bloquean clientes sin User-Agent.
+_HTTP_HEADERS = {
+    "User-Agent": "personal-financial-tracker/1.0",
+    "Accept": "application/json",
+}
+
 
 def cmf_api_key() -> str:
     return (os.environ.get("CMF_API_KEY") or "").strip()
@@ -55,7 +61,7 @@ def _parse_cmf_records(data: dict) -> list:
 
 def _cmf_get(url: str) -> list:
     _check_api_key()
-    with httpx.Client(timeout=10.0) as client:
+    with httpx.Client(timeout=10.0, headers=_HTTP_HEADERS) as client:
         resp = client.get(url, params=_cmf_params())
     resp.raise_for_status()
     return _parse_cmf_records(resp.json())
@@ -79,7 +85,7 @@ def get_current_rate(timeout: float = 5.0) -> dict:
     USD/CLP actual: DolarAPI; si falla, última observación CMF del mes en curso.
     """
     try:
-        with httpx.Client(timeout=timeout) as client:
+        with httpx.Client(timeout=timeout, headers=_HTTP_HEADERS) as client:
             resp = client.get(DOLARAPI_URL)
         resp.raise_for_status()
         data = resp.json()

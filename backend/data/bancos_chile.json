@@ -1,0 +1,25 @@
+[
+    { "sbif": "001", "name": "Banco de Chile" },
+    { "sbif": "009", "name": "Banco Internacional" },
+    { "sbif": "012", "name": "Banco del Estado" },
+    { "sbif": "014", "name": "Scotiabank" },
+    { "sbif": "016", "name": "Banco BCI / Mach" },
+    { "sbif": "028", "name": "Banco BICE" },
+    { "sbif": "031", "name": "Banco HSBC" },
+    { "sbif": "037", "name": "Banco Santander" },
+    { "sbif": "039", "name": "Banco Itau" },
+    { "sbif": "049", "name": "Banco Security" },
+    { "sbif": "051", "name": "Banco Falabella" },
+    { "sbif": "053", "name": "Banco Ripley" },
+    { "sbif": "055", "name": "Banco Consorcio" },
+    { "sbif": "504", "name": "Scotiabank Azul BBVA" },
+    { "sbif": "672", "name": "Coopeuch" },
+    { "sbif": "729", "name": "Prepago Los Heroes" },
+    { "sbif": "730", "name": "Tenpo" },
+    { "sbif": "732", "name": "Prepago Los Andes" },
+    { "sbif": "738", "name": "Global 66" },
+    { "sbif": "741", "name": "Copec Pay" },
+    { "sbif": "743", "name": "Prex" },
+    { "sbif": "875", "name": "MercadoPago" }
+  ]
+  

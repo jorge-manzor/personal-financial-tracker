@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { apiFetch, fetchJson } from "./api";
+import { apiFetch } from "./api";
 import type { ExchangeRateInfo } from "./types";
 
 async function postExchangeRefresh(): Promise<ExchangeRateInfo> {
@@ -89,7 +89,7 @@ export function AppHeader({
   useEffect(() => {
     if (!investmentsEnabled) return;
     if (fxRefreshNonce === 0) return;
-    fetchJson<ExchangeRateInfo>("/exchange-rate")
+    postExchangeRefresh()
       .then(setEx)
       .catch(() => setEx(null));
   }, [fxRefreshNonce, investmentsEnabled]);
@@ -98,6 +98,19 @@ export function AppHeader({
     ex != null
       ? `$${ex.rate.toLocaleString("es-CL", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       : "—";
+
+  const rateTitle =
+    ex != null
+      ? [
+          ex.source === "fintual"
+            ? "USD/CLP desde Fintual (getTailormadeExchangeRate)."
+            : "USD/CLP de referencia (DolarAPI u otro respaldo si Fintual no está disponible).",
+          ex.source != null && ex.source !== "" ? `Fuente: ${ex.source}.` : null,
+          ex.updated_at != null ? `Guardado: ${ex.updated_at}.` : null,
+        ]
+          .filter(Boolean)
+          .join(" ")
+      : undefined;
 
   return (
     <header
@@ -120,7 +133,12 @@ export function AppHeader({
             <>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-xs text-[#8b949e]">USD/CLP</span>
-                <span className="text-sm font-semibold tabular-nums text-white">{rateText}</span>
+                <span
+                  className="cursor-help text-sm font-semibold tabular-nums text-white underline decoration-dotted decoration-[#484f58] underline-offset-2"
+                  title={rateTitle}
+                >
+                  {rateText}
+                </span>
               </div>
 
               {headerSyncing ? (
