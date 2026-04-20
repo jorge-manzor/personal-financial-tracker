@@ -1,6 +1,7 @@
 /** Preferencias de servicios (extensible: nuevas claves en el futuro). */
 export interface UserServices {
   investments: boolean;
+  banking: boolean;
 }
 
 export interface UserMe {
@@ -26,10 +27,11 @@ export function normalizeUserMe(raw: {
   fintual_uid?: string | null;
 }): UserMe {
   const inv = raw.services && "investments" in raw.services ? raw.services.investments : undefined;
+  const bank = raw.services && "banking" in raw.services ? raw.services.banking : undefined;
   return {
     id: raw.id,
     email: raw.email,
-    services: { investments: inv ?? false },
+    services: { investments: inv ?? false, banking: bank ?? false },
     fintual_needs_setup: raw.fintual_needs_setup ?? false,
     fintual_reconnect_required: raw.fintual_reconnect_required ?? false,
     fintual_session_cookie: raw.fintual_session_cookie ?? null,
@@ -173,6 +175,8 @@ export interface SectorSlice {
 export interface ExchangeRateInfo {
   rate: number;
   updated_at: string | null;
+  /** Origen: `fintual` (GraphQL), `dolarapi`, `cmf_*`, etc. */
+  source?: string | null;
   previous_rate: number | null;
 }
 
@@ -203,3 +207,114 @@ export type MonthlyChartPoint = MonthlyMovementRow & {
   barGreen: number;
   barRed: number;
 };
+
+/** Tipos de producto bancario (coinciden con el backend). */
+export type BankingProductType =
+  | "cuenta_corriente"
+  | "cuenta_vista"
+  | "cuenta_prepago"
+  | "tarjeta_credito";
+
+export interface BankingAccountRow {
+  id: number;
+  name: string;
+  currency: string;
+  balance: number;
+  /** Suma de montos en categoría Provisiones (plantilla 21); reverso netea. */
+  provision_net_sum?: number;
+  /** Equivalente al efectivo en cuenta (~lo que muestra el banco): balance − provision_net_sum */
+  balance_at_bank?: number;
+  product_type: BankingProductType | null;
+  /** Código SBIF (bancos_chile.json). */
+  bank_sbif: string | null;
+  bank_name: string | null;
+  /** Solo tarjeta_credito: cuenta corriente del mismo banco para liquidar pagos. */
+  linked_checking_account_id: number | null;
+  linked_checking_account_name: string | null;
+  /** Si aparece en el selector de cuenta al crear movimientos. */
+  enabled: boolean;
+  /** Si tiene movimientos registrados no se puede eliminar (solo desactivar). */
+  has_transactions?: boolean;
+}
+
+/** Respuesta GET /banking/debt-totals */
+export interface BankingDebtTotalsOut {
+  credit_card_unpaid_clp: number;
+  shared_unsettled_clp: number;
+}
+
+export interface BankingBankRow {
+  sbif: string;
+  name: string;
+}
+
+export interface BankingSubcategoryRow {
+  id: number;
+  category_id: number;
+  name: string;
+  enabled: boolean;
+  /** Orden dentro de la categoría (selectores en movimientos siguen este orden). */
+  sort_order: number;
+  /** Si hay movimientos con esta subcategoría, no se puede desactivar. */
+  has_transactions: boolean;
+  /** Id en plantilla seed (p. ej. 1901 Entre cuentas propias). */
+  template_sub_id?: number | null;
+}
+
+export interface BankingCategoryRow {
+  id: number;
+  name: string;
+  sort_order: number;
+  /** Id en plantilla seed (p. ej. 19 Transferencia). */
+  template_cat_id?: number | null;
+  /** Hex #rrggbb (asignado en servidor si falta). */
+  color: string;
+  /** Si true, nombre y subcategorías vienen de la plantilla (solo color y orden editables). */
+  names_locked?: boolean;
+  enabled: boolean;
+  /** Plantilla reservada (uso interno): siempre activa; sin interruptor en ajustes. */
+  internal_reserved?: boolean;
+  has_transactions: boolean;
+  subcategories: BankingSubcategoryRow[];
+}
+
+/** `amount` con signo: positivo = ingreso, negativo = egreso. */
+export interface BankingTransactionRow {
+  id: number;
+  account_id: number;
+  account_name: string;
+  fecha: string;
+  amount: number;
+  description: string | null;
+  category_id: number;
+  category_name: string;
+  /** Id plantilla categoría (21 = Provisiones); opcional hasta backend actualizado. */
+  category_template_cat_id?: number | null;
+  category_color: string;
+  subcategory_id: number;
+  subcategory_name: string;
+  created_at: string;
+  is_shared: boolean;
+  split_participants: number | null;
+  shared_expense_settled: boolean;
+  credit_card_charge_paid: boolean | null;
+  accounting_month: string | null;
+  /** Calculado en servidor si is_shared: abs(amount)/split_participants */
+  amount_per_person?: number | null;
+  /** Movimiento gemelo (transferencia entre cuentas propias). */
+  peer_transaction_id?: number | null;
+  /** Reversa generada por la app; no editable, solo eliminar. */
+  is_provision_reversal?: boolean;
+  counterpart_account_id?: number | null;
+  counterpart_account_name?: string | null;
+}
+
+/** GET /banking/credit-card/unpaid-grouped */
+export interface BankingCreditCardUnpaidGroup {
+  account_id: number;
+  account_name: string;
+  items: BankingTransactionRow[];
+}
+
+/** GET /banking/shared/unsettled-grouped — misma forma que cargos TC pendientes */
+export type BankingSharedUnsettledGroup = BankingCreditCardUnpaidGroup;

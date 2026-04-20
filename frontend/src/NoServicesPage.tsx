@@ -6,9 +6,9 @@ export function NoServicesPage() {
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#30363d] bg-[#161b22] text-2xl" aria-hidden>
         ◻️
       </div>
-      <h2 className="text-lg font-semibold text-white">No tenés servicios activos</h2>
+      <h2 className="text-lg font-semibold text-white">No tienes servicios activos</h2>
       <p className="mt-2 text-sm leading-relaxed text-[#8b949e]">
-        Activá al menos una funcionalidad en tu perfil para ver contenido aquí. Más adelante podrás sumar otros
+        Activa al menos una funcionalidad en tu perfil para ver contenido aquí. Más adelante podrás sumar otros
         servicios además del portafolio de inversiones.
       </p>
       <Link

@@ -56,6 +56,13 @@ export function formatClpDots(n: number): string {
   return `$${s.replace(/,/g, ".")}`;
 }
 
+/** Movimientos bancarios: siempre `$1.000` con separador de miles; el signo se indica con color (verde/rojo). */
+export function formatBankingClpSigned(amount: number): string {
+  const abs = Math.abs(Math.round(amount));
+  const body = abs.toLocaleString("es-CL", { maximumFractionDigits: 0 }).replace(/,/g, ".");
+  return `$${body}`;
+}
+
 /** USD label style: USD $1,092.77 */
 export function formatMoneyUSDLabel(n: number): string {
   const x = formatMoney(n).replace("$", "").trim();

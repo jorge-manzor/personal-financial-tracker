@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 
 import json
+import os
 
 from dotenv import load_dotenv
 
@@ -27,17 +28,20 @@ from sqlalchemy.orm import Session
 from activity_service import distinct_transaction_tipos, monthly_movements, query_transactions
 from chart_goal_fondos import augment_chart_rows_with_fintual_goal_balance
 from auth import (
+    SERVICE_BANKING,
     SERVICE_INVESTMENTS,
     CurrentUser,
     InvestmentsUser,
     InvestmentsUserSSE,
     create_access_token,
+    get_optional_user,
     default_services,
     get_user_by_email,
     hash_password,
     user_services,
     verify_password,
 )
+from banking_routes import router as banking_router
 from database import Base, SessionLocal, engine, get_db
 from exchange_service import (
     ensure_exchange_history,
@@ -61,6 +65,10 @@ from history import (
 )
 from market_data import build_portfolio_history, get_current_prices
 from models import (
+    BankingAccount,
+    BankingCategory,
+    BankingSubcategory,
+    BankingTransaction,
     ExchangeRateHistory,
     ManualAsset,
     ManualAssetHistory,
@@ -182,6 +190,483 @@ def _migrate_db() -> None:
         conn.commit()
 
 
+def _rebuild_banking_accounts_without_account_type_id(conn) -> None:
+    """
+    Quita la columna heredada `account_type_id` recreando `banking_accounts`.
+
+    En SQLite, `ALTER TABLE ... DROP COLUMN` puede fallar con FKs inconsistentes en el esquema
+    (p. ej. «unknown column in foreign key definition»). Recrear la tabla conserva los `id`
+    para no romper `banking_transactions` ni `linked_checking_account_id`.
+    """
+    r = conn.execute(text("PRAGMA table_info(banking_accounts)"))
+    colnames = {row[1] for row in r.fetchall()}
+    if "account_type_id" not in colnames:
+        return
+    final_columns = (
+        "id",
+        "user_id",
+        "name",
+        "currency",
+        "product_type",
+        "bank_sbif",
+        "linked_checking_account_id",
+        "enabled",
+        "opening_balance",
+        "balance",
+        "created_at",
+    )
+    required = {"id", "user_id", "name", "currency", "created_at"}
+    missing = required - colnames
+    if missing:
+        raise RuntimeError(f"banking_accounts incompleta: faltan columnas {missing}")
+
+    conn.execute(text("DROP TABLE IF EXISTS banking_accounts_new"))
+    conn.execute(text("PRAGMA foreign_keys=OFF"))
+    try:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE banking_accounts_new (
+                    id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    name VARCHAR(255) NOT NULL,
+                    currency VARCHAR(8) NOT NULL,
+                    product_type VARCHAR(32),
+                    bank_sbif VARCHAR(8),
+                    linked_checking_account_id INTEGER,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    opening_balance FLOAT NOT NULL DEFAULT 0,
+                    balance FLOAT NOT NULL DEFAULT 0,
+                    created_at DATETIME NOT NULL
+                )
+                """
+            )
+        )
+
+        select_exprs: list[str] = []
+        for c in final_columns:
+            if c in colnames:
+                select_exprs.append(c)
+            elif c == "product_type":
+                select_exprs.append("NULL")
+            elif c == "bank_sbif":
+                select_exprs.append("NULL")
+            elif c == "linked_checking_account_id":
+                select_exprs.append("NULL")
+            elif c == "enabled":
+                select_exprs.append("1")
+            elif c in ("opening_balance", "balance"):
+                select_exprs.append("0")
+            else:
+                raise RuntimeError(f"columna sin valor por defecto: {c}")
+
+        ic = ", ".join(final_columns)
+        sel = ", ".join(select_exprs)
+        conn.execute(text(f"INSERT INTO banking_accounts_new ({ic}) SELECT {sel} FROM banking_accounts"))
+        conn.execute(text("DROP TABLE banking_accounts"))
+        conn.execute(text("ALTER TABLE banking_accounts_new RENAME TO banking_accounts"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_banking_accounts_user_id ON banking_accounts (user_id)"))
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_banking_accounts_linked_checking_account_id "
+                "ON banking_accounts (linked_checking_account_id)"
+            )
+        )
+        chk = conn.execute(
+            text("SELECT 1 FROM sqlite_master WHERE type='table' AND name='sqlite_sequence' LIMIT 1")
+        )
+        if chk.fetchone() is not None:
+            mx = conn.execute(text("SELECT COALESCE(MAX(id), 0) FROM banking_accounts")).scalar()
+            conn.execute(text("DELETE FROM sqlite_sequence WHERE name = 'banking_accounts'"))
+            conn.execute(
+                text("INSERT INTO sqlite_sequence (name, seq) VALUES ('banking_accounts', :mx)"),
+                {"mx": int(mx)},
+            )
+    finally:
+        conn.execute(text("PRAGMA foreign_keys=ON"))
+
+
+def _migrate_banking_schema() -> None:
+    """SQLite: `create_all` no añade columnas nuevas a tablas ya creadas."""
+    with engine.connect() as conn:
+        r = conn.execute(
+            text("SELECT 1 FROM sqlite_master WHERE type='table' AND name='banking_accounts' LIMIT 1")
+        )
+        if r.fetchone() is not None:
+            r = conn.execute(text("PRAGMA table_info(banking_accounts)"))
+            acols = {row[1] for row in r.fetchall()}
+            if "balance" not in acols:
+                conn.execute(text("ALTER TABLE banking_accounts ADD COLUMN balance FLOAT NOT NULL DEFAULT 0"))
+                logger.info("Migración banking_accounts: columna balance añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_accounts)"))
+            acols = {row[1] for row in r.fetchall()}
+            if "opening_balance" not in acols:
+                conn.execute(text("ALTER TABLE banking_accounts ADD COLUMN opening_balance FLOAT NOT NULL DEFAULT 0"))
+                conn.execute(
+                    text(
+                        """
+                        UPDATE banking_accounts
+                        SET opening_balance = CAST(balance AS REAL) - COALESCE(
+                            (
+                                SELECT SUM(bt.amount)
+                                FROM banking_transactions bt
+                                WHERE bt.account_id = banking_accounts.id
+                            ),
+                            0
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        UPDATE banking_accounts
+                        SET balance = CAST(opening_balance AS REAL) + COALESCE(
+                            (
+                                SELECT SUM(bt.amount)
+                                FROM banking_transactions bt
+                                WHERE bt.account_id = banking_accounts.id
+                            ),
+                            0
+                        )
+                        """
+                    )
+                )
+                logger.info(
+                    "Migración banking_accounts: opening_balance deducido; saldo alineado con movimientos"
+                )
+            r = conn.execute(text("PRAGMA table_info(banking_accounts)"))
+            acols2 = {row[1] for row in r.fetchall()}
+            if "product_type" not in acols2:
+                conn.execute(text("ALTER TABLE banking_accounts ADD COLUMN product_type VARCHAR(32)"))
+                logger.info("Migración banking_accounts: columna product_type añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_accounts)"))
+            acols2 = {row[1] for row in r.fetchall()}
+            if "bank_sbif" not in acols2:
+                conn.execute(text("ALTER TABLE banking_accounts ADD COLUMN bank_sbif VARCHAR(8)"))
+                logger.info("Migración banking_accounts: columna bank_sbif añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_accounts)"))
+            acols2 = {row[1] for row in r.fetchall()}
+            if "linked_checking_account_id" not in acols2:
+                conn.execute(
+                    text(
+                        "ALTER TABLE banking_accounts ADD COLUMN linked_checking_account_id "
+                        "INTEGER REFERENCES banking_accounts(id)"
+                    )
+                )
+                logger.info("Migración banking_accounts: columna linked_checking_account_id añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_accounts)"))
+            acols3 = {row[1] for row in r.fetchall()}
+            if "enabled" not in acols3:
+                conn.execute(
+                    text("ALTER TABLE banking_accounts ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
+                )
+                logger.info("Migración banking_accounts: columna enabled añadida")
+            # Esquema antiguo local: NOT NULL sin valor en INSERT actual (el tipo de producto es product_type).
+            r = conn.execute(text("PRAGMA table_info(banking_accounts)"))
+            acols_legacy = {row[1] for row in r.fetchall()}
+            if "account_type_id" in acols_legacy:
+                dropped = False
+                try:
+                    conn.execute(text("ALTER TABLE banking_accounts DROP COLUMN account_type_id"))
+                    logger.info("Migración banking_accounts: eliminada columna obsoleta account_type_id")
+                    dropped = True
+                except Exception:
+                    pass
+                if not dropped:
+                    try:
+                        _rebuild_banking_accounts_without_account_type_id(conn)
+                        logger.info("Migración banking_accounts: tabla reconstruida sin account_type_id")
+                    except Exception as ex:
+                        logger.warning(
+                            "Migración banking_accounts: no se pudo eliminar account_type_id (%s). "
+                            "Revisa la base o contacta soporte.",
+                            ex,
+                        )
+        r = conn.execute(
+            text("SELECT 1 FROM sqlite_master WHERE type='table' AND name='banking_subcategories' LIMIT 1")
+        )
+        if r.fetchone() is not None:
+            r = conn.execute(text("PRAGMA table_info(banking_subcategories)"))
+            scols = {row[1] for row in r.fetchall()}
+            if "template_sub_id" not in scols:
+                conn.execute(text("ALTER TABLE banking_subcategories ADD COLUMN template_sub_id INTEGER"))
+                logger.info("Migración banking_subcategories: columna template_sub_id añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_subcategories)"))
+            scols = {row[1] for row in r.fetchall()}
+            if "enabled" not in scols:
+                conn.execute(text("ALTER TABLE banking_subcategories ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1"))
+                logger.info("Migración banking_subcategories: columna enabled añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_subcategories)"))
+            scols = {row[1] for row in r.fetchall()}
+            if "user_id" not in scols:
+                conn.execute(text("ALTER TABLE banking_subcategories ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+                conn.execute(
+                    text(
+                        """
+                        UPDATE banking_subcategories
+                        SET user_id = (
+                            SELECT bc.user_id FROM banking_categories bc
+                            WHERE bc.id = banking_subcategories.category_id
+                        )
+                        WHERE user_id IS NULL
+                        """
+                    )
+                )
+                logger.info("Migración banking_subcategories: columna user_id añadida y rellenada")
+            r = conn.execute(text("PRAGMA table_info(banking_subcategories)"))
+            scols = {row[1] for row in r.fetchall()}
+            if "user_id" in scols:
+                conn.execute(
+                    text(
+                        """
+                        UPDATE banking_subcategories
+                        SET user_id = (
+                            SELECT bc.user_id FROM banking_categories bc
+                            WHERE bc.id = banking_subcategories.category_id
+                        )
+                        WHERE user_id IS NULL
+                        """
+                    )
+                )
+            r = conn.execute(text("PRAGMA table_info(banking_subcategories)"))
+            scols_created = {row[1] for row in r.fetchall()}
+            if "created_at" not in scols_created:
+                conn.execute(
+                    text(
+                        "ALTER TABLE banking_subcategories ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    )
+                )
+                logger.info("Migración banking_subcategories: columna created_at añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_subcategories)"))
+            scols_so = {row[1] for row in r.fetchall()}
+            if "sort_order" not in scols_so:
+                conn.execute(text("ALTER TABLE banking_subcategories ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"))
+                conn.execute(
+                    text(
+                        """
+                        UPDATE banking_subcategories
+                        SET sort_order = (
+                            SELECT COUNT(*)
+                            FROM banking_subcategories b2
+                            WHERE b2.category_id = banking_subcategories.category_id
+                            AND b2.id < banking_subcategories.id
+                        )
+                        """
+                    )
+                )
+                logger.info("Migración banking_subcategories: sort_order inicial por id dentro de cada categoría")
+        r = conn.execute(
+            text("SELECT 1 FROM sqlite_master WHERE type='table' AND name='banking_categories' LIMIT 1")
+        )
+        if r.fetchone() is not None:
+            r = conn.execute(text("PRAGMA table_info(banking_categories)"))
+            ccols = {row[1] for row in r.fetchall()}
+            if "sort_order" not in ccols:
+                conn.execute(text("ALTER TABLE banking_categories ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"))
+                logger.info("Migración banking_categories: columna sort_order añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_categories)"))
+            ccols = {row[1] for row in r.fetchall()}
+            if "color" not in ccols:
+                conn.execute(text("ALTER TABLE banking_categories ADD COLUMN color VARCHAR(16)"))
+                logger.info("Migración banking_categories: columna color añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_categories)"))
+            ccols = {row[1] for row in r.fetchall()}
+            if "names_locked" not in ccols:
+                conn.execute(
+                    text("ALTER TABLE banking_categories ADD COLUMN names_locked INTEGER NOT NULL DEFAULT 1")
+                )
+                logger.info("Migración banking_categories: columna names_locked añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_categories)"))
+            ccols = {row[1] for row in r.fetchall()}
+            if "created_at" not in ccols:
+                conn.execute(
+                    text(
+                        "ALTER TABLE banking_categories ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                    )
+                )
+                logger.info("Migración banking_categories: columna created_at añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_categories)"))
+            ccols = {row[1] for row in r.fetchall()}
+            if "template_cat_id" not in ccols:
+                conn.execute(text("ALTER TABLE banking_categories ADD COLUMN template_cat_id INTEGER"))
+                logger.info("Migración banking_categories: columna template_cat_id añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_categories)"))
+            ccols = {row[1] for row in r.fetchall()}
+            if "enabled" not in ccols:
+                conn.execute(text("ALTER TABLE banking_categories ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1"))
+                logger.info("Migración banking_categories: columna enabled añadida")
+        r = conn.execute(
+            text("SELECT 1 FROM sqlite_master WHERE type='table' AND name='banking_transactions' LIMIT 1")
+        )
+        if r.fetchone() is not None:
+            r = conn.execute(text("PRAGMA table_info(banking_transactions)"))
+            tcols = {row[1] for row in r.fetchall()}
+            if "category_id" not in tcols:
+                conn.execute(text("ALTER TABLE banking_transactions ADD COLUMN category_id INTEGER"))
+                logger.info("Migración banking_transactions: columna category_id añadida")
+            if "subcategory_id" not in tcols:
+                conn.execute(text("ALTER TABLE banking_transactions ADD COLUMN subcategory_id INTEGER"))
+                logger.info("Migración banking_transactions: columna subcategory_id añadida")
+            conn.execute(
+                text(
+                    """
+                    UPDATE banking_transactions
+                    SET category_id = (
+                        SELECT bs.category_id FROM banking_subcategories bs
+                        WHERE bs.id = banking_transactions.subcategory_id
+                    )
+                    WHERE category_id IS NULL AND subcategory_id IS NOT NULL
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE banking_transactions
+                    SET category_id = (
+                        SELECT MIN(bc.id) FROM banking_categories bc
+                        WHERE bc.user_id = banking_transactions.user_id
+                    )
+                    WHERE category_id IS NULL
+                    """
+                )
+            )
+            conn.execute(
+                text(
+                    """
+                    UPDATE banking_transactions
+                    SET subcategory_id = (
+                        SELECT MIN(bs.id) FROM banking_subcategories bs
+                        WHERE bs.category_id = banking_transactions.category_id
+                    )
+                    WHERE subcategory_id IS NULL AND category_id IS NOT NULL
+                    """
+                )
+            )
+            del_orphans = conn.execute(
+                text(
+                    "DELETE FROM banking_transactions WHERE category_id IS NULL OR subcategory_id IS NULL"
+                )
+            )
+            if del_orphans.rowcount and del_orphans.rowcount > 0:
+                logger.warning(
+                    "Migración banking_transactions: eliminadas %s filas sin categoría/subcategoría válida",
+                    del_orphans.rowcount,
+                )
+            # Solo si aún existe `kind` (BDs ya migradas no la tienen).
+            if "kind" in tcols:
+                conn.execute(
+                    text("UPDATE banking_transactions SET kind = 'income' WHERE lower(trim(kind)) = 'ingreso'")
+                )
+                conn.execute(
+                    text("UPDATE banking_transactions SET kind = 'expense' WHERE lower(trim(kind)) = 'egreso'")
+                )
+                conn.execute(
+                    text(
+                        "UPDATE banking_transactions SET amount = -ABS(CAST(amount AS REAL)) "
+                        "WHERE kind = 'expense'"
+                    )
+                )
+                conn.execute(
+                    text(
+                        "UPDATE banking_transactions SET amount = ABS(CAST(amount AS REAL)) "
+                        "WHERE kind = 'income'"
+                    )
+                )
+                try:
+                    conn.execute(text("ALTER TABLE banking_transactions DROP COLUMN kind"))
+                    logger.info(
+                        "Migración banking_transactions: monto con signo; columna kind eliminada"
+                    )
+                except Exception as ex:
+                    logger.warning("No se pudo DROP COLUMN kind en banking_transactions: %s", ex)
+            r2 = conn.execute(text("PRAGMA table_info(banking_transactions)"))
+            tcols2 = {row[1] for row in r2.fetchall()}
+            if "is_shared" not in tcols2:
+                conn.execute(
+                    text("ALTER TABLE banking_transactions ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 0")
+                )
+                logger.info("Migración banking_transactions: columna is_shared añadida")
+            if "split_participants" not in tcols2:
+                conn.execute(text("ALTER TABLE banking_transactions ADD COLUMN split_participants INTEGER"))
+                logger.info("Migración banking_transactions: columna split_participants añadida")
+            if "shared_expense_settled" not in tcols2:
+                conn.execute(
+                    text(
+                        "ALTER TABLE banking_transactions ADD COLUMN "
+                        "shared_expense_settled INTEGER NOT NULL DEFAULT 0"
+                    )
+                )
+                logger.info("Migración banking_transactions: columna shared_expense_settled añadida")
+            if "credit_card_charge_paid" not in tcols2:
+                conn.execute(text("ALTER TABLE banking_transactions ADD COLUMN credit_card_charge_paid INTEGER"))
+                logger.info("Migración banking_transactions: columna credit_card_charge_paid añadida")
+            if "accounting_month" not in tcols2:
+                conn.execute(text("ALTER TABLE banking_transactions ADD COLUMN accounting_month DATE"))
+                logger.info("Migración banking_transactions: columna accounting_month añadida")
+                conn.execute(
+                    text(
+                        """
+                        UPDATE banking_transactions
+                        SET accounting_month = strftime('%Y-%m-01', fecha)
+                        WHERE accounting_month IS NULL AND fecha IS NOT NULL
+                        """
+                    )
+                )
+            r_st = conn.execute(text("PRAGMA table_info(banking_transactions)"))
+            tcols_st = {row[1] for row in r_st.fetchall()}
+            if "status" not in tcols_st:
+                conn.execute(
+                    text(
+                        "ALTER TABLE banking_transactions ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'posted'"
+                    )
+                )
+                logger.info("Migración banking_transactions: columna status añadida")
+            r_peer = conn.execute(text("PRAGMA table_info(banking_transactions)"))
+            tcols_peer = {row[1] for row in r_peer.fetchall()}
+            if "peer_transaction_id" not in tcols_peer:
+                conn.execute(text("ALTER TABLE banking_transactions ADD COLUMN peer_transaction_id INTEGER"))
+                logger.info("Migración banking_transactions: columna peer_transaction_id añadida")
+
+        for table, idx_name, cols in (
+            ("banking_categories", "ix_banking_categories_user_id", "user_id"),
+            ("banking_subcategories", "ix_banking_subcategories_user_id", "user_id"),
+            ("banking_subcategories", "ix_banking_subcategories_category_id", "category_id"),
+            ("banking_subcategories", "ix_banking_subcategories_template_sub_id", "template_sub_id"),
+            ("banking_subcategories", "ix_banking_subcategories_category_sort", "category_id, sort_order"),
+        ):
+            r = conn.execute(
+                text("SELECT 1 FROM sqlite_master WHERE type='table' AND name=:t LIMIT 1"),
+                {"t": table},
+            )
+            if r.fetchone() is not None:
+                conn.execute(text(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({cols})"))
+        r = conn.execute(
+            text("SELECT 1 FROM sqlite_master WHERE type='table' AND name='banking_transactions' LIMIT 1")
+        )
+        if r.fetchone() is not None:
+            phantom = conn.execute(
+                text(
+                    """
+                    UPDATE banking_accounts
+                    SET opening_balance = 0.0, balance = 0.0
+                    WHERE CAST(balance AS REAL) < 0
+                    AND NOT EXISTS (
+                        SELECT 1 FROM banking_transactions bt
+                        WHERE bt.account_id = banking_accounts.id
+                    )
+                    """
+                )
+            )
+            if phantom.rowcount and phantom.rowcount > 0:
+                logger.info(
+                    "Migración banking_accounts: saldo negativo sin movimientos corregido en %s fila(s)",
+                    phantom.rowcount,
+                )
+        conn.commit()
+
+
 def _migrate_db_backfill() -> None:
     """Tras `user_id` en tablas: rellena occurred_at y stock_assets (requiere migración multiusuario)."""
     db_backfill = SessionLocal()
@@ -239,6 +724,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(banking_router, prefix="/banking", tags=["banking"])
 
 @app.get("/stock-logos/{symbol}.png")
 def stock_logo_png(symbol: str) -> FileResponse:
@@ -300,6 +787,8 @@ def auth_patch_me(
     svc = user_services(user)
     if body.investments is not None:
         svc[SERVICE_INVESTMENTS] = body.investments
+    if body.banking is not None:
+        svc[SERVICE_BANKING] = body.banking
     user.services_json = json.dumps(svc)
     db.add(user)
     db.commit()
@@ -422,13 +911,65 @@ def _seed_if_empty() -> None:
         db.close()
 
 
+def _backfill_banking_template_ids() -> None:
+    """Completa `template_sub_id` en subcategorías según el JSON por defecto (filas antiguas)."""
+    db = SessionLocal()
+    try:
+        from banking_service import backfill_banking_subcategory_template_ids
+
+        backfill_banking_subcategory_template_ids(db)
+    finally:
+        db.close()
+
+
+def _backfill_banking_category_colors() -> None:
+    db = SessionLocal()
+    try:
+        from banking_service import backfill_banking_category_colors
+
+        backfill_banking_category_colors(db)
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
     _migrate_db()
+    _migrate_banking_schema()
+    _backfill_banking_category_colors()
+    _backfill_banking_template_ids()
     run_multiuser_migration(engine)
     _migrate_db_backfill()
     _seed_if_empty()
+    db_tpl = SessionLocal()
+    try:
+        _reset_catalog = os.environ.get("RESET_BANKING_CATALOG_ON_STARTUP", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
+        if _reset_catalog:
+            from banking_service import reset_banking_catalog_from_json_fresh
+
+            reset_banking_catalog_from_json_fresh(db_tpl)
+        else:
+            from banking_service import reapply_banking_template_all_users
+
+            reapply_banking_template_all_users(db_tpl)
+    except Exception as e:
+        logger.warning("Startup: plantilla categorías banking (%s)", e)
+    finally:
+        db_tpl.close()
+    db_boot = SessionLocal()
+    try:
+        store_today_rate(db_boot)
+    except Exception as e:
+        logger.warning("Startup: no se pudo refrescar USD/CLP (%s)", e)
+        db_boot.rollback()
+    finally:
+        db_boot.close()
 
 
 def _period_start(period: str, last_day: date) -> date:
@@ -867,9 +1408,13 @@ def get_exchange_rate(db: Session = Depends(get_db)) -> ExchangeRateOut:
 
 
 @app.post("/exchange-rate/refresh", response_model=ExchangeRateOut)
-def post_exchange_rate_refresh(db: Session = Depends(get_db)) -> ExchangeRateOut:
+def post_exchange_rate_refresh(
+    db: Session = Depends(get_db),
+    auth_user: User | None = Depends(get_optional_user),
+) -> ExchangeRateOut:
     try:
-        store_today_rate(db)
+        uid = auth_user.id if auth_user is not None else None
+        store_today_rate(db, user_id=uid)
     except Exception as e:
         logger.warning("exchange-rate/refresh: %s", e)
     return _exchange_rate_payload(db)
@@ -940,7 +1485,7 @@ def create_transaction(
     if (body.categoria or "Acciones") == "Acciones":
         raise HTTPException(
             status_code=400,
-            detail="Las acciones US se sincronizan desde Fintual. Solo podés registrar Fondos o AFP manualmente.",
+            detail="Las acciones US se sincronizan desde Fintual. Solo puedes registrar Fondos o AFP manualmente.",
         )
     sym = body.activo.upper().strip()
 

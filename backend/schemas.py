@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 TransactionType = Literal["compra", "venta", "dividendo"]
 CategoriaType = Literal["Acciones", "Fondos", "AFP"]
@@ -252,6 +252,7 @@ class UserProfilePatch(BaseModel):
     """Actualización parcial de preferencias; solo se aplican campos enviados."""
 
     investments: bool | None = None
+    banking: bool | None = None
 
 
 class PasswordChange(BaseModel):
@@ -264,3 +265,274 @@ class FintualCredentialsIn(BaseModel):
 
     session_cookie: str = Field(..., min_length=1, description="Valor de _fintual_session_cookie")
     uid: str | None = Field(None, description="Valor de la cookie uid (recomendado)")
+
+
+BankingProductType = Literal["cuenta_corriente", "cuenta_vista", "cuenta_prepago", "tarjeta_credito"]
+
+
+class BankingAccountOut(BaseModel):
+    id: int
+    name: str
+    currency: str
+    balance: float
+    provision_net_sum: float = Field(
+        0.0,
+        description="Suma de montos en categoría Provisiones (plantilla 21); las reversas netean.",
+    )
+    balance_at_bank: float = Field(
+        ...,
+        description="Equivalente al saldo en el banco: balance del libro menos neto de provisiones.",
+    )
+    product_type: BankingProductType | None = None
+    bank_sbif: str | None = None
+    bank_name: str | None = None
+    linked_checking_account_id: int | None = None
+    linked_checking_account_name: str | None = None
+    enabled: bool = True
+    has_transactions: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class BankingDebtTotalsOut(BaseModel):
+    """Totales para resumen de deudas (no ligados a paginación de movimientos)."""
+
+    credit_card_unpaid_clp: float = Field(
+        ...,
+        description="Suma de cargos en cuentas tarjeta de crédito marcados como no pagados (egresos).",
+    )
+    shared_unsettled_clp: float = Field(
+        ...,
+        description="Suma de valores absolutos de movimientos compartidos aún sin liquidar.",
+    )
+
+
+class BankingAccountCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    initial_balance: float = 0.0
+    product_type: BankingProductType
+    bank_sbif: str = Field(..., min_length=1, max_length=8)
+    linked_checking_account_id: int | None = None
+    enabled: bool = True
+
+    @model_validator(mode="after")
+    def tarjeta_credito_requiere_cuenta(self) -> "BankingAccountCreate":
+        if self.product_type == "tarjeta_credito":
+            if self.linked_checking_account_id is None:
+                raise ValueError("Selecciona la cuenta corriente asociada a esta tarjeta.")
+            return self
+        return self.model_copy(update={"linked_checking_account_id": None})
+
+
+class BankingAccountPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    currency: str | None = Field(default=None, max_length=8)
+    # Ajusta el saldo mostrado; el backend fija `opening_balance` para que coincida con la suma de movimientos.
+    balance: float | None = None
+    product_type: BankingProductType | None = None
+    bank_sbif: str | None = Field(default=None, min_length=1, max_length=8)
+    linked_checking_account_id: int | None = None
+    enabled: bool | None = None
+
+
+class BankingBankOut(BaseModel):
+    sbif: str
+    name: str
+
+
+class BankingSubcategoryOut(BaseModel):
+    id: int
+    category_id: int
+    name: str
+    enabled: bool = True
+    sort_order: int = 0
+    has_transactions: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class BankingCategoryOut(BaseModel):
+    id: int
+    name: str
+    sort_order: int
+    color: str
+    names_locked: bool = True
+    enabled: bool = True
+    internal_reserved: bool = Field(
+        default=False,
+        description="Categoría de uso interno (plantilla reservada): siempre activa en la UI, sin interruptor.",
+    )
+    has_transactions: bool = False
+    subcategories: list[BankingSubcategoryOut] = Field(default_factory=list)
+
+    class Config:
+        from_attributes = True
+
+
+class BankingCategoryPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    sort_order: int | None = None
+    color: str | None = Field(default=None, max_length=16)
+    enabled: bool | None = None
+
+
+class BankingCategoriesReorderBody(BaseModel):
+    """Orden deseado: el primer id queda con sort_order 0, etc."""
+
+    category_ids: list[int] = Field(..., min_length=1)
+
+
+class BankingSubcategoriesReorderBody(BaseModel):
+    """Orden de subcategorías dentro de una categoría (primer id → sort_order 0)."""
+
+    subcategory_ids: list[int] = Field(..., min_length=1)
+
+
+class BankingSubcategoryPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    category_id: int | None = None
+    enabled: bool | None = None
+
+
+class BankingTransactionCreate(BaseModel):
+    account_id: int
+    fecha: date
+    amount: float = Field(..., description="Positivo = ingreso, negativo = egreso.")
+    description: str | None = None
+    category_id: int
+    subcategory_id: int
+    transfer_destination_account_id: int | None = Field(
+        default=None,
+        description="Solo Transferencia → Entre cuentas propias: id del producto destino (no tarjeta).",
+    )
+    is_shared: bool = False
+    split_participants: int | None = Field(
+        default=None,
+        ge=1,
+        description="Personas entre las que se divide el monto (solo si is_shared). Por defecto 2.",
+    )
+    shared_expense_settled: bool = Field(
+        default=False,
+        description="Si el gasto compartido ya fue pagado/cerrado entre participantes.",
+    )
+    credit_card_charge_paid: bool | None = Field(
+        default=None,
+        description="Solo tarjeta de crédito: si el cargo ya fue pagado en el estado de cuenta.",
+    )
+    accounting_month: date | None = Field(
+        default=None,
+        description="Mes contable (primer día del mes); por defecto el mes de fecha.",
+    )
+
+    @field_validator("amount")
+    @classmethod
+    def amount_nonzero(cls, v: float) -> float:
+        if v == 0:
+            raise ValueError("El monto no puede ser cero")
+        return v
+
+    @model_validator(mode="after")
+    def validate_shared_split(self):
+        if self.is_shared:
+            if self.split_participants is None:
+                object.__setattr__(self, "split_participants", 2)
+            elif self.split_participants < 1:
+                raise ValueError("split_participants debe ser >= 1")
+        else:
+            object.__setattr__(self, "split_participants", None)
+            object.__setattr__(self, "shared_expense_settled", False)
+        return self
+
+
+class BankingTransactionPatch(BaseModel):
+    account_id: int | None = None
+    fecha: date | None = None
+    amount: float | None = None
+    description: str | None = None
+    category_id: int | None = None
+    subcategory_id: int | None = None
+    is_shared: bool | None = None
+    split_participants: int | None = Field(default=None, ge=1)
+    shared_expense_settled: bool | None = None
+    credit_card_charge_paid: bool | None = None
+    accounting_month: date | None = None
+
+    @field_validator("amount")
+    @classmethod
+    def amount_nonzero_if_set(cls, v: float | None) -> float | None:
+        if v is not None and v == 0:
+            raise ValueError("El monto no puede ser cero")
+        return v
+
+
+class BankingTransactionOut(BaseModel):
+    id: int
+    account_id: int
+    account_name: str
+    fecha: date
+    amount: float
+    description: str | None = None
+    category_id: int
+    category_name: str
+    category_template_cat_id: int | None = Field(
+        default=None,
+        description="Id plantilla categoría (p. ej. 21 = Provisiones); solo UI.",
+    )
+    category_color: str
+    subcategory_id: int
+    subcategory_name: str
+    created_at: datetime
+    is_shared: bool = False
+    split_participants: int | None = None
+    shared_expense_settled: bool = False
+    credit_card_charge_paid: bool | None = None
+    accounting_month: date | None = None
+    amount_per_person: float | None = Field(
+        default=None,
+        description="abs(amount)/split_participants cuando is_shared.",
+    )
+    peer_transaction_id: int | None = None
+    is_provision_reversal: bool = Field(
+        default=False,
+        description="True si es reversa automática de provisión (solo lectura / borrar).",
+    )
+    counterpart_account_id: int | None = None
+    counterpart_account_name: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class BankingTransactionListOut(BaseModel):
+    items: list[BankingTransactionOut]
+    total: int
+    page: int
+    page_size: int
+
+
+class BankingCreditCardUnpaidGroupOut(BaseModel):
+    """Cargos en una cuenta TC sin marcar como pagados."""
+
+    account_id: int
+    account_name: str
+    items: list[BankingTransactionOut]
+
+
+class BankingCreditCardUnpaidGroupedResponse(BaseModel):
+    groups: list[BankingCreditCardUnpaidGroupOut]
+
+
+class BankingSharedUnsettledGroupedResponse(BaseModel):
+    """Misma forma que cargos TC pendientes: lista de grupos (uno para compartidos sin liquidar)."""
+
+    groups: list[BankingCreditCardUnpaidGroupOut]
+
+
+class BankingBulkSharedSettledBody(BaseModel):
+    transaction_ids: list[int] = Field(..., min_length=1)
+
+
+class BankingBulkSharedSettledOut(BaseModel):
+    updated: int

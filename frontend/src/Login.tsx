@@ -59,7 +59,7 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
           <span>tro</span>
         </h1>
         <p className="mb-5 text-center text-sm text-[#8b949e]">
-          {mode === "login" ? "Iniciá sesión para ver tu portafolio" : "Creá tu cuenta para empezar"}
+          {mode === "login" ? "Inicia sesión para ver tu portafolio" : "Crea tu cuenta para empezar"}
         </p>
 
         <div className="mb-6 flex rounded-lg border border-[#30363d] bg-[#0d1117] p-0.5">

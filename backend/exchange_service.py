@@ -4,15 +4,28 @@ import json
 import logging
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import desc, func
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
 from fx_usd_clp import cmf_configured, get_current_rate, get_historical_rates
-from models import ExchangeRateHistory
+from fintual_client import (
+    fetch_tailormade_exchange_rate_usd_to_clp,
+    fintual_configured,
+    use_fintual_credentials,
+)
+from models import ExchangeRateHistory, User
 
 logger = logging.getLogger(__name__)
+
+# Tipo de cambio es de referencia chilena: un solo registro “hoy” alineado con el calendario de CL.
+_FX_CAL = ZoneInfo("America/Santiago")
+
+
+def fx_calendar_today() -> date:
+    return datetime.now(_FX_CAL).date()
 
 
 def _fallback_rate_legacy() -> tuple[float, str]:
@@ -32,17 +45,45 @@ def _fallback_rate_legacy() -> tuple[float, str]:
     return 950.0, "fallback"
 
 
-def store_today_rate(db: Session) -> ExchangeRateHistory | None:
-    """Valor spot USD/CLP (DolarAPI → CMF) y persiste el día en curso."""
-    try:
-        fx = get_current_rate()
-        rate = float(fx["venta"])
-        source = str(fx.get("fuente", "dolarapi"))
-    except Exception as e:
-        logger.warning("FX live failed: %s", e)
-        rate, source = _fallback_rate_legacy()
+def store_today_rate(db: Session, user_id: int | None = None) -> ExchangeRateHistory | None:
+    """
+    Spot USD/CLP del día en curso.
 
-    today = datetime.now(timezone.utc).date()
+    Prioridad: Fintual `getTailormadeExchangeRate` si hay sesión del usuario en DB,
+    o variables de entorno `FINTUAL_SESSION` (solo cuando no hay `user_id`, p. ej. arranque).
+    Si falla o no hay credenciales Fintual: DolarAPI → CMF → mindicador → fallback.
+    """
+    rate: float | None = None
+    source = "dolarapi"
+
+    user_row: User | None = None
+    if user_id is not None:
+        user_row = db.query(User).filter(User.id == user_id).first()
+
+    if user_row is not None and (user_row.fintual_session or "").strip():
+        try:
+            with use_fintual_credentials(user_row.fintual_session, user_row.fintual_uid):
+                rate = fetch_tailormade_exchange_rate_usd_to_clp()
+                source = "fintual"
+        except Exception as e:
+            logger.warning("Fintual FX (usuario): %s", e)
+    elif user_id is None and fintual_configured():
+        try:
+            rate = fetch_tailormade_exchange_rate_usd_to_clp()
+            source = "fintual"
+        except Exception as e:
+            logger.warning("Fintual FX (env): %s", e)
+
+    if rate is None:
+        try:
+            fx = get_current_rate()
+            rate = float(fx["venta"])
+            source = str(fx.get("fuente", "dolarapi"))
+        except Exception as e:
+            logger.warning("FX live failed: %s", e)
+            rate, source = _fallback_rate_legacy()
+
+    today = fx_calendar_today()
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     stmt = sqlite_insert(ExchangeRateHistory).values(
         date=today,
@@ -83,7 +124,7 @@ def ensure_exchange_history(db: Session, user_id: int) -> None:
     else:
         start = default_start
 
-    today = date.today()
+    today = fx_calendar_today()
     last = db.query(func.max(ExchangeRateHistory.date)).scalar()
 
     if last is None:
@@ -93,7 +134,7 @@ def ensure_exchange_history(db: Session, user_id: int) -> None:
     else:
         fetch_start = last + timedelta(days=1)
 
-    # Histórico oficial hasta ayer; el día en curso lo actualiza DolarAPI (POST /exchange-rate/refresh).
+    # Histórico oficial hasta ayer; el día en curso lo actualiza Fintual o DolarAPI (POST /exchange-rate/refresh).
     cmf_end = today - timedelta(days=1)
     if fetch_start > cmf_end:
         return

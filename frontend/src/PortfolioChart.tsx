@@ -191,7 +191,7 @@ export function PortfolioChart({
       >
         <p>No hay datos en este periodo.</p>
         <p className="max-w-md text-xs text-[#6e7681]">
-          Agregá movimientos o sincronizá precios para ver el historial del portafolio.
+          Agrega movimientos o sincroniza precios para ver el historial del portafolio.
         </p>
       </div>
     );
