@@ -388,9 +388,6 @@ const BANKING_TX_COLUMN_LABELS: Record<BankingTxColumnKey, string> = {
 
 const BANKING_TX_COLUMN_KEYS = Object.keys(BANKING_TX_COLUMN_LABELS) as BankingTxColumnKey[];
 
-const bankingFilterInputClass =
-  "mt-1 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-2.5 py-2 text-sm text-white outline-none transition focus:border-[#58a6ff] [color-scheme:dark]";
-
 /** Filtros del popover de la tabla principal: menos contraste «negro sobre carbón». */
 const bankingMainTxFilterInputClass =
   "mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-2.5 py-2 text-sm text-white outline-none transition focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 [color-scheme:dark]";
