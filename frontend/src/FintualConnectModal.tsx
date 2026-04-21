@@ -1,18 +1,23 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { patchJson } from "./api";
 import { normalizeUserMe, type UserMe } from "./types";
+
+function CloseIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+      <path d="M18 6L6 18M6 6l12 12" />
+    </svg>
+  );
+}
 
 export function FintualConnectModal({
   onConnected,
   onDismiss,
-  allowDismiss = false,
   reconnectMode = false,
 }: {
   onConnected: (me: UserMe) => void;
-  /** Cerrar sin guardar (solo si `allowDismiss`). */
-  onDismiss?: () => void;
-  /** Si es true, se puede cerrar el modal sin conectar (p. ej. abierto desde Perfil). */
-  allowDismiss?: boolean;
+  /** Cerrar sin guardar (X, teclado, o toque fuera). */
+  onDismiss: () => void;
   /** True si la cookie anterior dejó de ser válida (sync falló). */
   reconnectMode?: boolean;
 }) {
@@ -21,6 +26,14 @@ export function FintualConnectModal({
   const [instructionsOpen, setInstructionsOpen] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onDismiss();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onDismiss]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -57,36 +70,37 @@ export function FintualConnectModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="fintual-modal-title"
-      onClick={() => {
-        if (allowDismiss) onDismiss?.();
-      }}
+      onClick={() => onDismiss()}
     >
       <div
         className="tx-scroll max-h-[min(90vh,720px)] w-full max-w-md overflow-y-auto rounded-2xl border border-[#30363d] bg-[#161b22] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <form onSubmit={(e) => void onSubmit(e)} className="p-6">
-          {allowDismiss && (
-            <div className="mb-2 flex justify-end">
-              <button
-                type="button"
-                onClick={() => onDismiss?.()}
-                className="rounded-lg px-2 py-1 text-sm text-[#8b949e] hover:bg-[#21262d] hover:text-[#e6edf3]"
-              >
-                Cerrar
-              </button>
+        <div className="border-b border-[#30363d] p-6 pb-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h2 id="fintual-modal-title" className="text-lg font-semibold text-white">
+                {reconnectMode ? "Reconectar Fintual" : "Conectar Fintual"}
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-[#8b949e]">
+                {reconnectMode
+                  ? "Tu sesión con Fintual expiró o dejó de ser válida (suele ocurrir cada ~30 días). Pega de nuevo la cookie y el uid desde fintual.cl."
+                  : "Conecta tu cuenta de Fintual para ver todas tus inversiones."}
+              </p>
             </div>
-          )}
-          <h2 id="fintual-modal-title" className="text-lg font-semibold text-white">
-            {reconnectMode ? "Reconectar Fintual" : "Conectar Fintual"}
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-[#8b949e]">
-            {reconnectMode
-              ? "Tu sesión con Fintual expiró o dejó de ser válida (suele ocurrir cada ~30 días). Pega de nuevo la cookie y el uid desde fintual.cl."
-              : "Conecta tu cuenta de Fintual para ver todas tus inversiones."}
-          </p>
+            <button
+              type="button"
+              onClick={() => onDismiss()}
+              className="-mr-1 -mt-0.5 shrink-0 rounded-lg p-2 text-[#8b949e] outline-none transition-colors hover:bg-[#21262d] hover:text-[#e6edf3] focus-visible:ring-2 focus-visible:ring-[#58a6ff]"
+              aria-label="Cerrar"
+            >
+              <CloseIcon />
+            </button>
+          </div>
+        </div>
 
-          <label className="mt-6 block">
+        <form onSubmit={(e) => void onSubmit(e)} className="p-6 pt-5">
+          <label className="block">
             <span className="text-xs font-medium text-[#8b949e]">Cookie de sesión</span>
             <input
               type="password"

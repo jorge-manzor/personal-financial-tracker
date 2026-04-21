@@ -91,6 +91,8 @@ export default function App() {
   const [fxRefreshNonce, setFxRefreshNonce] = useState(0);
   const [me, setMe] = useState<UserMe | null>(null);
   const [fintualModalFromProfile, setFintualModalFromProfile] = useState(false);
+  /** Si el usuario cierra el modal sin conectar Fintual, no volver a bloquear hasta que abra de nuevo desde Perfil o recargue. */
+  const [fintualSetupSkipped, setFintualSetupSkipped] = useState(false);
 
   const loadAll = useCallback(async () => {
     const d = await fetchJson<{
@@ -224,10 +226,16 @@ export default function App() {
 
   const handleFintualConnected = useCallback((next: UserMe) => {
     setFintualModalFromProfile(false);
+    setFintualSetupSkipped(false);
     setMe(normalizeUserMe(next));
     setReady(false);
     setInitError(null);
     setBootRetry((n) => n + 1);
+  }, []);
+
+  const dismissFintualModal = useCallback(() => {
+    setFintualModalFromProfile(false);
+    setFintualSetupSkipped(true);
   }, []);
 
   useEffect(() => {
@@ -294,7 +302,9 @@ export default function App() {
   const investmentsOn = !!me?.services.investments;
   const bankingOn = !!me?.services.banking;
   const needsFintualConnection = investmentsOn && !!me?.fintual_needs_setup;
-  const showFintualSetupModal = showMain && (needsFintualConnection || fintualModalFromProfile);
+  const showFintualSetupModal =
+    showMain &&
+    (fintualModalFromProfile || (needsFintualConnection && !fintualSetupSkipped));
 
   return (
     <div className="min-h-full bg-[#0d1117]">
@@ -474,8 +484,7 @@ export default function App() {
       {showFintualSetupModal && (
         <FintualConnectModal
           onConnected={handleFintualConnected}
-          onDismiss={() => setFintualModalFromProfile(false)}
-          allowDismiss={fintualModalFromProfile}
+          onDismiss={dismissFintualModal}
           reconnectMode={!!me?.fintual_reconnect_required}
         />
       )}

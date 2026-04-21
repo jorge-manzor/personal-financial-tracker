@@ -49,7 +49,7 @@ Aplicaci√≥n web **full-stack** para seguir **inversiones** (acciones y fondos v√
 - **`src/App.tsx`**: Boot (`/auth/me`, `/dashboard-initial`), estado global, rutas, overlay de sync SSE, modal **Fintual** cuando faltan credenciales o hay que reconectar.
 - **`src/api.ts` / `auth.ts`**: `fetch` con `Authorization: Bearer`, token en `localStorage`.
 - **`src/Profile.tsx`**: Servicios (toggle inversiones), estado Fintual, credenciales enmascaradas con ojo.
-- **`src/FintualConnectModal.tsx`**: Formulario de cookie/uid; `allowDismiss` si se abre desde Perfil vs modal obligatorio.
+- **`src/FintualConnectModal.tsx`**: Formulario de cookie/uid; cierre con X, **Esc** o toque en el fondo; se puede posponer el flujo inicial y reabrir desde Perfil.
 - **`src/config.ts`**: `VITE_API_BASE` (default `http://localhost:8000`).
 
 ---
