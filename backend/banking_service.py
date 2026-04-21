@@ -136,6 +136,120 @@ def _parse_template_id(value: object | None) -> int | None:
     return None
 
 
+def _dedupe_banking_subcategories_by_template_id(db: Session, user_id: int) -> int:
+    """
+    Una sola fila por (user_id, template_sub_id) cuando template_sub_id no es null.
+    Evita duplicados que rompen los dicts en sync_user_categories_from_json y multiplican la UI.
+    """
+    rows = (
+        db.query(BankingSubcategory)
+        .filter(
+            BankingSubcategory.user_id == user_id,
+            BankingSubcategory.template_sub_id.isnot(None),
+        )
+        .order_by(BankingSubcategory.template_sub_id, BankingSubcategory.id)
+        .all()
+    )
+    by_tid: dict[int, list[BankingSubcategory]] = {}
+    for s in rows:
+        tid = int(s.template_sub_id)  # type: ignore[arg-type]
+        by_tid.setdefault(tid, []).append(s)
+    removed = 0
+    for group in by_tid.values():
+        if len(group) <= 1:
+            continue
+        keeper = group[0]
+        for dup in group[1:]:
+            db.query(BankingTransaction).filter(
+                BankingTransaction.user_id == user_id,
+                BankingTransaction.subcategory_id == dup.id,
+            ).update(
+                {"subcategory_id": keeper.id, "category_id": keeper.category_id},
+                synchronize_session=False,
+            )
+            db.delete(dup)
+            removed += 1
+    if removed:
+        db.flush()
+        logger.info(
+            "Banking dedupe: %s subcategorías duplicadas eliminadas (template_sub_id, user_id=%s)",
+            removed,
+            user_id,
+        )
+    return removed
+
+
+def _dedupe_banking_categories_by_template_cat_id(db: Session, user_id: int) -> int:
+    """Una sola fila por (user_id, template_cat_id) cuando template_cat_id no es null."""
+    rows = (
+        db.query(BankingCategory)
+        .filter(
+            BankingCategory.user_id == user_id,
+            BankingCategory.template_cat_id.isnot(None),
+        )
+        .order_by(BankingCategory.template_cat_id, BankingCategory.id)
+        .all()
+    )
+    by_tid: dict[int, list[BankingCategory]] = {}
+    for c in rows:
+        tid = int(c.template_cat_id)  # type: ignore[arg-type]
+        by_tid.setdefault(tid, []).append(c)
+    removed = 0
+    for group in by_tid.values():
+        if len(group) <= 1:
+            continue
+        keeper = group[0]
+        for dup in group[1:]:
+            subs = (
+                db.query(BankingSubcategory)
+                .filter(BankingSubcategory.category_id == dup.id, BankingSubcategory.user_id == user_id)
+                .all()
+            )
+            for s in subs:
+                twin = None
+                if s.template_sub_id is not None:
+                    twin = (
+                        db.query(BankingSubcategory)
+                        .filter(
+                            BankingSubcategory.category_id == keeper.id,
+                            BankingSubcategory.user_id == user_id,
+                            BankingSubcategory.template_sub_id == s.template_sub_id,
+                        )
+                        .first()
+                    )
+                if twin is not None and twin.id != s.id:
+                    db.query(BankingTransaction).filter(
+                        BankingTransaction.user_id == user_id,
+                        BankingTransaction.subcategory_id == s.id,
+                    ).update(
+                        {"subcategory_id": twin.id, "category_id": keeper.id},
+                        synchronize_session=False,
+                    )
+                    db.delete(s)
+                else:
+                    s.category_id = keeper.id
+            db.query(BankingTransaction).filter(
+                BankingTransaction.user_id == user_id,
+                BankingTransaction.category_id == dup.id,
+            ).update({"category_id": keeper.id}, synchronize_session=False)
+            db.delete(dup)
+            removed += 1
+    if removed:
+        db.flush()
+        logger.info(
+            "Banking dedupe: %s categorías duplicadas eliminadas (template_cat_id, user_id=%s)",
+            removed,
+            user_id,
+        )
+    return removed
+
+
+def dedupe_banking_catalog_for_user(db: Session, user_id: int) -> None:
+    """Ordene: primero subs por template_sub_id, luego categorías por template_cat_id."""
+    _dedupe_banking_subcategories_by_template_id(db, user_id)
+    _dedupe_banking_categories_by_template_cat_id(db, user_id)
+
+
 def _load_default_categories_json() -> list | None:
     if not _DEFAULT_CATEGORIES_PATH.is_file():
         return None
@@ -238,11 +352,15 @@ def _prune_bank_subcategories_not_in_default_json(db: Session, user_id: int) -> 
     all_user_cats = db.query(BankingCategory).filter(BankingCategory.user_id == user_id).all()
     by_tpl_cat: dict[int, BankingCategory] = {}
     by_name_lower: dict[str, BankingCategory] = {}
-    for c in all_user_cats:
+    for c in sorted(all_user_cats, key=lambda x: x.id):
         tc = getattr(c, "template_cat_id", None)
         if tc is not None:
-            by_tpl_cat[int(tc)] = c
-        by_name_lower[c.name.strip().lower()] = c
+            ik = int(tc)
+            if ik not in by_tpl_cat:
+                by_tpl_cat[ik] = c
+        nl = c.name.strip().lower()
+        if nl not in by_name_lower:
+            by_name_lower[nl] = c
 
     pruned = 0
     for cat in raw:
@@ -576,11 +694,15 @@ def sync_user_categories_from_json(
     all_user_cats = db.query(BankingCategory).filter(BankingCategory.user_id == user_id).all()
     by_tpl_cat: dict[int, BankingCategory] = {}
     by_name_lower: dict[str, BankingCategory] = {}
-    for c in all_user_cats:
+    for c in sorted(all_user_cats, key=lambda x: x.id):
         tc = getattr(c, "template_cat_id", None)
         if tc is not None:
-            by_tpl_cat[int(tc)] = c
-        by_name_lower[c.name.strip().lower()] = c
+            ik = int(tc)
+            if ik not in by_tpl_cat:
+                by_tpl_cat[ik] = c
+        nl = c.name.strip().lower()
+        if nl not in by_name_lower:
+            by_name_lower[nl] = c
 
     max_sort = db.query(func.max(BankingCategory.sort_order)).filter(BankingCategory.user_id == user_id).scalar()
     next_sort = int(max_sort) + 1 if max_sort is not None else 0
@@ -635,8 +757,16 @@ def sync_user_categories_from_json(
             .order_by(BankingSubcategory.sort_order, BankingSubcategory.id)
             .all()
         )
-        by_tpl_sub = {int(s.template_sub_id): s for s in db_subs if s.template_sub_id is not None}
-        by_sub_name = {s.name.strip().lower(): s for s in db_subs}
+        by_tpl_sub: dict[int, BankingSubcategory] = {}
+        by_sub_name: dict[str, BankingSubcategory] = {}
+        for s in sorted(db_subs, key=lambda x: x.id):
+            if s.template_sub_id is not None:
+                stk = int(s.template_sub_id)
+                if stk not in by_tpl_sub:
+                    by_tpl_sub[stk] = s
+            snl = s.name.strip().lower()
+            if snl not in by_sub_name:
+                by_sub_name[snl] = s
 
         sub_pos = 0
         for sraw in subs_raw:
@@ -859,6 +989,7 @@ def _ensure_template_subcategories_complete(db: Session, user_id: int) -> None:
 def ensure_default_categories(
     db: Session, user_id: int, *, reset_sort_order_from_json: bool = False
 ) -> None:
+    dedupe_banking_catalog_for_user(db, user_id)
     sync_user_categories_from_json(db, user_id, reset_sort_order_from_json=reset_sort_order_from_json)
     repair_suscripciones_provisiones_duplicated_tpl(db, user_id)
     _prune_bank_subcategories_not_in_default_json(db, user_id)
