@@ -5,7 +5,33 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
   const headers = new Headers(init?.headers);
   const ah = authHeaders();
   if (ah.Authorization) headers.set("Authorization", ah.Authorization);
-  return fetch(`${API_BASE}${path}`, { ...init, headers });
+  return fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers,
+    cache: init?.cache ?? "no-store",
+  });
+}
+
+async function readJsonBody<T>(r: Response, pathForErrors: string): Promise<T> {
+  const text = await r.text();
+  const trimmed = text.trim();
+  if (!trimmed) {
+    if (r.status === 304) {
+      throw new Error(
+        "Respuesta sin cuerpo (304). Prueba recargar sin caché o revisa el API; si persiste, avísanos.",
+      );
+    }
+    throw new Error(
+      `Respuesta vacía del servidor en ${pathForErrors} (${r.status}). Si VITE_API_BASE apunta al sitio estático en lugar del API, corrígelo y vuelve a hacer build.`,
+    );
+  }
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch {
+    throw new Error(
+      `Respuesta no JSON en ${pathForErrors} (${r.status}): ${trimmed.slice(0, 160)}${trimmed.length > 160 ? "…" : ""}`,
+    );
+  }
 }
 
 export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -14,7 +40,7 @@ export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T>
     throw new Error("401");
   }
   if (!r.ok) throw new Error(`${path} ${r.status}`);
-  return r.json() as Promise<T>;
+  return readJsonBody<T>(r, path);
 }
 
 export async function patchJson<T>(path: string, body: unknown): Promise<T> {
@@ -32,7 +58,7 @@ export async function patchJson<T>(path: string, body: unknown): Promise<T> {
     }
     throw new Error(msg);
   }
-  return r.json() as Promise<T>;
+  return readJsonBody<T>(r, path);
 }
 
 export async function postJson<T>(path: string, body: unknown): Promise<T> {
@@ -50,5 +76,5 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
     }
     throw new Error(msg);
   }
-  return r.json() as Promise<T>;
+  return readJsonBody<T>(r, path);
 }
