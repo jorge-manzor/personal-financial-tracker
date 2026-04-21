@@ -125,10 +125,9 @@ Es **un tercer servicio** (otra caja en el lienzo), **separado** del API y del P
 4. **Build command:**  
    `npm run build:railway`
 
-   Es un script definido en [`frontend/package.json`](../frontend/package.json): borra `node_modules` antes de `npm ci` para evitar en Docker/Railway el error **`EBUSY … rmdir … node_modules/.vite`** (carpeta bloqueada al limpiar la caché de Vite entre capas).
+   Script en [`frontend/package.json`](../frontend/package.json): ejecuta [`frontend/scripts/railway-prebuild.mjs`](../frontend/scripts/railway-prebuild.mjs) (borra `node_modules` con `fs.rmSync` y **reintentos** ante `EBUSY`), luego `npm ci` y `npm run build`. Además, la caché de Vite y los `tsBuildInfo` de TypeScript están **fuera de `node_modules`** ([`vite.config.ts`](../frontend/vite.config.ts), `tsconfig.*.json`), para que no queden carpetas como `.vite` / `.cache` bloqueadas en capas Docker.
 
-   Alternativa equivalente si no quieres usar el script:  
-   `rm -rf node_modules && npm ci && npm run build`
+   No sustituyas esto por un simple `rm -rf node_modules && …`: en Railway ese `rm` suele fallar antes que el borrado con reintentos de Node.
 5. **Start command** (servir la carpeta `dist` como SPA; rutas del cliente necesitan fallback a `index.html`):  
 
    `npx --yes serve@14 dist -s -l tcp://0.0.0.0:$PORT`
@@ -189,7 +188,7 @@ Es **un tercer servicio** (otra caja en el lienzo), **separado** del API y del P
 | CORS | `CORS_ORIGINS` debe coincidir exactamente con el origen del navegador (`https://…`). |
 | Error SSL / conexión a Postgres | Añadir `?sslmode=require` al final de `DATABASE_URL` si Railway/postgres lo requieren (probar desde el panel de variables). |
 | Build Python incorrecto | Forzar Python **3.12** alineado con [`backend/.python-version`](../backend/.python-version). |
-| Build front: `npm error EBUSY` / `rmdir … node_modules/.vite` | Usar **`npm run build:railway`** (o `rm -rf node_modules && npm ci && npm run build`). Limpieza antes de `npm ci` evita locks en CI. Opcional: en Railway borrar **build cache** del servicio y redeploy. |
+| Build front: `EBUSY` / `Device or resource busy` en `node_modules/.vite`, `.cache`, etc. | Usar **`npm run build:railway`** (prebuild con reintentos + cachés fuera de `node_modules`). Si persiste: en Railway **borrar build cache** del servicio frontend y redeploy. |
 | Rutas React 404 al refrescar | El comando `serve -s` debe estar activo en el **start** del servicio frontend. |
 
 ---
