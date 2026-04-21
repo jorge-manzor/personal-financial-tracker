@@ -27,8 +27,9 @@ from fintual_client import (
     get_stock_positions_raw,
     refresh_pricing_jwt,
     sector_industry_for_symbol,
+    use_fintual_credentials,
 )
-from models import FintualPosition, PriceCache, StockSplit, Transaction, WalletMovement
+from models import FintualPosition, PriceCache, StockSplit, Transaction, User, WalletMovement
 from stock_assets import upsert_stock_asset
 
 logger = logging.getLogger(__name__)
@@ -305,7 +306,33 @@ def _fetch_asset_details_safe(sym: str, fallback_id: str) -> dict[str, Any]:
         return {"id": fallback_id, "name": sym, "symbol": sym}
 
 
+def _fetch_asset_details_in_thread(
+    sym: str,
+    fallback_id: str,
+    session_cookie: str | None,
+    uid: str | None,
+) -> dict[str, Any]:
+    """
+    `ContextVar` de `use_fintual_credentials` no se hereda en ThreadPoolExecutor; hay que re-aplicar credenciales en el worker.
+    """
+    with use_fintual_credentials(session_cookie, uid):
+        return _fetch_asset_details_safe(sym, fallback_id)
+
+
+def _fetch_symbol_movements_in_thread(
+    sym: str,
+    session_cookie: str | None,
+    uid: str | None,
+) -> tuple[str, dict[str, Any] | None, list[dict[str, Any]] | None, Exception | None]:
+    with use_fintual_credentials(session_cookie, uid):
+        return _fetch_symbol_movements(sym)
+
+
 def sync_positions(db: Session, user_id: int) -> int:
+    u_row = db.query(User).filter(User.id == user_id).first()
+    fs = ((u_row.fintual_session or "").strip() if u_row else "") or None
+    fu = ((u_row.fintual_uid or "").strip() if u_row else "") or None
+
     raw = get_stock_positions_raw()
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     seen: set[str] = set()
@@ -327,7 +354,7 @@ def sync_positions(db: Session, user_id: int) -> int:
         n_workers = min(10, len(rows))
         with ThreadPoolExecutor(max_workers=n_workers) as ex:
             futs = {
-                ex.submit(_fetch_asset_details_safe, sym, str(p.get("id", ""))): sym
+                ex.submit(_fetch_asset_details_in_thread, sym, str(p.get("id", "")), fs, fu): sym
                 for p, sym, _ in rows
             }
             for fut in as_completed(futs):
@@ -532,6 +559,10 @@ def _collect_symbols(db: Session, position_symbols: list[str], user_id: int) -> 
 
 def sync_fintual_stock_transactions(db: Session, symbols: list[str], user_id: int) -> int:
     """Reemplaza movimientos de acciones desde Fintual (compras, ventas, divs, divisiones)."""
+    u_row = db.query(User).filter(User.id == user_id).first()
+    fs = ((u_row.fintual_session or "").strip() if u_row else "") or None
+    fu = ((u_row.fintual_uid or "").strip() if u_row else "") or None
+
     db.execute(
         delete(Transaction).where(
             and_(
@@ -552,7 +583,7 @@ def sync_fintual_stock_transactions(db: Session, symbols: list[str], user_id: in
     if symbols:
         workers = min(10, len(symbols))
         with ThreadPoolExecutor(max_workers=workers) as ex:
-            futs = {ex.submit(_fetch_symbol_movements, s): s for s in symbols}
+            futs = {ex.submit(_fetch_symbol_movements_in_thread, s, fs, fu): s for s in symbols}
             for fut in as_completed(futs):
                 sym, pack, sells, err = fut.result()
                 if err is not None:

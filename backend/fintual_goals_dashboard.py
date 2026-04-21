@@ -14,8 +14,9 @@ from fintual_client import (
     fetch_goal_balance_graph_points,
     get_goals_rest,
     portal_balance_snapshot_from_graph,
+    use_fintual_credentials,
 )
-from models import Transaction
+from models import Transaction, User
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +229,10 @@ def _cards_from_synced_fondos_tx(db: Session, user_id: int) -> list[dict[str, An
     return out
 
 
-def _cards_from_goals_api() -> list[dict[str, Any]]:
+def _cards_from_goals_api(
+    fintual_session: str | None = None,
+    fintual_uid: str | None = None,
+) -> list[dict[str, Any]]:
     if not fintual_configured():
         return []
     try:
@@ -266,7 +270,7 @@ def _cards_from_goals_api() -> list[dict[str, Any]]:
             }
         )
 
-    _enrich_goal_cards_with_portal_balance_graph(out)
+    _enrich_goal_cards_with_portal_balance_graph(out, fintual_session, fintual_uid)
 
     out.sort(
         key=lambda x: (
@@ -278,7 +282,11 @@ def _cards_from_goals_api() -> list[dict[str, Any]]:
     return out
 
 
-def _enrich_goal_cards_with_portal_balance_graph(cards: list[dict[str, Any]]) -> None:
+def _enrich_goal_cards_with_portal_balance_graph(
+    cards: list[dict[str, Any]],
+    fintual_session: str | None = None,
+    fintual_uid: str | None = None,
+) -> None:
     """
     Alinea NAV, “depositado” y ganancia con el **último punto** del gráfico de balance (GQL),
     igual que la ficha en fintual.cl.
@@ -293,7 +301,8 @@ def _enrich_goal_cards_with_portal_balance_graph(cards: list[dict[str, Any]]) ->
 
     def _fetch_portal(gid: str) -> tuple[str, tuple[float, float, float, float] | None]:
         try:
-            pts = fetch_goal_balance_graph_points(gid)
+            with use_fintual_credentials(fintual_session, fintual_uid):
+                pts = fetch_goal_balance_graph_points(gid)
             return gid, portal_balance_snapshot_from_graph(pts)
         except Exception as exc:
             logger.debug("clGoalBalanceGraphDataPoints %s: %s", gid, exc)
@@ -320,8 +329,16 @@ def fetch_active_goal_cards(db: Session | None = None, user_id: int | None = Non
     Metas para el dashboard: primero API de goals (NAV real); si falta algo, rellena con
     metas vistas solo en el sync de movimientos (mismo `activo` = id de meta).
     """
+    fs: str | None = None
+    fu: str | None = None
+    if db is not None and user_id is not None:
+        u_row = db.query(User).filter(User.id == user_id).first()
+        if u_row:
+            fs = (u_row.fintual_session or "").strip() or None
+            fu = (u_row.fintual_uid or "").strip() or None
+
     by_id: dict[str, dict[str, Any]] = {}
-    for c in _cards_from_goals_api():
+    for c in _cards_from_goals_api(fs, fu):
         by_id[c["id"]] = c
 
     if db is not None and user_id is not None:
