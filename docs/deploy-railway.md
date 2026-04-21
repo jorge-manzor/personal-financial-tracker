@@ -125,9 +125,7 @@ Es **un tercer servicio** (otra caja en el lienzo), **separado** del API y del P
 4. **Build command:**  
    `npm run build:railway`
 
-   Script en [`frontend/package.json`](../frontend/package.json): ejecuta [`frontend/scripts/railway-prebuild.mjs`](../frontend/scripts/railway-prebuild.mjs), que **aparca** `node_modules` renombrándolo en el mismo directorio (`node_modules.__parked__…`) para no depender de `rmdir` sobre `.cache` / `.vite`; si hiciera falta, desprende esas carpetas y usa `fs.rmSync` con reintentos. Luego `npm ci` y `npm run build`. La caché de Vite y los `tsBuildInfo` siguen **fuera de `node_modules`** ([`vite.config.ts`](../frontend/vite.config.ts), `tsconfig.*.json`).
-
-   No sustituyas esto por `rm -rf node_modules`: en Railway suele fallar con `EBUSY` / “resource busy”.
+   Equivale a **`npm run build`** (Nixpacks ya ejecuta **`npm ci`** en la fase *install*). Lo importante es el archivo **[`frontend/nixpacks.toml`](../frontend/nixpacks.toml)** del mismo directorio raíz del servicio: desactiva la caché de build por defecto de Node en **`node_modules/.cache`** (Nixpacks la monta entre builds en otro volumen → **`EBUSY` / `EXDEV`** al borrar o renombrar `node_modules`). La caché de Vite y los `tsBuildInfo` siguen fuera de `node_modules` ([`vite.config.ts`](../frontend/vite.config.ts), `tsconfig.*.json`).
 5. **Start command** (servir la carpeta `dist` como SPA; rutas del cliente necesitan fallback a `index.html`):  
 
    `npx --yes serve@14 dist -s -l tcp://0.0.0.0:$PORT`
@@ -188,7 +186,7 @@ Es **un tercer servicio** (otra caja en el lienzo), **separado** del API y del P
 | CORS | `CORS_ORIGINS` debe coincidir exactamente con el origen del navegador (`https://…`). |
 | Error SSL / conexión a Postgres | Añadir `?sslmode=require` al final de `DATABASE_URL` si Railway/postgres lo requieren (probar desde el panel de variables). |
 | Build Python incorrecto | Forzar Python **3.12** alineado con [`backend/.python-version`](../backend/.python-version). |
-| Build front: `EBUSY` / `Device or resource busy` en `node_modules/.vite`, `.cache`, etc. | Usar **`npm run build:railway`** (prebuild con reintentos + cachés fuera de `node_modules`). Si persiste: en Railway **borrar build cache** del servicio frontend y redeploy. |
+| Build front: `EBUSY` / `EXDEV` en `node_modules/.cache` | Asegúrate de tener **[`frontend/nixpacks.toml`](../frontend/nixpacks.toml)** (`[phases.build] cacheDirectories = []`). Opcional: variable **`NIXPACKS_NO_CACHE=1`** en el servicio (desactiva toda la caché Nixpacks). Luego **borrar build cache** en Railway y redeploy. |
 | Rutas React 404 al refrescar | El comando `serve -s` debe estar activo en el **start** del servicio frontend. |
 
 ---

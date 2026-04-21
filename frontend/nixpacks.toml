@@ -1,0 +1,5 @@
+# Nixpacks (Railway) mounts `node_modules/.cache` between builds by default for Node.
+# That cache is a separate filesystem → npm/rm hits EBUSY / EXDEV when touching node_modules.
+# Clearing build-phase caches keeps everything on one volume.
+[phases.build]
+cacheDirectories = []
