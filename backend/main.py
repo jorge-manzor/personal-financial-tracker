@@ -747,19 +747,28 @@ def _migrate_db_backfill() -> None:
         db_backfill.close()
 
 
+def _normalize_cors_origin(origin: str) -> str:
+    """Origin header never includes a trailing slash; env typos like https://app/ would break CORS."""
+    return origin.strip().rstrip("/")
+
+
 def _cors_allow_origins() -> list[str]:
     """
     Orígenes permitidos: Vite local + lista en CORS_ORIGINS (coma) p. ej. https://tu-app.onrender.com
     """
-    base = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    base_raw = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    base = [_normalize_cors_origin(o) for o in base_raw]
+    seen = set(base)
+    out = list(base)
     extra = os.environ.get("CORS_ORIGINS", "").strip()
     if not extra:
-        return base
+        return out
     for part in extra.split(","):
-        p = part.strip()
-        if p and p not in base:
-            base.append(p)
-    return base
+        p = _normalize_cors_origin(part)
+        if p and p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out
 
 
 app = FastAPI(title="Portfolio Tracker API")
