@@ -123,7 +123,12 @@ Es **un tercer servicio** (otra caja en el lienzo), **separado** del API y del P
 2. **Settings** → **Root Directory**: **`frontend`** (solo el front).
 3. **Watch paths** (recomendado): **`frontend/**`**
 4. **Build command:**  
-   `npm ci && npm run build`
+   `npm run build:railway`
+
+   Es un script definido en [`frontend/package.json`](../frontend/package.json): borra `node_modules` antes de `npm ci` para evitar en Docker/Railway el error **`EBUSY … rmdir … node_modules/.vite`** (carpeta bloqueada al limpiar la caché de Vite entre capas).
+
+   Alternativa equivalente si no quieres usar el script:  
+   `rm -rf node_modules && npm ci && npm run build`
 5. **Start command** (servir la carpeta `dist` como SPA; rutas del cliente necesitan fallback a `index.html`):  
 
    `npx --yes serve@14 dist -s -l tcp://0.0.0.0:$PORT`
@@ -184,6 +189,7 @@ Es **un tercer servicio** (otra caja en el lienzo), **separado** del API y del P
 | CORS | `CORS_ORIGINS` debe coincidir exactamente con el origen del navegador (`https://…`). |
 | Error SSL / conexión a Postgres | Añadir `?sslmode=require` al final de `DATABASE_URL` si Railway/postgres lo requieren (probar desde el panel de variables). |
 | Build Python incorrecto | Forzar Python **3.12** alineado con [`backend/.python-version`](../backend/.python-version). |
+| Build front: `npm error EBUSY` / `rmdir … node_modules/.vite` | Usar **`npm run build:railway`** (o `rm -rf node_modules && npm ci && npm run build`). Limpieza antes de `npm ci` evita locks en CI. Opcional: en Railway borrar **build cache** del servicio y redeploy. |
 | Rutas React 404 al refrescar | El comando `serve -s` debe estar activo en el **start** del servicio frontend. |
 
 ---

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:railway": "rm -rf node_modules && npm ci && npm run build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
