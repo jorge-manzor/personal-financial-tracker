@@ -715,11 +715,26 @@ def _migrate_db_backfill() -> None:
         db_backfill.close()
 
 
+def _cors_allow_origins() -> list[str]:
+    """
+    Orígenes permitidos: Vite local + lista en CORS_ORIGINS (coma) p. ej. https://tu-app.onrender.com
+    """
+    base = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    extra = os.environ.get("CORS_ORIGINS", "").strip()
+    if not extra:
+        return base
+    for part in extra.split(","):
+        p = part.strip()
+        if p and p not in base:
+            base.append(p)
+    return base
+
+
 app = FastAPI(title="Portfolio Tracker API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_cors_allow_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
