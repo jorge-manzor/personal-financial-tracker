@@ -33,6 +33,7 @@ Guía ordenada para publicar el **API (FastAPI)** y el **frontend (Vite)** con U
    - **Region:** la más cercana (ej. Frankfurt si estás en Europa).
    - **Root Directory:** `backend`
    - **Runtime:** Python 3.
+   - **Versión de Python:** Render puede usar **3.14 por defecto** en servicios nuevos; para paquetes con extensiones (p. ej. `pydantic-core`) conviene **3.12**. El repo incluye `backend/.python-version` con `3.12`. Alternativa en el dashboard: variable de entorno **`PYTHON_VERSION`** = `3.12.11` (u otra patch 3.12.x que ofrezca Render).
    - **Build Command:**  
      `pip install -r requirements.txt`
    - **Start Command:**  
@@ -124,6 +125,7 @@ Si migráis datos desde SQLite local, es un paso aparte (export/import o script)
 | Error CORS en consola | `CORS_ORIGINS` debe ser exactamente la URL del front (https, sin path). Redeploy del API. |
 | API cae tras un rato | Plan gratuito con sleep; subir de plan en el Web Service. |
 | Error al conectar a Postgres | Comprobar `DATABASE_URL`; en Render usar la URL **Internal** desde el mismo servicio. |
+| Build del API: `pydantic-core` / `maturin` / `Read-only file system` / Rust | Estás en Python **3.14** sin wheel; fija **3.12** con `backend/.python-version` o `PYTHON_VERSION` (p. ej. `3.12.11`) y redeploy. |
 
 ---
 
