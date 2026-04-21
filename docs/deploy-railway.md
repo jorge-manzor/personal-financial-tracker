@@ -25,6 +25,16 @@ Hay **un solo proyecto Railway** con **tres piezas independientes** (tres “caj
 
 Si al crear el proyecto elegiste **“Deploy from GitHub”** y Railway generó solo un servicio automático, puedes **renombrarlo / ajustar Root Directory** o borrarlo y seguir esta guía desde **New** → servicios como abajo.
 
+### ¿Postgres primero o el watch path `backend/**`?
+
+**Son cosas distintas; no es “uno u otro”.**
+
+1. **Orden sí importa:** primero **PostgreSQL**, después **API** (`backend`), después **Frontend** (`frontend`). El watch path **no sustituye** ese orden.
+2. **`Root Directory`** (p. ej. `backend`): define **qué carpeta del repo** usa ese servicio para instalar dependencias y arrancar. Sin esto, Railway no sabe si es API o front.
+3. **`Watch paths`** (p. ej. `backend/**`): es **opcional** y va **dentro del servicio API**, cuando ya existe. Solo dice: “solo vuelve a desplegar **este** servicio si el commit tocó archivos bajo `backend/`”. Así un cambio en `frontend/` no redespliega el API (y al revés en el otro servicio con `frontend/**`).
+
+Resumen: **partes con proyecto vacío → añades Postgres → luego añades el servicio API** (ahí pones Root `backend` y, si quieres, Watch `backend/**`) **→ luego añades el servicio frontend** (Root `frontend`, Watch `frontend/**`).
+
 ---
 
 ## 0. Antes de empezar
