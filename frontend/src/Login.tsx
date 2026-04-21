@@ -55,8 +55,8 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#0d1117] px-4">
       <div className="w-full max-w-sm rounded-2xl border border-[#30363d] bg-[#161b22] p-8 shadow-xl">
         <h1 className="mb-1 text-center text-xl font-semibold text-white">
-          <span className="text-[#3b82f6]">Moni</span>
-          <span>tro</span>
+          <span className="text-[#3b82f6]">Zendo</span>
+          <span> Finance</span>
         </h1>
         <p className="mb-5 text-center text-sm text-[#8b949e]">
           {mode === "login" ? "Inicia sesión para ver tu portafolio" : "Crea tu cuenta para empezar"}

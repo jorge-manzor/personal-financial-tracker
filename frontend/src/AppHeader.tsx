@@ -120,8 +120,8 @@ export function AppHeader({
       <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-col justify-center gap-0.5 py-0.5">
           <h1 className="truncate text-lg font-bold leading-tight tracking-tight md:text-xl">
-            <span className="text-[#3b82f6]">Moni</span>
-            <span className="text-white">tro</span>
+            <span className="text-[#3b82f6]">Zendo</span>
+            <span className="text-white"> Finance</span>
           </h1>
           <p className="truncate text-[11px] font-medium text-[#8b949e] md:text-xs">
             {headerSubtitle(pathname, investmentsEnabled)}

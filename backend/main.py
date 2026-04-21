@@ -771,7 +771,7 @@ def _cors_allow_origins() -> list[str]:
     return out
 
 
-app = FastAPI(title="Portfolio Tracker API")
+app = FastAPI(title="Zendo Finance API")
 
 app.add_middleware(
     CORSMiddleware,

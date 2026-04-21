@@ -158,9 +158,9 @@ export function AppSidebar({
         <Link
           to="/"
           className="flex h-11 w-11 items-center justify-center rounded-xl transition-opacity hover:opacity-90"
-          aria-label="Inicio — Monitro"
+          aria-label="Inicio — Zendo Finance"
         >
-          <span className="text-[28px] font-black leading-none tracking-tight text-[#22d3ee]">M</span>
+          <span className="text-[28px] font-black leading-none tracking-tight text-[#3b82f6]">Z</span>
         </Link>
         <SidebarTooltip label="Inicio" />
       </div>

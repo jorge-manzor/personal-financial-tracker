@@ -62,7 +62,7 @@ export function FintualConnectModal({
       }}
     >
       <div
-        className="max-h-[min(90vh,720px)] w-full max-w-md overflow-y-auto rounded-2xl border border-[#30363d] bg-[#161b22] shadow-2xl"
+        className="tx-scroll max-h-[min(90vh,720px)] w-full max-w-md overflow-y-auto rounded-2xl border border-[#30363d] bg-[#161b22] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <form onSubmit={(e) => void onSubmit(e)} className="p-6">
@@ -165,7 +165,7 @@ export function FintualConnectModal({
                 </li>
               </ol>
               <p className="mt-4 text-xs leading-relaxed text-[#6e7681]">
-                Las credenciales se guardan en tu cuenta de Monitro y solo se usan en el servidor para consultar Fintual.
+                Las credenciales se guardan en tu cuenta de Zendo Finance y solo se usan en el servidor para consultar Fintual.
                 Renueva la cookie en Fintual cuando caduque (suele ser alrededor de 30 días).
               </p>
             </div>

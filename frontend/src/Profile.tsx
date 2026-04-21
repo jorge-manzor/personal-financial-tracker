@@ -228,7 +228,7 @@ export function Profile({
         onSubmit={(e) => void onChangePassword(e)}
       >
         <h3 className="text-sm font-semibold text-white">Contraseña</h3>
-        <p className="mt-1 text-sm text-[#8b949e]">Cambia tu contraseña de acceso a Monitro.</p>
+        <p className="mt-1 text-sm text-[#8b949e]">Cambia tu contraseña de acceso a Zendo Finance.</p>
 
         <label className="mt-4 block">
           <span className="text-xs text-[#8b949e]">Contraseña actual</span>
@@ -332,7 +332,7 @@ export function Profile({
                 )}
 
                 <p className="text-xs leading-relaxed text-[#6e7681]">
-                  Por defecto los valores se muestran ocultos. Solo puedes verlos con la sesión iniciada en Monitro.
+                  Por defecto los valores se muestran ocultos. Solo puedes verlos con la sesión iniciada en Zendo Finance.
                 </p>
               </div>
             )}

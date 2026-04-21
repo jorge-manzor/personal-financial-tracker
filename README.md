@@ -1,4 +1,4 @@
-# Monitro — Rastreador financiero personal
+# Zendo Finance — Rastreador financiero personal
 
 Aplicación web **full-stack** para seguir **inversiones** (acciones y fondos vía Fintual, activos manuales, gráficos y métricas) con **cuentas de usuario**, **JWT** y **servicios opt-in** por perfil.
 
@@ -10,7 +10,7 @@ Aplicación web **full-stack** para seguir **inversiones** (acciones y fondos v�
 
 | Ámbito | Descripción |
 |--------|-------------|
-| **Nombre en UI** | Monitro |
+| **Nombre en UI** | Zendo Finance |
 | **Servicio 1 — Inversiones** | Panel, transacciones (Fintual + manuales), sincronización de precios/posiciones, metas/fondos, billetera USD, gráficos, sectores. Activable en **Perfil**. |
 | **Autenticación** | Registro / login con **email + contraseña**; sesión con **JWT** (Bearer). |
 | **Multiusuario** | Cada usuario tiene su propia fila en `users`, datos de portafolio **acotados por `user_id`**, y credenciales **Fintual propias** guardadas en BD (no se mezclan con otras cuentas). |

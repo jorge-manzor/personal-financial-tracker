@@ -112,8 +112,8 @@ export function SyncOverlay({
               </svg>
             </div>
             <h1 className="text-xl font-semibold leading-tight">
-              <span className="text-[#3b82f6]">Moni</span>
-              <span className="text-white">tro</span>
+              <span className="text-[#3b82f6]">Zendo</span>
+              <span className="text-white"> Finance</span>
             </h1>
           </div>
 
