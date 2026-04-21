@@ -1,0 +1,3 @@
+# Railway/Nixpacks: alinear runtime Python con `.python-version` y evitar 3.14 por defecto en algunos builders.
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.12"
