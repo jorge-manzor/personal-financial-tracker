@@ -126,6 +126,7 @@ Si migráis datos desde SQLite local, es un paso aparte (export/import o script)
 | API cae tras un rato | Plan gratuito con sleep; subir de plan en el Web Service. |
 | Error al conectar a Postgres | Comprobar `DATABASE_URL`; en Render usar la URL **Internal** desde el mismo servicio. |
 | Build del API: `pydantic-core` / `maturin` / `Read-only file system` / Rust | Estás en Python **3.14** sin wheel; fija **3.12** con `backend/.python-version` o `PYTHON_VERSION` (p. ej. `3.12.11`) y redeploy. |
+| Build OK pero `uvicorn` termina en segundos (`Exited with status 3`) | Suele ser el **startup** ejecutando migraciones pensadas para **SQLite** sobre Postgres (`PRAGMA`, `sqlite_master`). El código actual **solo aplica esas migraciones en SQLite**; redeploy tras actualizar `main.py`. |
 
 ---
 

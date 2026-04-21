@@ -122,6 +122,38 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _db_is_sqlite() -> bool:
+    return engine.dialect.name == "sqlite"
+
+
+def _postgres_bootstrap_user_if_needed() -> None:
+    """
+    PostgreSQL: el esquema sale de `Base.metadata.create_all`; las migraciones legacy están pensadas para SQLite.
+    Si la tabla `users` está vacía, crear el mismo usuario inicial que inserta `run_multiuser_migration` en SQLite.
+    """
+    if engine.dialect.name != "postgresql":
+        return
+    db = SessionLocal()
+    try:
+        n = db.query(func.count(User.id)).scalar() or 0
+        if n == 0:
+            db.add(
+                User(
+                    email="local@portfolio.local",
+                    password_hash=hash_password("changeme"),
+                    created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    services_json='{"investments": true}',
+                    fintual_reconnect_required=False,
+                )
+            )
+            db.commit()
+            logger.warning(
+                "Usuario inicial: local@portfolio.local / changeme — cambiá la contraseña cuando puedas."
+            )
+    finally:
+        db.close()
+
+
 def _fintual_needs_setup(user: User) -> bool:
     """Modal de conexión / reconexión Fintual."""
     if not user_services(user).get(SERVICE_INVESTMENTS, False):
@@ -950,11 +982,15 @@ def _backfill_banking_category_colors() -> None:
 @app.on_event("startup")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
-    _migrate_db()
-    _migrate_banking_schema()
+    if _db_is_sqlite():
+        _migrate_db()
+        _migrate_banking_schema()
     _backfill_banking_category_colors()
     _backfill_banking_template_ids()
-    run_multiuser_migration(engine)
+    if _db_is_sqlite():
+        run_multiuser_migration(engine)
+    else:
+        _postgres_bootstrap_user_if_needed()
     _migrate_db_backfill()
     _seed_if_empty()
     db_tpl = SessionLocal()
