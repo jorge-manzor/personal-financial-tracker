@@ -125,9 +125,9 @@ Es **un tercer servicio** (otra caja en el lienzo), **separado** del API y del P
 4. **Build command:**  
    `npm run build:railway`
 
-   Script en [`frontend/package.json`](../frontend/package.json): ejecuta [`frontend/scripts/railway-prebuild.mjs`](../frontend/scripts/railway-prebuild.mjs) (borra `node_modules` con `fs.rmSync` y **reintentos** ante `EBUSY`), luego `npm ci` y `npm run build`. Además, la caché de Vite y los `tsBuildInfo` de TypeScript están **fuera de `node_modules`** ([`vite.config.ts`](../frontend/vite.config.ts), `tsconfig.*.json`), para que no queden carpetas como `.vite` / `.cache` bloqueadas en capas Docker.
+   Script en [`frontend/package.json`](../frontend/package.json): ejecuta [`frontend/scripts/railway-prebuild.mjs`](../frontend/scripts/railway-prebuild.mjs), que **aparca** `node_modules` renombrándolo en el mismo directorio (`node_modules.__parked__…`) para no depender de `rmdir` sobre `.cache` / `.vite`; si hiciera falta, desprende esas carpetas y usa `fs.rmSync` con reintentos. Luego `npm ci` y `npm run build`. La caché de Vite y los `tsBuildInfo` siguen **fuera de `node_modules`** ([`vite.config.ts`](../frontend/vite.config.ts), `tsconfig.*.json`).
 
-   No sustituyas esto por un simple `rm -rf node_modules && …`: en Railway ese `rm` suele fallar antes que el borrado con reintentos de Node.
+   No sustituyas esto por `rm -rf node_modules`: en Railway suele fallar con `EBUSY` / “resource busy”.
 5. **Start command** (servir la carpeta `dist` como SPA; rutas del cliente necesitan fallback a `index.html`):  
 
    `npx --yes serve@14 dist -s -l tcp://0.0.0.0:$PORT`
