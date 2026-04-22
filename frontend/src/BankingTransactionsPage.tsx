@@ -476,7 +476,7 @@ const bankingToolbarGhostBtnMdClass =
 const bankingAuxActionBtnClass =
   "rounded-lg border border-teal-200 bg-gradient-to-b from-teal-50 to-emerald-50 px-2 py-1 text-[11px] font-semibold text-teal-900 shadow-sm ring-1 ring-teal-100 transition hover:from-teal-100 hover:to-emerald-50 disabled:cursor-wait disabled:opacity-40";
 const bankingAuxBulkBtnClass =
-  "rounded-xl border border-teal-200 bg-gradient-to-b from-teal-50 to-emerald-50 px-3 py-1.5 text-xs font-semibold text-teal-900 shadow-sm ring-1 ring-teal-100 transition hover:from-teal-100 hover:to-emerald-50 disabled:cursor-not-allowed disabled:opacity-40";
+  "rounded-xl border border-teal-200 bg-gradient-to-b from-teal-50 to-emerald-50 px-3.5 py-2 text-sm font-semibold text-teal-900 shadow-sm ring-1 ring-teal-100 transition hover:from-teal-100 hover:to-emerald-50 disabled:cursor-not-allowed disabled:opacity-40";
 
 /** Tabla principal — tarjeta blanca + menta muy suave (modo claro). */
 const BANKING_MAIN_TX_CARD_CLASS =
@@ -603,6 +603,7 @@ const BANKING_TX_COL_WIDTH: Record<BankingTxColumnKey, string> = {
 const BANKING_CC_PENDING_EXCLUDED_COLUMNS = new Set<BankingTxColumnKey>([
   "tipo_movimiento",
   "compartido_liquidado",
+  "cargo_tc",
   "mes_contable",
 ]);
 
@@ -1755,7 +1756,7 @@ function BankingSharedPendingChargesTable({
             onClick={() => void onBulkSettle()}
             className={bankingAuxBulkBtnClass}
           >
-            {bulkSettling ? "Liquidando…" : `Liquidar seleccionados (${selectedInSection})`}
+            {bulkSettling ? "Marcando…" : `Marcar como pagados (${selectedInSection})`}
           </button>
         </div>
       ) : null}
@@ -1838,7 +1839,7 @@ function BankingSharedPendingChargesTable({
                       onClick={() => void onMarkSettled(row)}
                       className={bankingAuxActionBtnClass}
                     >
-                      {markingSettledId === row.id ? "…" : "Liquidado"}
+                      {markingSettledId === row.id ? "…" : "Marcar Pagado"}
                     </button>
                   </td>
                   <td className="align-middle px-1.5 py-3 sm:px-2">
@@ -3220,7 +3221,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             {movementTab === "credit_card"
               ? "Cargos y pagos de TC; arriba, cargos pendientes por tarjeta para marcarlos pagados al liquidar."
               : movementTab === "shared"
-                ? "Solo movimientos compartidos; arriba, pendientes de liquidar. Puedes marcar varios a la vez con la casilla y «Liquidar seleccionados»."
+                ? "Solo movimientos compartidos; arriba, pendientes de liquidar. Puedes marcar varios a la vez con la casilla y «Marcar como pagados»."
                 : "Ingresos y egresos por cuenta: el signo del monto define el tipo (positivo / negativo)."}
           </p>
         </div>
