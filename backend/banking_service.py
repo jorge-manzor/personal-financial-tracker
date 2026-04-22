@@ -609,12 +609,14 @@ def sync_credit_card_payment_mirror(
     amt_out = -abs(float(cc_tx.amount))
     desc_src = (cc_tx.description or "").strip()
     pay_desc = f"Pago TC — {desc_src}" if desc_src else "Pago Tarjeta de Credito"
-    acct_m = getattr(cc_tx, "accounting_month", None) or first_day_of_month_calendar(cc_tx.fecha)
+    # El egreso en cuenta corriente debe reflejar el día en que se marca pagado el cargo, no la fecha del consumo.
+    pay_fecha = _banking_today_cl()
+    acct_m = first_day_of_month_calendar(pay_fecha)
     now_ts = datetime.now(timezone.utc).replace(tzinfo=None)
 
     if existing:
         existing.amount = amt_out
-        existing.fecha = cc_tx.fecha
+        existing.fecha = pay_fecha
         existing.description = pay_desc
         existing.accounting_month = acct_m
         existing.category_id = cat_id
@@ -626,7 +628,7 @@ def sync_credit_card_payment_mirror(
     pay = BankingTransaction(
         user_id=user_id,
         account_id=int(linked_id),
-        fecha=cc_tx.fecha,
+        fecha=pay_fecha,
         amount=amt_out,
         description=pay_desc,
         category_id=cat_id,
@@ -1251,9 +1253,13 @@ def banking_bulk_set_shared_expense_settled(db: Session, user_id: int, transacti
             detail=f"Estos movimientos no son compartidos: {sorted(not_shared)}",
         )
     n = 0
+    d_liquidacion = _banking_today_cl()
+    acct_liq = first_day_of_month_calendar(d_liquidacion)
     for t in txs:
         if not bool(getattr(t, "shared_expense_settled", False)):
             t.shared_expense_settled = True
+            t.fecha = d_liquidacion
+            t.accounting_month = acct_liq
             n += 1
     db.commit()
     return n
@@ -1578,6 +1584,11 @@ def list_categories_nested(db: Session, user_id: int) -> list[dict[str, Any]]:
 
 def first_day_of_month_calendar(d: date) -> date:
     return date(d.year, d.month, 1)
+
+
+def _banking_today_cl() -> date:
+    """Fecha calendario Chile para «hoy» al marcar pagado / liquidado."""
+    return datetime.now(ZoneInfo("America/Santiago")).date()
 
 
 def _banking_amount_per_person(tx: BankingTransaction) -> float | None:
@@ -1978,7 +1989,7 @@ def reverse_provision_transaction_row(db: Session, user_id: int, tx_id: int) -> 
     orig_desc = (tx.description or "").strip()
     new_desc = ("Reversa - " + orig_desc) if orig_desc else "Reversa -"
 
-    fecha_rev = datetime.now(ZoneInfo("America/Santiago")).date()
+    fecha_rev = _banking_today_cl()
     acct_month = first_day_of_month_calendar(fecha_rev)
 
     is_shared = bool(getattr(tx, "is_shared", False))
@@ -2055,6 +2066,9 @@ def patch_transaction_row(
     )
     if not tx:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado")
+
+    old_shared_settled = bool(getattr(tx, "shared_expense_settled", False))
+    old_cc_paid = getattr(tx, "credit_card_charge_paid", None)
 
     if getattr(tx, "peer_transaction_id", None):
         raise HTTPException(
@@ -2162,6 +2176,27 @@ def patch_transaction_row(
     elif getattr(tx, "accounting_month", None) is None:
         tx.accounting_month = first_day_of_month_calendar(tx.fecha)
 
+    # Sin fecha explícita en el PATCH: al liquidar compartido o marcar cargo TC pagado, usar el día actual (CL).
+    if fecha is None:
+        d_pay = _banking_today_cl()
+        am_pay = first_day_of_month_calendar(d_pay)
+        if (
+            shared_expense_settled is not None
+            and bool(tx.shared_expense_settled)
+            and not old_shared_settled
+            and bool(getattr(tx, "is_shared", False))
+        ):
+            tx.fecha = d_pay
+            tx.accounting_month = am_pay
+        elif (
+            credit_card_charge_paid is not None
+            and pt_final == "tarjeta_credito"
+            and bool(tx.credit_card_charge_paid)
+            and (old_cc_paid is None or old_cc_paid is False)
+        ):
+            tx.fecha = d_pay
+            tx.accounting_month = am_pay
+
     old_pt = getattr(old_acc, "product_type", None)
     if pt_final == "tarjeta_credito" or old_pt == "tarjeta_credito":
         sync_credit_card_payment_mirror(db, user_id, tx)
@@ -2259,8 +2294,8 @@ def delete_transaction_row(db: Session, user_id: int, tx_id: int) -> None:
 def create_category_row(
     db: Session, user_id: int, *, name: str, sort_order: int, color: str | None = None
 ) -> BankingCategory:
-    n = db.query(func.count(BankingCategory.id)).filter(BankingCategory.user_id == user_id).scalar() or 0
-    c_hex = _normalize_hex_color(color) or category_color_for_index(int(n))
+    """Categoría creada por el usuario: color por defecto coral (`_BANK_CAT_DEFAULT`)."""
+    c_hex = _normalize_hex_color(color) or _BANK_CAT_DEFAULT
     bc = BankingCategory(
         user_id=user_id,
         name=name.strip(),

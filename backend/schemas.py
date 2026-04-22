@@ -378,6 +378,15 @@ class BankingCategoryPatch(BaseModel):
     enabled: bool | None = None
 
 
+class BankingCategoryCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    color: str | None = Field(default=None, max_length=16)
+
+
+class BankingSubcategoryCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+
+
 class BankingCategoriesReorderBody(BaseModel):
     """Orden deseado: el primer id queda con sort_order 0, etc."""
 

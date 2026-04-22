@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
@@ -8,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from auth import BankingUser
 from banking_service import (
+    create_category_row,
+    create_subcategory_row,
     BANKING_PRODUCT_TYPES,
     banking_account_to_out,
     banking_apply_credit_card_transaction_scope,
@@ -39,7 +42,7 @@ from banking_service import (
     validate_linked_checking_for_credit_card,
 )
 from database import get_db
-from models import BankingAccount, BankingTransaction
+from models import BankingAccount, BankingCategory, BankingTransaction
 from schemas import (
     BankingAccountCreate,
     BankingAccountOut,
@@ -53,8 +56,10 @@ from schemas import (
     BankingDebtTotalsOut,
     BankingCategoriesReorderBody,
     BankingSubcategoriesReorderBody,
+    BankingCategoryCreate,
     BankingCategoryOut,
     BankingCategoryPatch,
+    BankingSubcategoryCreate,
     BankingSubcategoryOut,
     BankingSubcategoryPatch,
     BankingTransactionCreate,
@@ -266,6 +271,62 @@ def banking_categories(user: BankingUser, db: Session = Depends(get_db)) -> list
     return list_categories_nested(db, user.id)
 
 
+@router.post("/categories", response_model=BankingCategoryOut)
+def banking_create_category(
+    body: BankingCategoryCreate,
+    user: BankingUser,
+    db: Session = Depends(get_db),
+) -> BankingCategoryOut:
+    ensure_default_categories(db, user.id)
+    max_so = (
+        db.query(func.coalesce(func.max(BankingCategory.sort_order), -1))
+        .filter(BankingCategory.user_id == user.id)
+        .scalar()
+    )
+    next_so = int(max_so) + 1
+    bc = create_category_row(
+        db,
+        user.id,
+        name=body.name,
+        sort_order=next_so,
+        color=body.color,
+    )
+    nested = list_categories_nested(db, user.id)
+    row = next((x for x in nested if x["id"] == bc.id), None)
+    if row is None:
+        raise HTTPException(status_code=500, detail="No se pudo cargar la categoría creada")
+    return BankingCategoryOut(
+        id=row["id"],
+        name=row["name"],
+        sort_order=row["sort_order"],
+        color=row["color"],
+        names_locked=row["names_locked"],
+        enabled=row["enabled"],
+        internal_reserved=row["internal_reserved"],
+        has_transactions=row["has_transactions"],
+        subcategories=[BankingSubcategoryOut(**s) for s in row["subcategories"]],
+    )
+
+
+@router.post("/categories/{category_id}/subcategories", response_model=BankingSubcategoryOut)
+def banking_create_subcategory(
+    category_id: int,
+    body: BankingSubcategoryCreate,
+    user: BankingUser,
+    db: Session = Depends(get_db),
+) -> BankingSubcategoryOut:
+    ensure_default_categories(db, user.id)
+    sub = create_subcategory_row(db, user.id, category_id=category_id, name=body.name)
+    nested = list_categories_nested(db, user.id)
+    for cat in nested:
+        if cat["id"] != category_id:
+            continue
+        for s in cat["subcategories"]:
+            if s["id"] == sub.id:
+                return BankingSubcategoryOut(**s)
+    raise HTTPException(status_code=404, detail="Subcategoría no encontrada tras crear")
+
+
 @router.patch("/categories/reorder")
 def banking_reorder_categories(
     body: BankingCategoriesReorderBody,
@@ -419,6 +480,7 @@ def banking_list_transactions(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     account_id: int | None = Query(None),
+    account_ids: Annotated[list[int] | None, Query()] = None,
     scope: str | None = Query(None, description="credit_card | shared (compartidos). Vacío = todos."),
     db: Session = Depends(get_db),
 ) -> BankingTransactionListOut:
@@ -427,16 +489,21 @@ def banking_list_transactions(
         raise HTTPException(status_code=400, detail="Parámetro scope inválido (use credit_card, shared u omita).")
     cc_scope = scope == "credit_card"
     shared_scope = scope == "shared"
+    acc_filter: list[int] | None = None
+    if account_ids:
+        acc_filter = list(dict.fromkeys(account_ids))
+    elif account_id is not None:
+        acc_filter = [account_id]
     q = db.query(BankingTransaction).filter(BankingTransaction.user_id == user.id)
-    if account_id is not None:
-        q = q.filter(BankingTransaction.account_id == account_id)
+    if acc_filter is not None:
+        q = q.filter(BankingTransaction.account_id.in_(acc_filter))
     if cc_scope:
         q = banking_apply_credit_card_transaction_scope(db, user.id, q)
     elif shared_scope:
         q = banking_apply_shared_transaction_scope(db, user.id, q)
     cq = db.query(func.count(BankingTransaction.id)).filter(BankingTransaction.user_id == user.id)
-    if account_id is not None:
-        cq = cq.filter(BankingTransaction.account_id == account_id)
+    if acc_filter is not None:
+        cq = cq.filter(BankingTransaction.account_id.in_(acc_filter))
     if cc_scope:
         cq = banking_apply_credit_card_transaction_scope(db, user.id, cq)
     elif shared_scope:

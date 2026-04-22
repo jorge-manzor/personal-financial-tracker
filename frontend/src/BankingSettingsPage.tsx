@@ -24,6 +24,9 @@ import type {
   BankingSubcategoryRow,
 } from "./types";
 
+/** Coincide con `backend` `_BANK_CAT_DEFAULT`: coral / rojizo para categorías nuevas. */
+const BANKING_DEFAULT_NEW_CATEGORY_COLOR = "#ff7b72";
+
 function IconPencil({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
@@ -328,7 +331,13 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
   const [bankSbif, setBankSbif] = useState("");
   const [linkedCheckingId, setLinkedCheckingId] = useState<number | "">("");
 
+  /** Solo color (plantilla / categorías internas). */
   const [categoryEdit, setCategoryEdit] = useState<{ id: number; color: string } | null>(null);
+  /** Nombre + color (categorías sin bloqueo de plantilla). */
+  const [categoryFullEdit, setCategoryFullEdit] = useState<{ id: number; name: string; color: string } | null>(null);
+  const [newCategoryForm, setNewCategoryForm] = useState<{ name: string; color: string } | null>(null);
+  const [newSubDraft, setNewSubDraft] = useState<Record<number, string>>({});
+  const [subNameEdit, setSubNameEdit] = useState<{ id: number; categoryId: number; name: string } | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   /** Si el id está en el set, la categoría está expandida (por defecto todas colapsadas). */
@@ -626,6 +635,112 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
     }
   }
 
+  async function saveCategoryFullEdit() {
+    if (!categoryFullEdit) return;
+    const nm = categoryFullEdit.name.trim();
+    if (!nm) {
+      onToast("Escribe un nombre para la categoría");
+      return;
+    }
+    setBusyKey(`cat-full-${categoryFullEdit.id}`);
+    try {
+      await patchJson(`/banking/categories/${categoryFullEdit.id}`, {
+        name: nm,
+        color: categoryFullEdit.color,
+      });
+      setCategoryFullEdit(null);
+      onToast("Categoría actualizada");
+      await load();
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : "No se pudo guardar");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function createCategory() {
+    if (!newCategoryForm) return;
+    const nm = newCategoryForm.name.trim();
+    if (!nm) {
+      onToast("Escribe un nombre para la categoría");
+      return;
+    }
+    setBusyKey("new-cat");
+    try {
+      await postJson("/banking/categories", {
+        name: nm,
+        color: newCategoryForm.color,
+      });
+      setNewCategoryForm(null);
+      onToast("Categoría creada");
+      await load();
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : "No se pudo crear la categoría");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function createSubcategory(categoryId: number) {
+    const name = (newSubDraft[categoryId] ?? "").trim();
+    if (!name) {
+      onToast("Escribe un nombre para la subcategoría");
+      return;
+    }
+    setBusyKey(`new-sub-${categoryId}`);
+    try {
+      await postJson(`/banking/categories/${categoryId}/subcategories`, { name });
+      setNewSubDraft((d) => ({ ...d, [categoryId]: "" }));
+      onToast("Subcategoría añadida");
+      await load();
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : "No se pudo añadir la subcategoría");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function saveSubNameEdit() {
+    if (!subNameEdit) return;
+    const nm = subNameEdit.name.trim();
+    if (!nm) {
+      onToast("Escribe un nombre");
+      return;
+    }
+    setBusyKey(`sub-name-${subNameEdit.id}`);
+    try {
+      await patchJson(`/banking/subcategories/${subNameEdit.id}`, { name: nm });
+      setSubNameEdit(null);
+      onToast("Subcategoría actualizada");
+      await load();
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : "No se pudo guardar");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function removeCategory(cat: BankingCategoryRow) {
+    if (cat.names_locked || cat.has_transactions) return;
+    setBusyKey(`del-cat-${cat.id}`);
+    try {
+      const r = await apiFetch(`/banking/categories/${cat.id}`, { method: "DELETE" });
+      if (!r.ok) {
+        const j = (await r.json().catch(() => null)) as { detail?: string } | null;
+        onToast(j?.detail ?? "No se pudo eliminar la categoría");
+        return;
+      }
+      setCategoryFullEdit(null);
+      setCategoryEdit(null);
+      onToast("Categoría eliminada");
+      await load();
+    } catch {
+      onToast("No se pudo eliminar la categoría");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   async function setCategoryEnabled(cat: BankingCategoryRow, next: boolean) {
     setBusyKey(`cat-en-${cat.id}`);
     try {
@@ -748,19 +863,75 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
       </section>
 
       <section className="space-y-4" aria-labelledby="banking-categories-heading">
-        <div>
-          <h3 id="banking-categories-heading" className="text-base font-semibold text-slate-900">
-            Categorías y subcategorías
-          </h3>
-          <p className="mt-1 text-sm text-slate-500">
-            El listado coincide con el catálogo del servidor. Usa el interruptor para activar o desactivar categorías y
-            subcategorías en movimientos manuales (si hay movimientos en una subcategoría, el interruptor queda fijo). Las
-            categorías de uso interno al final están siempre activas (sin interruptor); puedes cambiar solo su color con el
-            lápiz.
-          </p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h3 id="banking-categories-heading" className="text-base font-semibold text-slate-900">
+              Categorías y subcategorías
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Categorías iniciales desde el servidor; puedes añadir las tuyas, editar nombre y color (salvo plantilla
+              fijada) y crear subcategorías. El interruptor controla visibilidad en movimientos; con movimientos
+              asociados, el apagado queda bloqueado. Las categorías reservadas al final solo permiten color.
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={loading || busyKey !== null}
+            onClick={() => {
+              setCategoryEdit(null);
+              setCategoryFullEdit(null);
+              setNewCategoryForm({ name: "", color: BANKING_DEFAULT_NEW_CATEGORY_COLOR });
+            }}
+            className={btnGreenBanking}
+          >
+            Nueva categoría
+          </button>
         </div>
 
         <div className={bankingSettingsCardClass}>
+          {newCategoryForm ? (
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-dashed border-teal-200 bg-teal-50/50 p-4 sm:flex-row sm:flex-wrap sm:items-end">
+              <label className="min-w-[12rem] flex-1 text-sm">
+                <span className="text-xs text-slate-500">Nombre</span>
+                <input
+                  type="text"
+                  value={newCategoryForm.name}
+                  onChange={(e) => setNewCategoryForm({ ...newCategoryForm, name: e.target.value })}
+                  className={selectFieldClass}
+                  placeholder="Ej. Gastos hogar"
+                  autoFocus
+                />
+              </label>
+              <label className="flex shrink-0 items-center gap-2">
+                <span className="text-xs text-slate-500">Color</span>
+                <input
+                  type="color"
+                  value={newCategoryForm.color}
+                  onChange={(e) => setNewCategoryForm({ ...newCategoryForm, color: e.target.value })}
+                  className="h-10 w-14 cursor-pointer rounded-lg border border-slate-200 bg-white p-1 shadow-sm"
+                  title="Color de la categoría"
+                />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={busyKey !== null}
+                  onClick={() => void createCategory()}
+                  className={`${btnGreenBanking} px-4 py-2 text-sm`}
+                >
+                  Crear
+                </button>
+                <button
+                  type="button"
+                  disabled={busyKey !== null}
+                  onClick={() => setNewCategoryForm(null)}
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : null}
           {loading ? (
             <p className="text-sm text-slate-500">Cargando categorías…</p>
           ) : categories.length === 0 ? (
@@ -815,7 +986,89 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                       <IconChevronDown className="block h-4 w-4" />
                     </span>
                     <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                    {categoryEdit?.id === cat.id ? (
+                    {categoryFullEdit?.id === cat.id && !cat.names_locked ? (
+                      <>
+                        <input
+                          type="text"
+                          className="min-w-[10rem] flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm font-medium text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25"
+                          value={categoryFullEdit.name}
+                          onChange={(e) =>
+                            setCategoryFullEdit({ ...categoryFullEdit, name: e.target.value })
+                          }
+                          onClick={(e) => e.stopPropagation()}
+                          aria-label="Nombre de categoría"
+                        />
+                        <span className="shrink-0 text-xs text-slate-500">({cat.subcategories.length})</span>
+                        <div
+                          className={`flex shrink-0 items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                        >
+                          <BankingEnabledToggle
+                            enabled={cat.enabled ?? true}
+                            disabled={busyKey !== null || !!(cat.has_transactions ?? false)}
+                            onChange={(next) => void setCategoryEnabled(cat, next)}
+                            title={
+                              (cat.has_transactions ?? false)
+                                ? "Hay movimientos con esta categoría; no se puede desactivar."
+                                : "Disponible para movimientos nuevos"
+                            }
+                            ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "inactiva"}`}
+                          />
+                        </div>
+                        <input
+                          type="color"
+                          value={categoryFullEdit.color}
+                          onChange={(e) =>
+                            setCategoryFullEdit({ ...categoryFullEdit, color: e.target.value })
+                          }
+                          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-200 bg-white p-0.5 shadow-sm"
+                          title="Color"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <button
+                          type="button"
+                          disabled={busyKey !== null}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            void saveCategoryFullEdit();
+                          }}
+                          className={`${btnGreenBanking} shrink-0 px-3 py-1.5 text-xs`}
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyKey !== null}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setCategoryFullEdit(null);
+                          }}
+                          className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50"
+                        >
+                          Cancelar
+                        </button>
+                        {!cat.names_locked && !cat.has_transactions ? (
+                          <button
+                            type="button"
+                            title="Eliminar categoría"
+                            disabled={busyKey !== null}
+                            className={iconBtnDanger}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              void removeCategory(cat);
+                            }}
+                          >
+                            <IconTrash />
+                          </button>
+                        ) : null}
+                      </>
+                    ) : categoryEdit?.id === cat.id ? (
                       <>
                         <p
                           className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800"
@@ -907,12 +1160,25 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           </div>
                           <button
                             type="button"
-                            title="Cambiar color"
+                            title={cat.names_locked ? "Cambiar color (nombre fijado por plantilla)" : "Editar nombre y color"}
                             className={iconBtn}
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              setCategoryEdit({ id: cat.id, color: cat.color || "#58a6ff" });
+                              if (cat.names_locked) {
+                                setCategoryFullEdit(null);
+                                setCategoryEdit({
+                                  id: cat.id,
+                                  color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR,
+                                });
+                              } else {
+                                setCategoryEdit(null);
+                                setCategoryFullEdit({
+                                  id: cat.id,
+                                  name: cat.name,
+                                  color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR,
+                                });
+                              }
                             }}
                           >
                             <IconPencil />
@@ -965,9 +1231,62 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                     >
                                       <IconGripVertical className="block h-3.5 w-3.5" />
                                     </CategoryDragHandleButton>
-                                    <span className={`min-w-0 flex-1 ${!parentEnabled ? "text-slate-500" : ""}`}>
-                                      {s.name}
-                                    </span>
+                                    {!cat.names_locked && subNameEdit?.id === s.id ? (
+                                      <input
+                                        type="text"
+                                        className="min-w-0 flex-1 rounded border border-teal-300 bg-white px-1.5 py-1 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-teal-400/35"
+                                        value={subNameEdit.name}
+                                        onChange={(e) =>
+                                          setSubNameEdit({ ...subNameEdit, name: e.target.value })
+                                        }
+                                        onClick={(e) => e.stopPropagation()}
+                                        aria-label="Nombre de subcategoría"
+                                      />
+                                    ) : (
+                                      <span className={`min-w-0 flex-1 ${!parentEnabled ? "text-slate-500" : ""}`}>
+                                        {s.name}
+                                      </span>
+                                    )}
+                                    {!cat.names_locked && subNameEdit?.id !== s.id ? (
+                                      <button
+                                        type="button"
+                                        title="Renombrar subcategoría"
+                                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-teal-50 hover:text-teal-800"
+                                        disabled={busyKey !== null || !parentEnabled}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setSubNameEdit({ id: s.id, categoryId: cat.id, name: s.name });
+                                        }}
+                                      >
+                                        <IconPencil className="h-3.5 w-3.5" />
+                                      </button>
+                                    ) : null}
+                                    {!cat.names_locked && subNameEdit?.id === s.id ? (
+                                      <div className="flex shrink-0 gap-1">
+                                        <button
+                                          type="button"
+                                          disabled={busyKey !== null}
+                                          className="rounded-md bg-teal-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-teal-700 disabled:opacity-40"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void saveSubNameEdit();
+                                          }}
+                                        >
+                                          OK
+                                        </button>
+                                        <button
+                                          type="button"
+                                          disabled={busyKey !== null}
+                                          className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSubNameEdit(null);
+                                          }}
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ) : null}
                                   </div>
                                   <div
                                     className={`flex shrink-0 items-center ${
@@ -999,6 +1318,33 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           );
                         })}
                       </SortableContext>
+                      {!cat.names_locked ? (
+                        <li className="mt-2 flex list-none flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                          <input
+                            type="text"
+                            placeholder="Nueva subcategoría…"
+                            className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
+                            value={newSubDraft[cat.id] ?? ""}
+                            onChange={(e) =>
+                              setNewSubDraft((d) => ({ ...d, [cat.id]: e.target.value }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                void createSubcategory(cat.id);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            disabled={busyKey !== null}
+                            className={`${btnGreenBanking} shrink-0 px-3 py-1.5 text-xs`}
+                            onClick={() => void createSubcategory(cat.id)}
+                          >
+                            Añadir
+                          </button>
+                        </li>
+                      ) : null}
                     </DndContext>
                   </ul>
                         </details>
@@ -1108,7 +1454,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                 onClick={(e) => {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  setCategoryEdit({ id: cat.id, color: cat.color || "#58a6ff" });
+                                  setCategoryEdit({ id: cat.id, color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR });
                                 }}
                               >
                                 <IconPencil />

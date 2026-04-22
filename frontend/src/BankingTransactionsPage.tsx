@@ -15,7 +15,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { CSSProperties } from "react";
+import type { CSSProperties, Dispatch, SetStateAction } from "react";
 import {
   createContext,
   useCallback,
@@ -405,14 +405,24 @@ function BankingSharedUnsettledDebtCard({ amountClp }: { amountClp: number }) {
 
 const BANKING_TX_TABLE_PREFS_STORAGE_KEY = "banking_tx_table_prefs_v2";
 
-/** Columna «Tipo de movimiento»: personal vs compartido. */
-type BankingTxSharedScopeFilter = "all" | "personal" | "shared_any";
+/** Opciones multi-selección «Tipo de movimiento». Vacío = todas. */
+type BankingTxSharedScopeOption = "personal" | "shared_any";
 
-/** Columna «Compartido liquidado». */
-type BankingTxLiquidadoFilter = "all" | "yes" | "no" | "na";
+/** Opciones multi-selección «Compartido liquidado». Vacío = todas. */
+type BankingTxLiquidadoOption = "yes" | "no" | "na";
 
-/** Filtro cargo TC pagado. */
-type BankingTxTcPaidFilter = "all" | "paid" | "unpaid" | "na";
+/** Opciones multi-selección «Cargo TC». Vacío = todas. */
+type BankingTxTcPaidOption = "paid" | "unpaid" | "na";
+
+function toggleNumInSortedList(prev: number[], id: number): number[] {
+  const i = prev.indexOf(id);
+  if (i >= 0) return prev.filter((x) => x !== id);
+  return [...prev, id].sort((a, b) => a - b);
+}
+
+function toggleEnumInList<T extends string>(prev: T[], v: T): T[] {
+  return prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v];
+}
 
 type BankingTxColumnKey =
   | "fecha"
@@ -759,15 +769,15 @@ type BankingTxFilterSnapshot = {
   filterDateFrom: string;
   filterDateTo: string;
   filterDescription: string;
-  filterAccountId: number | "";
+  filterAccountIds: number[];
   filterAmountMin: string;
   filterAmountMax: string;
-  filterCategoryId: number | "";
-  filterSubcategoryId: number | "";
-  filterSharedScope: BankingTxSharedScopeFilter;
-  filterLiquidado: BankingTxLiquidadoFilter;
-  filterTcPaid: BankingTxTcPaidFilter;
-  filterAccountingMonthYm: string;
+  filterCategoryIds: number[];
+  filterSubcategoryIds: number[];
+  filterSharedScopes: BankingTxSharedScopeOption[];
+  filterLiquidadoValues: BankingTxLiquidadoOption[];
+  filterTcPaidValues: BankingTxTcPaidOption[];
+  filterAccountingMonthYms: string[];
 };
 
 function bankingTxColumnFilterActive(colKey: BankingTxColumnKey, f: BankingTxFilterSnapshot): boolean {
@@ -777,21 +787,21 @@ function bankingTxColumnFilterActive(colKey: BankingTxColumnKey, f: BankingTxFil
     case "descripcion":
       return !!f.filterDescription.trim();
     case "producto":
-      return f.filterAccountId !== "";
+      return f.filterAccountIds.length > 0;
     case "monto":
       return !!(f.filterAmountMin.trim() || f.filterAmountMax.trim());
     case "categoria":
-      return f.filterCategoryId !== "";
+      return f.filterCategoryIds.length > 0;
     case "subcategoria":
-      return f.filterSubcategoryId !== "";
+      return f.filterSubcategoryIds.length > 0;
     case "tipo_movimiento":
-      return f.filterSharedScope !== "all";
+      return f.filterSharedScopes.length > 0;
     case "compartido_liquidado":
-      return f.filterLiquidado !== "all";
+      return f.filterLiquidadoValues.length > 0;
     case "cargo_tc":
-      return f.filterTcPaid !== "all";
+      return f.filterTcPaidValues.length > 0;
     case "mes_contable":
-      return f.filterAccountingMonthYm.trim() !== "";
+      return f.filterAccountingMonthYms.length > 0;
     default:
       return false;
   }
@@ -835,24 +845,24 @@ type BankingTxFilterUICtxValue = {
   setFilterDateTo: (v: string) => void;
   filterDescription: string;
   setFilterDescription: (v: string) => void;
-  filterAccountId: number | "";
-  setFilterAccountId: (v: number | "") => void;
+  filterAccountIds: number[];
+  setFilterAccountIds: Dispatch<SetStateAction<number[]>>;
   filterAmountMin: string;
   setFilterAmountMin: (v: string) => void;
   filterAmountMax: string;
   setFilterAmountMax: (v: string) => void;
-  filterCategoryId: number | "";
-  setFilterCategoryId: (v: number | "") => void;
-  filterSubcategoryId: number | "";
-  setFilterSubcategoryId: (v: number | "") => void;
-  filterSharedScope: BankingTxSharedScopeFilter;
-  setFilterSharedScope: (v: BankingTxSharedScopeFilter) => void;
-  filterLiquidado: BankingTxLiquidadoFilter;
-  setFilterLiquidado: (v: BankingTxLiquidadoFilter) => void;
-  filterTcPaid: BankingTxTcPaidFilter;
-  setFilterTcPaid: (v: BankingTxTcPaidFilter) => void;
-  filterAccountingMonthYm: string;
-  setFilterAccountingMonthYm: (v: string) => void;
+  filterCategoryIds: number[];
+  setFilterCategoryIds: Dispatch<SetStateAction<number[]>>;
+  filterSubcategoryIds: number[];
+  setFilterSubcategoryIds: Dispatch<SetStateAction<number[]>>;
+  filterSharedScopes: BankingTxSharedScopeOption[];
+  setFilterSharedScopes: Dispatch<SetStateAction<BankingTxSharedScopeOption[]>>;
+  filterLiquidadoValues: BankingTxLiquidadoOption[];
+  setFilterLiquidadoValues: Dispatch<SetStateAction<BankingTxLiquidadoOption[]>>;
+  filterTcPaidValues: BankingTxTcPaidOption[];
+  setFilterTcPaidValues: Dispatch<SetStateAction<BankingTxTcPaidOption[]>>;
+  filterAccountingMonthYms: string[];
+  setFilterAccountingMonthYms: Dispatch<SetStateAction<string[]>>;
   filterAccountsSorted: BankingAccountRow[];
   filterCategoriesSorted: BankingCategoryRow[];
   filterSubcategoryDropdownRows: { id: number; label: string; categoryId: number; categoryColor: string }[];
@@ -864,6 +874,184 @@ function useBankingTxFilterUICtx(): BankingTxFilterUICtxValue {
   const v = useContext(BankingTxFilterUICtx);
   if (!v) throw new Error("BankingTx filter UI context missing");
   return v;
+}
+
+function BankingTxMesContableFilterBody() {
+  const ctx = useBankingTxFilterUICtx();
+  const sel = bankingMainTxFilterInputClass;
+  const [pickerKey, setPickerKey] = useState(0);
+
+  return (
+    <div className="space-y-2">
+      <span className="text-xs text-slate-500">Meses contables</span>
+      {ctx.filterAccountingMonthYms.length > 0 ? (
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {ctx.filterAccountingMonthYms.map((ym) => (
+            <button
+              key={ym}
+              type="button"
+              title="Quitar"
+              onClick={() =>
+                ctx.setFilterAccountingMonthYms((prev) => prev.filter((x) => x !== ym))
+              }
+              className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2 py-1 text-[12px] font-medium text-teal-900 ring-1 ring-teal-100 transition hover:bg-teal-100/80"
+            >
+              <span className="tabular-nums">{ym}</span>
+              <span className="text-teal-600" aria-hidden>
+                ×
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <input
+        key={pickerKey}
+        type="month"
+        className={`${sel} mt-1 cursor-pointer`}
+        defaultValue=""
+        onChange={(e) => {
+          const v = e.target.value;
+          if (!v) return;
+          ctx.setFilterAccountingMonthYms((prev) =>
+            prev.includes(v) ? prev : [...prev, v].sort(),
+          );
+          setPickerKey((k) => k + 1);
+        }}
+      />
+      <p className="text-[11px] leading-snug text-slate-500">Elige meses con el selector; puedes combinar varios.</p>
+    </div>
+  );
+}
+
+function BankingTxCategoryFilterBody() {
+  const ctx = useBankingTxFilterUICtx();
+  const sel = bankingMainTxFilterInputClass;
+  const [query, setQuery] = useState("");
+  const qNorm = query.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    if (!qNorm) return ctx.filterCategoriesSorted;
+    return ctx.filterCategoriesSorted.filter((c) => c.name.toLowerCase().includes(qNorm));
+  }, [ctx.filterCategoriesSorted, qNorm]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-slate-500">Categorías (varias)</span>
+        <button
+          type="button"
+          onClick={() => ctx.setFilterCategoryIds([])}
+          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-teal-50"
+        >
+          Borrar selección
+        </button>
+      </div>
+      <label className="block">
+        <span className="text-xs text-slate-500">Buscar categoría</span>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Escribe para acotar la lista…"
+          autoComplete="off"
+          className={`${sel} mt-1`}
+        />
+      </label>
+      <div className="mt-1 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-0.5 tx-scroll">
+        {filtered.map((c) => {
+          const picked = ctx.filterCategoryIds.includes(c.id);
+          return (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() =>
+                ctx.setFilterCategoryIds((prev) => toggleNumInSortedList(prev, c.id))
+              }
+              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-teal-50 ${
+                picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-200 bg-white"
+              }`}
+            >
+              {c.name}
+            </button>
+          );
+        })}
+      </div>
+      {ctx.filterCategoriesSorted.length === 0 ? (
+        <p className="text-[12px] leading-snug text-slate-500">No hay categorías en los movimientos cargados.</p>
+      ) : filtered.length === 0 ? (
+        <p className="text-[12px] leading-snug text-slate-500">
+          Ninguna categoría coincide con «{query.trim()}».
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function BankingTxSubcategoryFilterBody() {
+  const ctx = useBankingTxFilterUICtx();
+  const sel = bankingMainTxFilterInputClass;
+  const [query, setQuery] = useState("");
+  const qNorm = query.trim().toLowerCase();
+  const filtered = useMemo(() => {
+    if (!qNorm) return ctx.filterSubcategoryDropdownRows;
+    return ctx.filterSubcategoryDropdownRows.filter((r) => r.label.toLowerCase().includes(qNorm));
+  }, [ctx.filterSubcategoryDropdownRows, qNorm]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-slate-500">Subcategorías (varias)</span>
+        <button
+          type="button"
+          onClick={() => ctx.setFilterSubcategoryIds([])}
+          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-teal-50"
+        >
+          Borrar selección
+        </button>
+      </div>
+      <label className="block">
+        <span className="text-xs text-slate-500">Buscar subcategoría</span>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Nombre o categoría › subcategoría…"
+          autoComplete="off"
+          className={`${sel} mt-1`}
+        />
+      </label>
+      <div className="mt-1 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-0.5 tx-scroll">
+        {filtered.map((r) => {
+          const picked = ctx.filterSubcategoryIds.includes(r.id);
+          const shortLabel =
+            ctx.filterCategoryIds.length !== 1 ? r.label : (r.label.split(" › ").pop() ?? r.label);
+          return (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() =>
+                ctx.setFilterSubcategoryIds((prev) => toggleNumInSortedList(prev, r.id))
+              }
+              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-teal-50 ${
+                picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-200 bg-white"
+              }`}
+            >
+              {shortLabel}
+            </button>
+          );
+        })}
+      </div>
+      {ctx.filterSubcategoryDropdownRows.length === 0 ? (
+        <p className="text-[12px] leading-snug text-slate-500">
+          No hay subcategorías en los movimientos cargados
+          {ctx.filterCategoryIds.length > 0 ? " para las categorías seleccionadas." : "."}
+        </p>
+      ) : filtered.length === 0 ? (
+        <p className="text-[12px] leading-snug text-slate-500">
+          Ninguna subcategoría coincide con «{query.trim()}».
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function BankingTxColumnHeader({ colKey }: { colKey: BankingTxColumnKey }) {
@@ -945,21 +1133,37 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
       );
     case "producto":
       return (
-        <label className="block">
-          <span className="text-xs text-slate-500">Producto</span>
-          <select
-            value={ctx.filterAccountId === "" ? "" : String(ctx.filterAccountId)}
-            onChange={(e) => ctx.setFilterAccountId(e.target.value ? Number(e.target.value) : "")}
-            className={`${sel} mt-1`}
-          >
-            <option value="">Todos</option>
-            {ctx.filterAccountsSorted.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-slate-500">Productos (varios)</span>
+            <button
+              type="button"
+              onClick={() => ctx.setFilterAccountIds([])}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-teal-50"
+            >
+              Borrar selección
+            </button>
+          </div>
+          <div className="mt-1 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-0.5 tx-scroll">
+            {ctx.filterAccountsSorted.map((a) => {
+              const picked = ctx.filterAccountIds.includes(a.id);
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() =>
+                    ctx.setFilterAccountIds((prev) => toggleNumInSortedList(prev, a.id))
+                  }
+                  className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
+                    picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-200 bg-white"
+                  }`}
+                >
+                  <span className={picked ? "font-semibold text-teal-900" : "text-slate-800"}>{a.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       );
     case "monto":
       return (
@@ -987,139 +1191,106 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
         </div>
       );
     case "categoria":
-      return (
-        <div className="space-y-2">
-          <span className="text-xs text-slate-500">Categoría</span>
-          <div className="mt-1 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-0.5 tx-scroll">
-            <button
-              type="button"
-              onClick={() => ctx.setFilterCategoryId("")}
-              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
-                ctx.filterCategoryId === "" ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border-slate-200 bg-white"
-              }`}
-            >
-              <span className="text-slate-800">Todas</span>
-            </button>
-            {ctx.filterCategoriesSorted.map((c) => {
-              const picked = ctx.filterCategoryId === c.id;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => ctx.setFilterCategoryId(c.id)}
-                  className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-teal-50 ${
-                    picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-200 bg-white"
-                  }`}
-                >
-                  {c.name}
-                </button>
-              );
-            })}
-          </div>
-          {ctx.filterCategoriesSorted.length === 0 ? (
-            <p className="text-[12px] leading-snug text-slate-500">No hay categorías en los movimientos cargados.</p>
-          ) : null}
-        </div>
-      );
+      return <BankingTxCategoryFilterBody />;
     case "subcategoria":
-      return (
-        <div className="space-y-2">
-          <span className="text-xs text-slate-500">Subcategoría</span>
-          <div className="mt-1 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-0.5 tx-scroll">
-            <button
-              type="button"
-              onClick={() => ctx.setFilterSubcategoryId("")}
-              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
-                ctx.filterSubcategoryId === "" ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border-slate-200 bg-white"
-              }`}
-            >
-              <span className="text-slate-800">Todas</span>
-            </button>
-            {ctx.filterSubcategoryDropdownRows.map((r) => {
-              const picked = ctx.filterSubcategoryId === r.id;
-              const shortLabel =
-                ctx.filterCategoryId === "" ? r.label : (r.label.split(" › ").pop() ?? r.label);
-              return (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => ctx.setFilterSubcategoryId(r.id)}
-                  className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-teal-50 ${
-                    picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-200 bg-white"
-                  }`}
-                >
-                  {shortLabel}
-                </button>
-              );
-            })}
-          </div>
-          {ctx.filterSubcategoryDropdownRows.length === 0 ? (
-            <p className="text-[12px] leading-snug text-slate-500">
-              No hay subcategorías en los movimientos cargados
-              {ctx.filterCategoryId !== "" ? " para esta categoría." : "."}
-            </p>
-          ) : null}
-        </div>
-      );
+      return <BankingTxSubcategoryFilterBody />;
     case "tipo_movimiento":
       return (
-        <label className="block">
-          <span className="text-xs text-slate-500">Tipo</span>
-          <select
-            value={ctx.filterSharedScope}
-            onChange={(e) => ctx.setFilterSharedScope(e.target.value as BankingTxSharedScopeFilter)}
-            className={`${sel} mt-1`}
-          >
-            <option value="all">Todos</option>
-            <option value="personal">Solo personal</option>
-            <option value="shared_any">Solo compartido</option>
-          </select>
-        </label>
+        <div className="space-y-2">
+          <span className="text-xs text-slate-500">Tipo (varios)</span>
+          <div className="mt-1 flex flex-col gap-1.5">
+            <button
+              type="button"
+              onClick={() =>
+                ctx.setFilterSharedScopes((prev) => toggleEnumInList(prev, "personal"))
+              }
+              className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
+                ctx.filterSharedScopes.includes("personal")
+                  ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              Solo personal
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                ctx.setFilterSharedScopes((prev) => toggleEnumInList(prev, "shared_any"))
+              }
+              className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
+                ctx.filterSharedScopes.includes("shared_any")
+                  ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
+                  : "border-slate-200 bg-white"
+              }`}
+            >
+              Solo compartido
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-500">Sin selección = mostrar todos. Varios = unión (cualquiera).</p>
+        </div>
       );
     case "compartido_liquidado":
       return (
-        <label className="block">
-          <span className="text-xs text-slate-500">Valor en tabla</span>
-          <select
-            value={ctx.filterLiquidado}
-            onChange={(e) => ctx.setFilterLiquidado(e.target.value as BankingTxLiquidadoFilter)}
-            className={`${sel} mt-1`}
-          >
-            <option value="all">Todos</option>
-            <option value="yes">Sí</option>
-            <option value="no">No</option>
-            <option value="na">—</option>
-          </select>
-        </label>
+        <div className="space-y-2">
+          <span className="text-xs text-slate-500">Valor en tabla (varios)</span>
+          <div className="mt-1 flex flex-col gap-1.5">
+            {(
+              [
+                ["yes", "Sí"],
+                ["no", "No"],
+                ["na", "—"],
+              ] as const
+            ).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() =>
+                  ctx.setFilterLiquidadoValues((prev) => toggleEnumInList(prev, val))
+                }
+                className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
+                  ctx.filterLiquidadoValues.includes(val)
+                    ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-500">Sin selección = todos. Varios = unión.</p>
+        </div>
       );
     case "cargo_tc":
       return (
-        <label className="block">
-          <span className="text-xs text-slate-500">Valor en tabla</span>
-          <select
-            value={ctx.filterTcPaid}
-            onChange={(e) => ctx.setFilterTcPaid(e.target.value as BankingTxTcPaidFilter)}
-            className={`${sel} mt-1`}
-          >
-            <option value="all">Todos</option>
-            <option value="paid">Sí</option>
-            <option value="unpaid">No</option>
-            <option value="na">—</option>
-          </select>
-        </label>
+        <div className="space-y-2">
+          <span className="text-xs text-slate-500">Valor en tabla (varios)</span>
+          <div className="mt-1 flex flex-col gap-1.5">
+            {(
+              [
+                ["paid", "Sí"],
+                ["unpaid", "No"],
+                ["na", "—"],
+              ] as const
+            ).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => ctx.setFilterTcPaidValues((prev) => toggleEnumInList(prev, val))}
+                className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
+                  ctx.filterTcPaidValues.includes(val)
+                    ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-500">Sin selección = todos. Varios = unión.</p>
+        </div>
       );
     case "mes_contable":
-      return (
-        <label className="block">
-          <span className="text-xs text-slate-500">Mes contable</span>
-          <input
-            type="month"
-            value={ctx.filterAccountingMonthYm}
-            onChange={(e) => ctx.setFilterAccountingMonthYm(e.target.value)}
-            className={`${sel} mt-1 cursor-pointer`}
-          />
-        </label>
-      );
+      return <BankingTxMesContableFilterBody />;
     default:
       return null;
   }
@@ -1862,15 +2033,15 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
   const [filterDescription, setFilterDescription] = useState("");
-  const [filterAccountId, setFilterAccountId] = useState<number | "">("");
+  const [filterAccountIds, setFilterAccountIds] = useState<number[]>([]);
   const [filterAmountMin, setFilterAmountMin] = useState("");
   const [filterAmountMax, setFilterAmountMax] = useState("");
-  const [filterCategoryId, setFilterCategoryId] = useState<number | "">("");
-  const [filterSubcategoryId, setFilterSubcategoryId] = useState<number | "">("");
-  const [filterSharedScope, setFilterSharedScope] = useState<BankingTxSharedScopeFilter>("all");
-  const [filterLiquidado, setFilterLiquidado] = useState<BankingTxLiquidadoFilter>("all");
-  const [filterTcPaid, setFilterTcPaid] = useState<BankingTxTcPaidFilter>("all");
-  const [filterAccountingMonthYm, setFilterAccountingMonthYm] = useState("");
+  const [filterCategoryIds, setFilterCategoryIds] = useState<number[]>([]);
+  const [filterSubcategoryIds, setFilterSubcategoryIds] = useState<number[]>([]);
+  const [filterSharedScopes, setFilterSharedScopes] = useState<BankingTxSharedScopeOption[]>([]);
+  const [filterLiquidadoValues, setFilterLiquidadoValues] = useState<BankingTxLiquidadoOption[]>([]);
+  const [filterTcPaidValues, setFilterTcPaidValues] = useState<BankingTxTcPaidOption[]>([]);
+  const [filterAccountingMonthYms, setFilterAccountingMonthYms] = useState<string[]>([]);
   const [headerFilterOpen, setHeaderFilterOpen] = useState<BankingTxColumnKey | null>(null);
   const [headerFilterPopoverPos, setHeaderFilterPopoverPos] = useState<{
     top: number;
@@ -1890,23 +2061,24 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   }, [columnOrder, columnVisibility]);
 
   useEffect(() => {
-    setFilterSubcategoryId((prev) => {
-      if (prev === "" || filterCategoryId === "") return prev;
-      const cat = categories.find((c) => c.id === filterCategoryId);
-      if (!cat?.subcategories.some((s) => s.id === prev)) return "";
-      return prev;
-    });
-  }, [filterCategoryId, categories]);
-
-  useEffect(() => {
     const usedCat = new Set(items.map((r) => r.category_id));
-    setFilterCategoryId((prev) => (prev !== "" && !usedCat.has(prev) ? "" : prev));
+    setFilterCategoryIds((prev) => prev.filter((id) => usedCat.has(id)));
   }, [items]);
 
   useEffect(() => {
     const usedSub = new Set(items.map((r) => r.subcategory_id));
-    setFilterSubcategoryId((prev) => (prev !== "" && !usedSub.has(prev) ? "" : prev));
+    setFilterSubcategoryIds((prev) => prev.filter((id) => usedSub.has(id)));
   }, [items]);
+
+  useEffect(() => {
+    if (filterCategoryIds.length === 0) return;
+    const allowed = new Set<number>();
+    for (const cid of filterCategoryIds) {
+      const cat = categories.find((c) => c.id === cid);
+      if (cat) for (const s of cat.subcategories) allowed.add(s.id);
+    }
+    setFilterSubcategoryIds((prev) => prev.filter((id) => allowed.has(id)));
+  }, [filterCategoryIds, categories]);
 
   useEffect(() => {
     if (!columnPickerOpen) return;
@@ -1983,29 +2155,29 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       filterDateFrom,
       filterDateTo,
       filterDescription,
-      filterAccountId,
+      filterAccountIds,
       filterAmountMin,
       filterAmountMax,
-      filterCategoryId,
-      filterSubcategoryId,
-      filterSharedScope,
-      filterLiquidado,
-      filterTcPaid,
-      filterAccountingMonthYm,
+      filterCategoryIds,
+      filterSubcategoryIds,
+      filterSharedScopes,
+      filterLiquidadoValues,
+      filterTcPaidValues,
+      filterAccountingMonthYms,
     }),
     [
       filterDateFrom,
       filterDateTo,
       filterDescription,
-      filterAccountId,
+      filterAccountIds,
       filterAmountMin,
       filterAmountMax,
-      filterCategoryId,
-      filterSubcategoryId,
-      filterSharedScope,
-      filterLiquidado,
-      filterTcPaid,
-      filterAccountingMonthYm,
+      filterCategoryIds,
+      filterSubcategoryIds,
+      filterSharedScopes,
+      filterLiquidadoValues,
+      filterTcPaidValues,
+      filterAccountingMonthYms,
     ],
   );
 
@@ -2166,7 +2338,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("page_size", String(BANKING_TX_PAGE_SIZE));
-    if (filterAccountId !== "") params.set("account_id", String(filterAccountId));
+    if (filterAccountIds.length === 1) {
+      params.set("account_id", String(filterAccountIds[0]));
+    } else if (filterAccountIds.length > 1) {
+      for (const id of filterAccountIds) params.append("account_ids", String(id));
+    }
     if (movementTab === "credit_card") params.set("scope", "credit_card");
     if (movementTab === "shared") params.set("scope", "shared");
 
@@ -2196,7 +2372,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     setBankingTxPage(txList.page);
     setCcUnpaidGroups(groups);
     setSharedUnsettledGroups(sharedGroups);
-  }, [filterAccountId, movementTab]);
+  }, [filterAccountIds, movementTab]);
 
   useEffect(() => {
     if (movementTab !== "shared") setSelectedSharedIds(new Set());
@@ -2446,9 +2622,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       }
     }
     rows.sort((a, b) => a.label.localeCompare(b.label, "es"));
-    if (filterCategoryId === "") return rows;
-    return rows.filter((r) => r.categoryId === filterCategoryId);
-  }, [categories, items, filterCategoryId]);
+    if (filterCategoryIds.length === 0) return rows;
+    const allow = new Set(filterCategoryIds);
+    return rows.filter((r) => allow.has(r.categoryId));
+  }, [categories, items, filterCategoryIds]);
 
   const filteredBankingTxItems = useMemo(() => {
     const parseAmt = (s: string) => {
@@ -2464,10 +2641,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
       if (descQ && !(row.description ?? "").toLowerCase().includes(descQ)) return false;
 
-      if (filterAccountId !== "" && row.account_id !== filterAccountId) return false;
+      if (filterAccountIds.length > 0 && !filterAccountIds.includes(row.account_id)) return false;
 
-      if (filterCategoryId !== "" && row.category_id !== filterCategoryId) return false;
-      if (filterSubcategoryId !== "" && row.subcategory_id !== filterSubcategoryId) return false;
+      if (filterCategoryIds.length > 0 && !filterCategoryIds.includes(row.category_id)) return false;
+      if (filterSubcategoryIds.length > 0 && !filterSubcategoryIds.includes(row.subcategory_id)) return false;
 
       if (filterAmountMin.trim()) {
         const mn = parseAmt(filterAmountMin);
@@ -2478,40 +2655,38 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         if (!Number.isNaN(mx) && row.amount > mx) return false;
       }
 
-      switch (filterSharedScope) {
-        case "personal":
-          if (row.is_shared) return false;
-          break;
-        case "shared_any":
-          if (!row.is_shared) return false;
-          break;
-        default:
-          break;
+      if (filterSharedScopes.length > 0) {
+        const ok = filterSharedScopes.some((scope) => {
+          if (scope === "personal") return !row.is_shared;
+          if (scope === "shared_any") return row.is_shared;
+          return false;
+        });
+        if (!ok) return false;
       }
 
-      if (filterLiquidado !== "all") {
-        if (filterLiquidado === "yes" && !(row.is_shared && row.shared_expense_settled)) return false;
-        if (filterLiquidado === "no" && !(row.is_shared && !row.shared_expense_settled)) return false;
-        if (filterLiquidado === "na" && row.is_shared) return false;
+      if (filterLiquidadoValues.length > 0) {
+        const matchesLiq = (v: BankingTxLiquidadoOption) => {
+          if (v === "yes") return row.is_shared && row.shared_expense_settled;
+          if (v === "no") return row.is_shared && !row.shared_expense_settled;
+          if (v === "na") return !row.is_shared;
+          return false;
+        };
+        if (!filterLiquidadoValues.some(matchesLiq)) return false;
       }
 
-      switch (filterTcPaid) {
-        case "paid":
-          if (row.credit_card_charge_paid !== true) return false;
-          break;
-        case "unpaid":
-          if (row.credit_card_charge_paid !== false) return false;
-          break;
-        case "na":
-          if (row.credit_card_charge_paid != null) return false;
-          break;
-        default:
-          break;
+      if (filterTcPaidValues.length > 0) {
+        const matchesTc = (v: BankingTxTcPaidOption) => {
+          if (v === "paid") return row.credit_card_charge_paid === true;
+          if (v === "unpaid") return row.credit_card_charge_paid === false;
+          if (v === "na") return row.credit_card_charge_paid == null;
+          return false;
+        };
+        if (!filterTcPaidValues.some(matchesTc)) return false;
       }
 
-      if (filterAccountingMonthYm.trim()) {
+      if (filterAccountingMonthYms.length > 0) {
         const rowYm = row.accounting_month ? row.accounting_month.slice(0, 7) : row.fecha.slice(0, 7);
-        if (rowYm !== filterAccountingMonthYm) return false;
+        if (!filterAccountingMonthYms.includes(rowYm)) return false;
       }
 
       return true;
@@ -2521,15 +2696,15 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     filterDateFrom,
     filterDateTo,
     filterDescription,
-    filterAccountId,
+    filterAccountIds,
     filterAmountMin,
     filterAmountMax,
-    filterCategoryId,
-    filterSubcategoryId,
-    filterSharedScope,
-    filterLiquidado,
-    filterTcPaid,
-    filterAccountingMonthYm,
+    filterCategoryIds,
+    filterSubcategoryIds,
+    filterSharedScopes,
+    filterLiquidadoValues,
+    filterTcPaidValues,
+    filterAccountingMonthYms,
   ]);
 
   useEffect(() => {
@@ -2541,29 +2716,29 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       filterDateFrom !== "" ||
       filterDateTo !== "" ||
       filterDescription.trim() !== "" ||
-      filterAccountId !== "" ||
+      filterAccountIds.length > 0 ||
       filterAmountMin.trim() !== "" ||
       filterAmountMax.trim() !== "" ||
-      filterCategoryId !== "" ||
-      filterSubcategoryId !== "" ||
-      filterSharedScope !== "all" ||
-      filterLiquidado !== "all" ||
-      filterTcPaid !== "all" ||
-      filterAccountingMonthYm !== ""
+      filterCategoryIds.length > 0 ||
+      filterSubcategoryIds.length > 0 ||
+      filterSharedScopes.length > 0 ||
+      filterLiquidadoValues.length > 0 ||
+      filterTcPaidValues.length > 0 ||
+      filterAccountingMonthYms.length > 0
     );
   }, [
     filterDateFrom,
     filterDateTo,
     filterDescription,
-    filterAccountId,
+    filterAccountIds,
     filterAmountMin,
     filterAmountMax,
-    filterCategoryId,
-    filterSubcategoryId,
-    filterSharedScope,
-    filterLiquidado,
-    filterTcPaid,
-    filterAccountingMonthYm,
+    filterCategoryIds,
+    filterSubcategoryIds,
+    filterSharedScopes,
+    filterLiquidadoValues,
+    filterTcPaidValues,
+    filterAccountingMonthYms,
   ]);
 
   const bankingTxFilterUICtxValue = useMemo(
@@ -2578,24 +2753,24 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       setFilterDateTo,
       filterDescription,
       setFilterDescription,
-      filterAccountId,
-      setFilterAccountId,
+      filterAccountIds,
+      setFilterAccountIds,
       filterAmountMin,
       setFilterAmountMin,
       filterAmountMax,
       setFilterAmountMax,
-      filterCategoryId,
-      setFilterCategoryId,
-      filterSubcategoryId,
-      setFilterSubcategoryId,
-      filterSharedScope,
-      setFilterSharedScope,
-      filterLiquidado,
-      setFilterLiquidado,
-      filterTcPaid,
-      setFilterTcPaid,
-      filterAccountingMonthYm,
-      setFilterAccountingMonthYm,
+      filterCategoryIds,
+      setFilterCategoryIds,
+      filterSubcategoryIds,
+      setFilterSubcategoryIds,
+      filterSharedScopes,
+      setFilterSharedScopes,
+      filterLiquidadoValues,
+      setFilterLiquidadoValues,
+      filterTcPaidValues,
+      setFilterTcPaidValues,
+      filterAccountingMonthYms,
+      setFilterAccountingMonthYms,
       filterAccountsSorted,
       filterCategoriesSorted,
       filterSubcategoryDropdownRows,
@@ -2608,15 +2783,15 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       filterDateFrom,
       filterDateTo,
       filterDescription,
-      filterAccountId,
+      filterAccountIds,
       filterAmountMin,
       filterAmountMax,
-      filterCategoryId,
-      filterSubcategoryId,
-      filterSharedScope,
-      filterLiquidado,
-      filterTcPaid,
-      filterAccountingMonthYm,
+      filterCategoryIds,
+      filterSubcategoryIds,
+      filterSharedScopes,
+      filterLiquidadoValues,
+      filterTcPaidValues,
+      filterAccountingMonthYms,
       filterAccountsSorted,
       filterCategoriesSorted,
       filterSubcategoryDropdownRows,
@@ -2627,15 +2802,15 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     setFilterDateFrom("");
     setFilterDateTo("");
     setFilterDescription("");
-    setFilterAccountId("");
+    setFilterAccountIds([]);
     setFilterAmountMin("");
     setFilterAmountMax("");
-    setFilterCategoryId("");
-    setFilterSubcategoryId("");
-    setFilterSharedScope("all");
-    setFilterLiquidado("all");
-    setFilterTcPaid("all");
-    setFilterAccountingMonthYm("");
+    setFilterCategoryIds([]);
+    setFilterSubcategoryIds([]);
+    setFilterSharedScopes([]);
+    setFilterLiquidadoValues([]);
+    setFilterTcPaidValues([]);
+    setFilterAccountingMonthYms([]);
     setHeaderFilterOpen(null);
   }, []);
 
@@ -3291,8 +3466,13 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 <div className={BANKING_MAIN_TX_FOOTER_CLASS}>
                   <p className="text-[12px] leading-snug text-slate-400">
                     Hasta <strong className="text-slate-800">{BANKING_TX_PAGE_SIZE}</strong> movimientos por página.
-                    {filterAccountId !== "" ? (
-                      <span className="text-slate-500"> Cuenta acotada en servidor.</span>
+                    {filterAccountIds.length > 0 ? (
+                      <span className="text-slate-500">
+                        {" "}
+                        {filterAccountIds.length === 1
+                          ? "Cuenta acotada en servidor."
+                          : "Cuentas acotadas en servidor."}
+                      </span>
                     ) : null}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3">
