@@ -56,28 +56,58 @@ body {
   background: #6e7681;
 }
 
-/* Tabla movimientos bancarios (scroll horizontal en tarjeta; misma familia que acciones-scroll / tx-scroll) */
-.banking-table-scroll {
+/*
+ * Tema Banking (pastel / fintech): solo dentro de `.banking-theme`.
+ * Scroll horizontal tablas — no reutilizar fuera de rutas /banking/*.
+ */
+.banking-theme {
+  /* Barra horizontal tablas: menta pastel sobre track claro */
+  --bk-scrollbar-thumb: rgb(45 212 191 / 0.42);
+  --bk-scrollbar-thumb-hover: rgb(20 184 166 / 0.55);
+  --bk-scrollbar-track: rgb(241 245 249 / 0.95);
+  --bk-scrollbar-track-edge: rgb(203 213 225 / 0.35);
+}
+
+.banking-theme .banking-table-scroll {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
-  scrollbar-color: #484f58 #1c2128;
+  scrollbar-color: var(--bk-scrollbar-thumb) var(--bk-scrollbar-track);
 }
-.banking-table-scroll::-webkit-scrollbar {
+.banking-theme .banking-table-scroll::-webkit-scrollbar {
   height: 10px;
 }
-.banking-table-scroll::-webkit-scrollbar-track {
+.banking-theme .banking-table-scroll::-webkit-scrollbar-track {
   margin: 0 6px 2px;
-  background: #1c2128;
+  background: var(--bk-scrollbar-track);
   border-radius: 9999px;
-  box-shadow: inset 0 0 0 1px rgba(48, 54, 61, 0.55);
+  box-shadow: inset 0 0 0 1px var(--bk-scrollbar-track-edge);
 }
-.banking-table-scroll::-webkit-scrollbar-thumb {
-  background: #484f58;
+.banking-theme .banking-table-scroll::-webkit-scrollbar-thumb {
+  background: var(--bk-scrollbar-thumb);
   border-radius: 9999px;
-  border: 2px solid #1c2128;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
-.banking-table-scroll::-webkit-scrollbar-thumb:hover {
-  background: #6e7681;
+.banking-theme .banking-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--bk-scrollbar-thumb-hover);
+}
+
+/* Scroll vertical dentro de Banking (modales, listas): coherente con fondo claro */
+.banking-theme.tx-scroll,
+.banking-theme .tx-scroll {
+  scrollbar-color: rgb(45 212 191 / 0.38) rgb(241 245 249 / 0.95);
+}
+.banking-theme.tx-scroll::-webkit-scrollbar-track,
+.banking-theme .tx-scroll::-webkit-scrollbar-track {
+  background: rgb(241 245 249 / 0.95);
+}
+.banking-theme.tx-scroll::-webkit-scrollbar-thumb,
+.banking-theme .tx-scroll::-webkit-scrollbar-thumb {
+  background: rgb(45 212 191 / 0.38);
+}
+.banking-theme.tx-scroll::-webkit-scrollbar-thumb:hover,
+.banking-theme .tx-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(20 184 166 / 0.48);
 }
 
 /* Misma fila que el panel de sectores: oculta la barra pero mantiene el scroll */

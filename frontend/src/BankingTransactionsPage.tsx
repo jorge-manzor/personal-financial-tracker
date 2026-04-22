@@ -55,6 +55,43 @@ function bankingNonCreditAccounts(accounts: BankingAccountRow[]): BankingAccount
   return accounts.filter((a) => (a.enabled ?? true) && a.product_type !== "tarjeta_credito");
 }
 
+function bankingAccountAtBank(a: BankingAccountRow): number {
+  const p = a.provision_net_sum ?? 0;
+  return a.balance_at_bank !== undefined ? a.balance_at_bank : a.balance - p;
+}
+
+/** Deuda pendiente CLP por grupo de cargos TC (egresos no pagados). Coincide con backend sum(-amount). */
+function sumUnpaidTcDebtFromItems(items: BankingTransactionRow[]): number {
+  let s = 0;
+  for (const tx of items) {
+    if (tx.amount < 0) s += -tx.amount;
+  }
+  return s;
+}
+
+/**
+ * Reparte cargos TC no pagados por cuenta corriente asociada (`linked_checking_account_id`).
+ * Solo esas TC descuentan el «saldo real» de la cuenta líquida enlazada.
+ */
+function creditCardUnpaidAllocatedByChecking(
+  accounts: BankingAccountRow[],
+  groups: BankingCreditCardUnpaidGroup[],
+): { byCheckingId: Map<number, number>; totalLinkedUnpaidClp: number } {
+  const byId = new Map(accounts.map((x) => [x.id, x]));
+  const byCheckingId = new Map<number, number>();
+  for (const g of groups) {
+    const tc = byId.get(g.account_id);
+    if (!tc || tc.product_type !== "tarjeta_credito") continue;
+    const lid = tc.linked_checking_account_id;
+    if (lid == null) continue;
+    const debt = sumUnpaidTcDebtFromItems(g.items);
+    byCheckingId.set(lid, (byCheckingId.get(lid) ?? 0) + debt);
+  }
+  let totalLinkedUnpaidClp = 0;
+  for (const v of byCheckingId.values()) totalLinkedUnpaidClp += v;
+  return { byCheckingId, totalLinkedUnpaidClp };
+}
+
 /** Conserva el orden guardado; añade cuentas nuevas al final (por nombre). */
 function mergeBalanceCardOrder(prev: number[], rows: BankingAccountRow[]): number[] {
   const idSet = new Set(rows.map((r) => r.id));
@@ -151,7 +188,18 @@ function bankingProductBadgeLabel(t: BankingProductType | null): string {
 }
 
 /** Tarjeta de saldo (estilo alineado con Fondos en inversiones). */
-function BankingAccountBalanceCard({ account: a }: { account: BankingAccountRow }) {
+function BankingAccountBalanceCard({
+  account: a,
+  creditCardUnpaidAllocatedClp = 0,
+}: {
+  account: BankingAccountRow;
+  /** Solo cuentas líquidas con TC asociadas: cargos TC no pagados enlazados a esta cuenta corriente. */
+  creditCardUnpaidAllocatedClp?: number;
+}) {
+  const liquid = a.product_type !== "tarjeta_credito";
+  const unpaidCut = liquid ? Math.max(0, creditCardUnpaidAllocatedClp) : 0;
+  const saldoReal = liquid ? a.balance - unpaidCut : a.balance;
+
   const inactive = Math.abs(a.balance) < 1e-9;
   const prov = a.provision_net_sum ?? 0;
   const atBank =
@@ -159,16 +207,16 @@ function BankingAccountBalanceCard({ account: a }: { account: BankingAccountRow 
 
   return (
     <div
-      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border bg-gradient-to-br from-sky-950/90 via-[#0a1520] to-[#0f1a26] p-3 shadow-md ring-1 ring-sky-500/20 ${
-        inactive ? "border-sky-900/50 opacity-[0.92]" : "border-sky-700/35"
+      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-cyan-50/80 p-3.5 shadow-[0_10px_36px_-12px_rgba(14,165,233,0.2)] ring-1 ring-sky-100/80 ${
+        inactive ? "opacity-[0.88]" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-1.5">
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sky-950/85 ring-1 ring-sky-400/25"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-100 ring-1 ring-sky-200/80"
           aria-hidden
         >
-          <svg className="h-4 w-4 text-sky-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 text-sky-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -176,34 +224,51 @@ function BankingAccountBalanceCard({ account: a }: { account: BankingAccountRow 
             />
           </svg>
         </div>
-        <span className="max-w-[55%] shrink-0 truncate rounded-full bg-sky-950/75 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-200/95">
+        <span className="max-w-[55%] shrink-0 truncate rounded-full bg-sky-100/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-800">
           {bankingProductBadgeLabel(a.product_type)}
         </span>
       </div>
 
-      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-bold leading-snug text-white">{a.name}</p>
+      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-bold leading-snug text-slate-800">{a.name}</p>
 
       <p
-        className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-white"
-        title="Saldo real (libro): saldo inicial + suma de movimientos (incluye efecto neto de provisiones)."
+        className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-slate-900"
+        title={
+          liquid
+            ? `Saldo real (libro): incluye provisiones en el saldo libro; menos cargos en TC no pagados asociados a esta cuenta (${formatClpDots(unpaidCut)}).`
+            : "Saldo libro en la cuenta tarjeta (egresos no pagados siguen pendientes hasta marcarlos o pagar)."
+        }
       >
-        {formatClpDots(a.balance)}
+        {formatClpDots(saldoReal)}
       </p>
-      <div className="mt-1 border-t border-sky-800/55 pt-1">
-        <div className="grid grid-cols-2 gap-x-2 gap-y-0 leading-none">
+      <div className="mt-1 border-t border-sky-100 pt-1">
+        <div
+          className={`grid gap-x-2 gap-y-0 leading-none ${unpaidCut > 0 ? "grid-cols-3" : "grid-cols-2"}`}
+        >
           <div className="min-w-0">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-sky-500/85">Saldo actual</p>
+            <p className="text-[9px] font-medium uppercase tracking-wide text-sky-600/90">Saldo actual</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-[#e6edf3]"
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-700"
               title="Efectivo en cuenta (libro menos neto de Provisiones)."
             >
               {formatClpDots(atBank)}
             </p>
           </div>
+          {unpaidCut > 0 ? (
+            <div className="min-w-0 text-right">
+              <p className="text-[9px] font-medium uppercase tracking-wide text-sky-600/90">Deuda TC</p>
+              <p
+                className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-600"
+                title="Cargos en tarjeta(s) asociada(s) a esta cuenta marcados como no pagados."
+              >
+                {formatClpDots(unpaidCut)}
+              </p>
+            </div>
+          ) : null}
           <div className="min-w-0 text-right">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-sky-500/85">Provisiones</p>
+            <p className="text-[9px] font-medium uppercase tracking-wide text-sky-600/90">Provisiones</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-[#f87171]"
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-600"
               title="Monto neto en categoría Provisiones (reversas netean)."
             >
               {formatClpDots(Math.abs(prov))}
@@ -215,60 +280,81 @@ function BankingAccountBalanceCard({ account: a }: { account: BankingAccountRow 
   );
 }
 
-/** Resumen: suma de saldos (cuentas no TC); mismo tamaño/criterios que tarjetas por cuenta. */
-function BankingNonCreditTotalBalanceCard({ accounts }: { accounts: BankingAccountRow[] }) {
-  const totalReal = accounts.reduce((s, a) => s + a.balance, 0);
-  const totalAtBank = accounts.reduce((s, a) => {
-    const p = a.provision_net_sum ?? 0;
-    const at = a.balance_at_bank !== undefined ? a.balance_at_bank : a.balance - p;
-    return s + at;
-  }, 0);
-  const provisionSumDisplay = accounts.reduce((s, a) => s + Math.abs(a.provision_net_sum ?? 0), 0);
+/**
+ * Saldo real (libro neto TC): suma saldos libro líquidos − deuda pendiente solo de TC con cuenta asociada.
+ * Saldo actual: suma saldos «en banco» (libro − neto provisiones), sin restar TC.
+ */
+function BankingNonCreditTotalBalanceCard({
+  liquidAccounts,
+  creditCardUnpaidLinkedTotalClp,
+}: {
+  liquidAccounts: BankingAccountRow[];
+  creditCardUnpaidLinkedTotalClp: number;
+}) {
+  const liquidBook = liquidAccounts.reduce((s, a) => s + a.balance, 0);
+  const liquidAtBank = liquidAccounts.reduce((s, a) => s + bankingAccountAtBank(a), 0);
+  const unpaidLinked = Math.max(0, creditCardUnpaidLinkedTotalClp);
+  const totalReal = liquidBook - unpaidLinked;
+  const totalAtBank = liquidAtBank;
+  const provisionSumDisplay = liquidAccounts.reduce((s, a) => s + Math.abs(a.provision_net_sum ?? 0), 0);
   const inactive = Math.abs(totalReal) < 1e-9;
 
   return (
     <div
-      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border bg-gradient-to-br from-emerald-950/95 via-[#0c1914] to-[#141c18] p-3 shadow-md ring-1 ring-emerald-500/25 ${
-        inactive ? "border-emerald-800/40 opacity-[0.92]" : "border-emerald-600/35"
+      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-emerald-300 bg-gradient-to-br from-emerald-200/95 via-emerald-100 to-teal-200/90 p-3.5 shadow-[0_10px_36px_-12px_rgba(5,150,105,0.3)] ring-1 ring-emerald-300/70 ${
+        inactive ? "opacity-[0.88]" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-1.5">
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-950/90 ring-1 ring-emerald-500/35"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-600/95 ring-1 ring-emerald-700/50"
           aria-hidden
         >
-          <svg className="h-4 w-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-emerald-950/80 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-200/95">
+        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-emerald-800 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-50 shadow-sm">
           Total
         </span>
       </div>
 
-      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-bold leading-snug text-white">Saldo total</p>
+      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-bold leading-snug text-emerald-950">Saldo real</p>
 
       <p
-        className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-emerald-50"
-        title="Suma de saldos libro (saldo real) de cuentas no tarjeta de crédito."
+        className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-emerald-950"
+        title="Suma de saldos libro (incluye provisiones en libro) en cuentas líquidas, menos cargos TC no pagados solo en tarjetas con cuenta corriente asociada."
       >
         {formatClpDots(totalReal)}
       </p>
-      <div className="mt-1 border-t border-emerald-800/60 pt-1">
-        <div className="grid grid-cols-2 gap-x-2 gap-y-0 leading-none">
+      <div className="mt-1 border-t border-emerald-500/35 pt-1">
+        <div
+          className={`grid gap-x-2 gap-y-0 leading-none ${unpaidLinked > 0 ? "grid-cols-3" : "grid-cols-2"}`}
+        >
           <div className="min-w-0">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-500/90">Saldo actual</p>
+            <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-950/90">Saldo actual</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-[#e6edf3]"
-              title="Suma de saldos «en banco» por cuenta."
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-700"
+              title="Suma de saldos «en banco» por cuenta líquida (movimientos sin efecto neto de categoría Provisiones)."
             >
               {formatClpDots(totalAtBank)}
             </p>
           </div>
+          {unpaidLinked > 0 ? (
+            <div className="min-w-0 text-right">
+              <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-950/90">Deuda TC</p>
+              <p
+                className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-600"
+                title="Suma de cargos en tarjetas con cuenta corriente asociada marcados como no pagados."
+              >
+                {formatClpDots(unpaidLinked)}
+              </p>
+            </div>
+          ) : null}
           <div className="min-w-0 text-right">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-500/90">Provisiones</p>
+            <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-950/90">Provisiones</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-[#f87171]"
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-600"
               title="Suma por cuenta del valor absoluto del neto en Provisiones."
             >
               {formatClpDots(provisionSumDisplay)}
@@ -280,54 +366,21 @@ function BankingNonCreditTotalBalanceCard({ accounts }: { accounts: BankingAccou
   );
 }
 
-/** Cargos en tarjetas de crédito marcados como no pagados (suma de egresos pendientes). */
-function BankingCreditCardUnpaidDebtCard({ amountClp }: { amountClp: number }) {
-  const inactive = Math.abs(amountClp) < 1e-9;
-  return (
-    <div
-      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border bg-gradient-to-br from-zinc-900/95 via-[#1c1c1f] to-[#141416] p-3 shadow-md ring-1 ring-zinc-500/20 ${
-        inactive ? "border-zinc-700/55 opacity-[0.92]" : "border-zinc-600/40"
-      }`}
-    >
-      <div className="flex items-start justify-between gap-1.5">
-        <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-zinc-950/90 ring-1 ring-zinc-600/35"
-          aria-hidden
-        >
-          <svg className="h-4 w-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M2 10h20M6 14h4m8 0h4M8 18h8M6 6h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2z" />
-          </svg>
-        </div>
-        <span className="ml-auto max-w-[calc(100%-2.75rem)] rounded-md bg-zinc-950/85 px-1.5 py-1 text-right text-[8px] font-bold uppercase leading-tight tracking-wide text-zinc-300/95">
-          Tarjetas de crédito
-        </span>
-      </div>
-      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-bold leading-snug text-white">Deuda TC</p>
-      <p
-        className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-zinc-100"
-        title="Suma de cargos en cuentas tarjeta de crédito con «cargo TC pagado» = No."
-      >
-        {formatClpDots(amountClp)}
-      </p>
-    </div>
-  );
-}
+/** Deuda pago compartido — mismo lenguaje visual que tarjetas de cuenta (gradiente violeta suave). */
+const BANKING_SHARED_DEBT_CARD_CLASS =
+  "flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50/75 p-3.5 shadow-[0_10px_36px_-12px_rgba(139,92,246,0.2)] ring-1 ring-violet-100/80 backdrop-blur-sm";
 
 /** Movimientos compartidos aún sin marcar como liquidados (suma de |monto|). */
 function BankingSharedUnsettledDebtCard({ amountClp }: { amountClp: number }) {
   const inactive = Math.abs(amountClp) < 1e-9;
   return (
-    <div
-      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border bg-gradient-to-br from-neutral-900/95 via-[#1a1a1d] to-[#121214] p-3 shadow-md ring-1 ring-neutral-500/18 ${
-        inactive ? "border-neutral-700/55 opacity-[0.92]" : "border-neutral-600/38"
-      }`}
-    >
+    <div className={`${BANKING_SHARED_DEBT_CARD_CLASS} ${inactive ? "opacity-[0.88]" : ""}`}>
       <div className="flex items-start justify-between gap-1.5">
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-neutral-950/90 ring-1 ring-neutral-600/30"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 ring-1 ring-violet-200/80"
           aria-hidden
         >
-          <svg className="h-4 w-4 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -335,13 +388,13 @@ function BankingSharedUnsettledDebtCard({ amountClp }: { amountClp: number }) {
             />
           </svg>
         </div>
-        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-neutral-950/85 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-neutral-300/95">
+        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-violet-100/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-800">
           Compartido
         </span>
       </div>
-      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-bold leading-snug text-white">Pago Compartido</p>
+      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-bold leading-snug text-slate-800">Deuda Pago Compartido</p>
       <p
-        className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-neutral-100"
+        className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-slate-900"
         title="Suma de valores absolutos de movimientos compartidos con liquidación pendiente."
       >
         {formatClpDots(amountClp)}
@@ -388,47 +441,123 @@ const BANKING_TX_COLUMN_LABELS: Record<BankingTxColumnKey, string> = {
 
 const BANKING_TX_COLUMN_KEYS = Object.keys(BANKING_TX_COLUMN_LABELS) as BankingTxColumnKey[];
 
-/** Filtros del popover de la tabla principal: menos contraste «negro sobre carbón». */
+/** Filtros popover — inputs sobre fondo claro (fintech pastel). */
 const bankingMainTxFilterInputClass =
-  "mt-1 w-full rounded-lg border border-slate-600 bg-slate-950 px-2.5 py-2 text-sm text-white outline-none transition focus:border-sky-500 focus:ring-1 focus:ring-sky-500/30 [color-scheme:dark]";
+  "mt-1 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light]";
 
-/**
- * Tabla principal — paleta Slate (Tailwind): superficie única por fila, sin rayas alternas.
- * Referencia habitual en dark UI (contraste estable, menos fatiga visual).
- */
+/** Modal nuevo/editar movimiento y toolbars secundarios — controles sobre blanco. */
+const bankingModalControlClass =
+  "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light]";
+const bankingModalCategoryTriggerClass =
+  "flex w-full items-center justify-between gap-2 overflow-hidden rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-3 text-left text-sm outline-none shadow-sm transition hover:border-teal-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 disabled:cursor-not-allowed disabled:opacity-40 [color-scheme:light]";
+const bankingToolbarGhostBtnClass =
+  "rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50/90";
+const bankingToolbarGhostBtnMdClass =
+  "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50/90 disabled:cursor-not-allowed disabled:opacity-35";
+const bankingAuxActionBtnClass =
+  "rounded-lg border border-teal-200 bg-gradient-to-b from-teal-50 to-emerald-50 px-2 py-1 text-[11px] font-semibold text-teal-900 shadow-sm ring-1 ring-teal-100 transition hover:from-teal-100 hover:to-emerald-50 disabled:cursor-wait disabled:opacity-40";
+const bankingAuxBulkBtnClass =
+  "rounded-xl border border-teal-200 bg-gradient-to-b from-teal-50 to-emerald-50 px-3 py-1.5 text-xs font-semibold text-teal-900 shadow-sm ring-1 ring-teal-100 transition hover:from-teal-100 hover:to-emerald-50 disabled:cursor-not-allowed disabled:opacity-40";
+
+/** Tabla principal — tarjeta blanca + menta muy suave (modo claro). */
 const BANKING_MAIN_TX_CARD_CLASS =
-  "banking-table-scroll overflow-x-auto rounded-xl border border-slate-600 bg-slate-900 pb-2 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] ring-1 ring-black/25";
+  "banking-table-scroll overflow-x-auto rounded-2xl border border-teal-100 bg-white/95 pb-2 shadow-[0_8px_40px_-12px_rgba(45,212,191,0.18),inset_0_1px_0_0_rgba(255,255,255,0.9)] backdrop-blur-sm";
 const BANKING_MAIN_TX_TOOLBAR_CLASS =
-  "sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-slate-700 bg-slate-900 px-3 py-2";
-const BANKING_MAIN_TX_THEAD_CLASS = "border-b border-slate-700 bg-slate-950";
-const BANKING_MAIN_TX_TBODY_CLASS = "divide-y divide-slate-700/90";
-const BANKING_MAIN_TX_TR_CLASS = "bg-slate-800 text-slate-100 transition-colors hover:bg-slate-700";
+  "sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-teal-100/90 bg-gradient-to-r from-teal-50/95 to-cyan-50/80 px-3 py-2.5";
+const BANKING_MAIN_TX_THEAD_CLASS =
+  "border-b border-teal-100 bg-gradient-to-r from-teal-50 via-emerald-50/90 to-teal-50";
+const BANKING_MAIN_TX_TBODY_CLASS = "divide-y divide-slate-100";
+const BANKING_MAIN_TX_TR_CLASS =
+  "odd:bg-white even:bg-slate-50/90 text-slate-800 transition-colors hover:bg-teal-50/70";
 const BANKING_MAIN_TX_FOOTER_CLASS =
-  "flex flex-wrap items-center justify-between gap-3 border-t border-slate-700 bg-slate-900 px-3 py-2.5";
+  "flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/95 px-3 py-2.5";
 
-/** Pendientes TC / compartidos: mismo sistema Slate, sin zebra. */
+/** Pendientes TC / compartidos — violeta pastel sobre claro. */
 const BANKING_AUX_TX_CARD_CLASS =
-  "banking-table-scroll overflow-x-auto rounded-xl border border-slate-600 bg-slate-900 pb-2 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] ring-1 ring-black/25";
-const BANKING_AUX_TX_THEAD_CLASS = "border-b border-slate-700 bg-slate-950";
-const BANKING_AUX_TX_TBODY_CLASS = "divide-y divide-slate-700/90";
-const BANKING_AUX_TX_TR_CLASS = "bg-slate-800 text-slate-100 transition-colors hover:bg-slate-700";
-const BANKING_AUX_TX_TH_TEXT_CLASS = "text-[12px] font-semibold uppercase tracking-wide text-slate-400";
-const BANKING_AUX_SECTION_HEADING_CLASS = "text-sm font-semibold text-slate-100";
+  "banking-table-scroll overflow-x-auto rounded-2xl border border-violet-100 bg-white/95 pb-2 shadow-[0_8px_40px_-12px_rgba(139,92,246,0.12)] backdrop-blur-sm";
+const BANKING_AUX_TX_THEAD_CLASS =
+  "border-b border-violet-100 bg-gradient-to-r from-violet-50 via-fuchsia-50/70 to-violet-50";
+const BANKING_AUX_TX_TBODY_CLASS = "divide-y divide-slate-100";
+const BANKING_AUX_TX_TR_CLASS =
+  "odd:bg-white even:bg-violet-50/40 text-slate-800 transition-colors hover:bg-violet-50/90";
+const BANKING_AUX_TX_TH_TEXT_CLASS =
+  "text-[12px] font-semibold uppercase tracking-wide text-violet-900/75";
+const BANKING_AUX_SECTION_HEADING_CLASS = "text-sm font-semibold text-slate-700";
 
 /** Contenedor pestañas «Movimientos». */
 const BANKING_MOVEMENTS_SECTION_CLASS =
-  "overflow-hidden rounded-xl border border-slate-600 bg-slate-900 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.06)] ring-1 ring-black/25";
+  "overflow-hidden rounded-2xl border border-teal-100 bg-white/90 shadow-[0_12px_48px_-16px_rgba(20,184,166,0.15)] backdrop-blur-sm";
 const BANKING_MOVEMENTS_TABLIST_CLASS =
-  "flex flex-wrap gap-1 border-b border-slate-700 bg-slate-950 px-2 pt-2";
+  "flex flex-wrap gap-2 border-b border-teal-100 bg-gradient-to-r from-teal-50/90 to-cyan-50/70 px-2 pt-3";
 
-/** Botones ícono sobre filas Slate. */
+/** Botones ícono filas auxiliares. */
 const txIconBtnAux =
-  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-400 transition hover:border-slate-600 hover:bg-slate-700 hover:text-sky-400";
-const txIconBtnAuxDanger = `${txIconBtnAux} hover:text-red-400`;
+  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700";
+const txIconBtnAuxDanger = `${txIconBtnAux} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600`;
 
-/** Casillas en tablas auxiliares. */
-const BANKING_AUX_CHECKBOX_CLASS =
-  "h-4 w-4 rounded border-slate-500 bg-slate-700 accent-emerald-600";
+/** Casilla circular para pendientes TC / compartidos: borde gris → al marcar fondo verde con ✓ (parcial = guión). */
+function BankingAuxRoundCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+  title,
+  "aria-label": ariaLabel,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: () => void;
+  title?: string;
+  "aria-label": string;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (el) el.indeterminate = !!indeterminate;
+  }, [indeterminate]);
+
+  const partial = !!indeterminate;
+
+  return (
+    <label className="inline-flex cursor-pointer select-none items-center justify-center" title={title}>
+      <input
+        ref={inputRef}
+        type="checkbox"
+        className="peer sr-only"
+        checked={checked}
+        onChange={onChange}
+        aria-label={ariaLabel}
+      />
+      <span
+        className={[
+          "flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded-full border-2 transition-[background-color,border-color,box-shadow] duration-150",
+          "peer-focus-visible:ring-2 peer-focus-visible:ring-teal-400/40 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-white",
+          partial
+            ? "border-amber-300 bg-amber-50 shadow-sm"
+            : checked
+              ? "border-teal-500 bg-teal-400 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)]"
+              : "border-slate-300 bg-white hover:border-teal-300 hover:bg-teal-50/50",
+        ].join(" ")}
+        aria-hidden
+      >
+        {partial ? (
+          <span className="h-0.5 w-2 rounded-full bg-amber-100/95" />
+        ) : checked ? (
+          <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+            <path
+              d="M3.75 8.25L6.75 11.25L12.25 4.75"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </svg>
+        ) : null}
+      </span>
+    </label>
+  );
+}
 
 /** Siempre visibles; no se pueden ocultar (sí se pueden reordenar). */
 const BANKING_TX_REQUIRED_COLUMNS: readonly BankingTxColumnKey[] = ["fecha", "monto"];
@@ -560,7 +689,13 @@ function IconGripVertical({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
-function SortableBankingBalanceCard({ account }: { account: BankingAccountRow }) {
+function SortableBankingBalanceCard({
+  account,
+  creditCardUnpaidAllocatedClp = 0,
+}: {
+  account: BankingAccountRow;
+  creditCardUnpaidAllocatedClp?: number;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: account.id,
     transition: { duration: 200, easing: "cubic-bezier(0.25, 0.1, 0.25, 1)" },
@@ -579,7 +714,10 @@ function SortableBankingBalanceCard({ account }: { account: BankingAccountRow })
       {...listeners}
       title={`Arrastra para cambiar el orden · ${account.name}`}
     >
-      <BankingAccountBalanceCard account={account} />
+      <BankingAccountBalanceCard
+        account={account}
+        creditCardUnpaidAllocatedClp={creditCardUnpaidAllocatedClp}
+      />
     </div>
   );
 }
@@ -608,8 +746,8 @@ function BankingTxColumnVisibilityToggle({
         e.stopPropagation();
         if (!disabled) onToggle();
       }}
-      className={`inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border p-[3px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2       focus-visible:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-50 ${
-        on ? "justify-end border-emerald-700 bg-emerald-600/90" : "justify-start border-slate-600 bg-slate-800"
+      className={`inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border p-[3px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 ${
+        on ? "justify-end border-teal-400 bg-teal-400 shadow-inner" : "justify-start border-slate-300 bg-slate-200"
       }`}
     >
       <span className="pointer-events-none block h-3.5 w-3.5 shrink-0 rounded-full bg-white shadow" />
@@ -747,13 +885,13 @@ function BankingTxColumnHeader({ colKey }: { colKey: BankingTxColumnKey }) {
         aria-expanded={open}
         aria-haspopup="dialog"
         className={`w-full px-2 py-2.5 text-center transition sm:px-2.5 ${
-          open ? "bg-slate-900 ring-1 ring-inset ring-sky-500/35" : "hover:bg-slate-900/90"
+          open ? "bg-teal-100/90 ring-1 ring-inset ring-teal-300/60" : "hover:bg-teal-50/80"
         }`}
       >
-        <span className={`block ${titleSize} font-semibold uppercase tracking-wide text-slate-400`}>{label}</span>
+        <span className={`block ${titleSize} font-semibold uppercase tracking-wide text-teal-900/85`}>{label}</span>
         <span
           className={`mt-0.5 block text-[9px] font-medium normal-case tracking-normal ${
-            active ? "text-emerald-400" : "text-[#8e9aab]"
+            active ? "text-teal-700" : "text-slate-500"
           }`}
         >
           {active ? "Filtro activo" : "Filtrar"}
@@ -772,7 +910,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
       return (
         <div className="space-y-3">
           <label className="block">
-            <span className="text-xs text-[#8b949e]">Fecha desde</span>
+            <span className="text-xs text-slate-500">Fecha desde</span>
             <input
               type="date"
               value={ctx.filterDateFrom}
@@ -781,7 +919,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
             />
           </label>
           <label className="block">
-            <span className="text-xs text-[#8b949e]">Fecha hasta</span>
+            <span className="text-xs text-slate-500">Fecha hasta</span>
             <input
               type="date"
               value={ctx.filterDateTo}
@@ -794,7 +932,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
     case "descripcion":
       return (
         <label className="block">
-          <span className="text-xs text-[#8b949e]">Contiene texto</span>
+          <span className="text-xs text-slate-500">Contiene texto</span>
           <input
             type="search"
             value={ctx.filterDescription}
@@ -808,7 +946,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
     case "producto":
       return (
         <label className="block">
-          <span className="text-xs text-[#8b949e]">Producto</span>
+          <span className="text-xs text-slate-500">Producto</span>
           <select
             value={ctx.filterAccountId === "" ? "" : String(ctx.filterAccountId)}
             onChange={(e) => ctx.setFilterAccountId(e.target.value ? Number(e.target.value) : "")}
@@ -827,7 +965,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
       return (
         <div className="space-y-3">
           <label className="block">
-            <span className="text-xs text-[#8b949e]">Monto mínimo</span>
+            <span className="text-xs text-slate-500">Monto mínimo</span>
             <input
               inputMode="decimal"
               value={ctx.filterAmountMin}
@@ -837,7 +975,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
             />
           </label>
           <label className="block">
-            <span className="text-xs text-[#8b949e]">Monto máximo</span>
+            <span className="text-xs text-slate-500">Monto máximo</span>
             <input
               inputMode="decimal"
               value={ctx.filterAmountMax}
@@ -851,16 +989,16 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
     case "categoria":
       return (
         <div className="space-y-2">
-          <span className="text-xs text-[#8b949e]">Categoría</span>
+          <span className="text-xs text-slate-500">Categoría</span>
           <div className="mt-1 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-0.5 tx-scroll">
             <button
               type="button"
               onClick={() => ctx.setFilterCategoryId("")}
-              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-slate-800/90 ${
-                ctx.filterCategoryId === "" ? "border-sky-500/50 ring-1 ring-sky-500/35" : "border-slate-600"
+              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
+                ctx.filterCategoryId === "" ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border-slate-200 bg-white"
               }`}
             >
-              <span className="text-[#e6edf3]">Todas</span>
+              <span className="text-slate-800">Todas</span>
             </button>
             {ctx.filterCategoriesSorted.map((c) => {
               const picked = ctx.filterCategoryId === c.id;
@@ -869,8 +1007,8 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
                   key={c.id}
                   type="button"
                   onClick={() => ctx.setFilterCategoryId(c.id)}
-                  className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-100 transition hover:bg-slate-800/80 ${
-                    picked ? "border-sky-500/45 bg-slate-800 ring-1 ring-sky-500/35" : "border border-slate-700"
+                  className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-teal-50 ${
+                    picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-200 bg-white"
                   }`}
                 >
                   {c.name}
@@ -879,23 +1017,23 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
             })}
           </div>
           {ctx.filterCategoriesSorted.length === 0 ? (
-            <p className="text-[12px] leading-snug text-[#8b949e]">No hay categorías en los movimientos cargados.</p>
+            <p className="text-[12px] leading-snug text-slate-500">No hay categorías en los movimientos cargados.</p>
           ) : null}
         </div>
       );
     case "subcategoria":
       return (
         <div className="space-y-2">
-          <span className="text-xs text-[#8b949e]">Subcategoría</span>
+          <span className="text-xs text-slate-500">Subcategoría</span>
           <div className="mt-1 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-0.5 tx-scroll">
             <button
               type="button"
               onClick={() => ctx.setFilterSubcategoryId("")}
-              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-slate-800/90 ${
-                ctx.filterSubcategoryId === "" ? "border-sky-500/50 ring-1 ring-sky-500/35" : "border-slate-600"
+              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
+                ctx.filterSubcategoryId === "" ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border-slate-200 bg-white"
               }`}
             >
-              <span className="text-[#e6edf3]">Todas</span>
+              <span className="text-slate-800">Todas</span>
             </button>
             {ctx.filterSubcategoryDropdownRows.map((r) => {
               const picked = ctx.filterSubcategoryId === r.id;
@@ -906,8 +1044,8 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
                   key={r.id}
                   type="button"
                   onClick={() => ctx.setFilterSubcategoryId(r.id)}
-                  className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-100 transition hover:bg-slate-800/80 ${
-                    picked ? "border-sky-500/45 bg-slate-800 ring-1 ring-sky-500/35" : "border border-slate-700"
+                  className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-teal-50 ${
+                    picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-200 bg-white"
                   }`}
                 >
                   {shortLabel}
@@ -916,7 +1054,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
             })}
           </div>
           {ctx.filterSubcategoryDropdownRows.length === 0 ? (
-            <p className="text-[12px] leading-snug text-[#8b949e]">
+            <p className="text-[12px] leading-snug text-slate-500">
               No hay subcategorías en los movimientos cargados
               {ctx.filterCategoryId !== "" ? " para esta categoría." : "."}
             </p>
@@ -926,7 +1064,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
     case "tipo_movimiento":
       return (
         <label className="block">
-          <span className="text-xs text-[#8b949e]">Tipo</span>
+          <span className="text-xs text-slate-500">Tipo</span>
           <select
             value={ctx.filterSharedScope}
             onChange={(e) => ctx.setFilterSharedScope(e.target.value as BankingTxSharedScopeFilter)}
@@ -941,7 +1079,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
     case "compartido_liquidado":
       return (
         <label className="block">
-          <span className="text-xs text-[#8b949e]">Valor en tabla</span>
+          <span className="text-xs text-slate-500">Valor en tabla</span>
           <select
             value={ctx.filterLiquidado}
             onChange={(e) => ctx.setFilterLiquidado(e.target.value as BankingTxLiquidadoFilter)}
@@ -957,7 +1095,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
     case "cargo_tc":
       return (
         <label className="block">
-          <span className="text-xs text-[#8b949e]">Valor en tabla</span>
+          <span className="text-xs text-slate-500">Valor en tabla</span>
           <select
             value={ctx.filterTcPaid}
             onChange={(e) => ctx.setFilterTcPaid(e.target.value as BankingTxTcPaidFilter)}
@@ -973,7 +1111,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
     case "mes_contable":
       return (
         <label className="block">
-          <span className="text-xs text-[#8b949e]">Mes contable</span>
+          <span className="text-xs text-slate-500">Mes contable</span>
           <input
             type="month"
             value={ctx.filterAccountingMonthYm}
@@ -991,26 +1129,26 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
 function BankingTxSiNoDashBadge({ text }: { text: string }) {
   if (text === "—") {
     return (
-      <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-[#21262d]/90 px-1.5 py-0.5 text-[12px] font-semibold tabular-nums text-[#8b949e] ring-1 ring-[#30363d]">
+      <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[12px] font-semibold tabular-nums text-slate-500 ring-1 ring-slate-200">
         —
       </span>
     );
   }
   if (text === "Sí") {
     return (
-      <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-emerald-500/18 px-1.5 py-0.5 text-[12px] font-semibold text-emerald-300 ring-1 ring-emerald-500/40">
+      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-emerald-100 px-2 py-0.5 text-[12px] font-semibold text-emerald-800 ring-1 ring-emerald-200">
         Sí
       </span>
     );
   }
   if (text === "No") {
     return (
-      <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-rose-500/18 px-1.5 py-0.5 text-[12px] font-semibold text-rose-300 ring-1 ring-rose-500/40">
+      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-rose-100 px-2 py-0.5 text-[12px] font-semibold text-rose-800 ring-1 ring-rose-200">
         No
       </span>
     );
   }
-  return <span className="text-[12px] text-[#8b949e]">{text}</span>;
+  return <span className="text-[12px] text-slate-500">{text}</span>;
 }
 
 function BankingTxTd({
@@ -1031,13 +1169,13 @@ function BankingTxTd({
   switch (colKey) {
     case "fecha":
       return (
-        <td className="align-middle whitespace-nowrap px-2 py-3 text-center text-[12px] text-[#e6edf3] sm:px-2.5">
+        <td className="align-middle whitespace-nowrap px-2 py-3 text-center text-[12px] text-slate-700 sm:px-2.5">
           {row.fecha.slice(0, 10)}
         </td>
       );
     case "descripcion":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-left text-[12px] leading-snug text-[#c9d1d9] sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-left text-[12px] leading-snug text-slate-600 sm:px-2.5">
           <span className="line-clamp-3 break-words [overflow-wrap:anywhere]">
             {row.description?.trim() || "—"}
           </span>
@@ -1045,13 +1183,13 @@ function BankingTxTd({
       );
     case "producto":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-center text-[12px] text-[#e6edf3] sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-center text-[12px] text-slate-700 sm:px-2.5">
           <span className="line-clamp-3 break-words [overflow-wrap:anywhere]">{row.account_name}</span>
         </td>
       );
     case "monto": {
       /** Colores como actividad de inversiones; tamaño más compacto que la lista principal. */
-      const signClass = income ? "text-[#4ade80]" : "text-[#f87171]";
+      const signClass = income ? "text-teal-600" : "text-rose-600";
       const text = `${income ? "+" : "-"}${formatBankingClpSigned(row.amount)}`;
       return (
         <td className="align-middle whitespace-nowrap px-2 py-3 sm:px-2.5">
@@ -1063,7 +1201,7 @@ function BankingTxTd({
     }
     case "categoria":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-slate-100 sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-slate-700 sm:px-2.5">
           <span className="line-clamp-2 break-words font-medium leading-snug [overflow-wrap:anywhere]">
             {row.category_name}
           </span>
@@ -1071,7 +1209,7 @@ function BankingTxTd({
       );
     case "subcategoria":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-slate-100 sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-slate-700 sm:px-2.5">
           <span className="line-clamp-3 break-words font-medium leading-snug [overflow-wrap:anywhere]">
             {row.subcategory_name}
           </span>
@@ -1083,8 +1221,8 @@ function BankingTxTd({
           <span
             className={`inline-flex max-w-full justify-center rounded-md px-1.5 py-0.5 text-[12px] font-medium ${
               row.is_shared
-                ? "bg-violet-500/15 text-violet-200 ring-1 ring-violet-500/25"
-                : "bg-emerald-500/10 text-emerald-200/95 ring-1 ring-emerald-500/20"
+                ? "bg-violet-100 text-violet-900 ring-1 ring-violet-200"
+                : "bg-teal-100 text-teal-900 ring-1 ring-teal-200"
             }`}
           >
             {row.is_shared ? "Compartido" : "Personal"}
@@ -1105,7 +1243,7 @@ function BankingTxTd({
       );
     case "mes_contable":
       return (
-        <td className="align-middle whitespace-nowrap px-2 py-3 text-center text-[12px] text-[#8b949e] sm:px-2.5">
+        <td className="align-middle whitespace-nowrap px-2 py-3 text-center text-[12px] text-slate-500 sm:px-2.5">
           {accountingLabel}
         </td>
       );
@@ -1137,20 +1275,20 @@ function SortableBankingTxColumnPickerRow({
 
   return (
     <li ref={setNodeRef} style={style} className="list-none">
-      <div className="flex items-center gap-2 rounded-lg border border-transparent px-1 py-1.5 transition hover:border-slate-600 hover:bg-slate-800/90">
+      <div className="flex items-center gap-2 rounded-lg border border-transparent px-1 py-1.5 transition hover:border-teal-100 hover:bg-teal-50/60">
         <button
           type="button"
           ref={setActivatorNodeRef}
-          className="inline-flex shrink-0 cursor-grab touch-manipulation rounded-md p-1 text-[#aeb8c8] hover:bg-[#5f7088] hover:text-[#f8fafc] active:cursor-grabbing"
+          className="inline-flex shrink-0 cursor-grab touch-manipulation rounded-md p-1 text-slate-400 hover:bg-slate-200/80 hover:text-slate-800 active:cursor-grabbing"
           aria-label={`Arrastrar ${label}`}
           {...attributes}
           {...listeners}
         >
           <IconGripVertical className="h-4 w-4" />
         </button>
-        <span className="min-w-0 flex-1 text-sm leading-snug text-[#f1f5f9]">{label}</span>
+        <span className="min-w-0 flex-1 text-sm leading-snug text-slate-800">{label}</span>
         {requiredCol ? (
-          <span className="shrink-0 rounded-md border border-slate-600 bg-slate-800 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+          <span className="shrink-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
             Fija
           </span>
         ) : null}
@@ -1166,8 +1304,14 @@ function SortableBankingTxColumnPickerRow({
 }
 
 const txIconBtn =
-  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-400 transition hover:border-slate-600 hover:bg-slate-700 hover:text-sky-400";
-const txIconBtnDanger = `${txIconBtn} hover:text-red-400`;
+  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700";
+const txIconBtnDanger = `${txIconBtn} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600`;
+
+/** Monto en CLP que aporta un cargo TC a la deuda (egreso negativo → valor positivo). */
+function tcChargeDebtMagnitudeClp(row: BankingTransactionRow): number {
+  if (row.amount < 0) return -row.amount;
+  return Math.abs(row.amount);
+}
 
 /** Tabla de cargos TC pendientes de pagar (mismas columnas visibles que la tabla principal + Pagado). */
 function BankingCcPendingChargesTable({
@@ -1191,14 +1335,82 @@ function BankingCcPendingChargesTable({
   openEdit: (row: BankingTransactionRow) => void;
   removeRow: (row: BankingTransactionRow) => void;
 }) {
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
+  const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const allSelected = rowIds.length > 0 && rowIds.every((id) => selectedIds.has(id));
+  const someSelected = rowIds.some((id) => selectedIds.has(id));
+
+  useEffect(() => {
+    const valid = new Set(rowIds);
+    setSelectedIds((prev) => {
+      const next = new Set<number>();
+      for (const id of prev) {
+        if (valid.has(id)) next.add(id);
+      }
+      return next;
+    });
+  }, [rowIds]);
+
+  const selectedSumClp = useMemo(() => {
+    let s = 0;
+    for (const row of rows) {
+      if (!selectedIds.has(row.id)) continue;
+      s += tcChargeDebtMagnitudeClp(row);
+    }
+    return s;
+  }, [rows, selectedIds]);
+
+  const toggleRow = useCallback((id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      if (rowIds.length > 0 && rowIds.every((id) => prev.has(id))) return new Set();
+      return new Set(rowIds);
+    });
+  }, [rowIds]);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
   return (
     <section className="mb-6 space-y-2" aria-labelledby={`cc-pending-heading-${accountId}`}>
       <h3 id={`cc-pending-heading-${accountId}`} className={BANKING_AUX_SECTION_HEADING_CLASS}>
         Cargos pendientes · {accountHeading}
       </h3>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-100 bg-teal-50/80 px-3 py-2 text-xs leading-snug text-slate-600 shadow-sm">
+        <p className="min-w-0 flex-1">
+          {selectedIds.size > 0 ? (
+            <>
+              <span className="text-slate-400">Suma seleccionada (cuadrar con pago al banco): </span>
+              <strong className="tabular-nums text-teal-700">{formatClpDots(selectedSumClp)}</strong>
+              <span className="text-slate-500"> · {selectedIds.size} movimiento(s)</span>
+            </>
+          ) : (
+            <span className="text-slate-400">
+              Marca cargos para ver la suma y alinearla con el monto que transferirás desde la cuenta corriente asociada.
+            </span>
+          )}
+        </p>
+        {selectedIds.size > 0 ? (
+          <button
+            type="button"
+            onClick={clearSelection}
+            className={bankingToolbarGhostBtnClass}
+          >
+            Limpiar selección
+          </button>
+        ) : null}
+      </div>
       <div className={BANKING_AUX_TX_CARD_CLASS}>
         <table className="w-full table-fixed border-collapse text-[12px]" style={{ minWidth: tableMinWidthPx }}>
           <colgroup>
+            <col style={{ width: "2.75rem" }} />
             {orderedVisibleBankingTxColumns.map((colKey) => (
               <col key={colKey} style={{ width: BANKING_TX_COL_WIDTH[colKey] }} />
             ))}
@@ -1207,6 +1419,15 @@ function BankingCcPendingChargesTable({
           </colgroup>
           <thead className={BANKING_AUX_TX_THEAD_CLASS}>
             <tr>
+              <th scope="col" className="px-1 py-2.5 text-center sm:px-1.5">
+                <BankingAuxRoundCheckbox
+                  checked={allSelected}
+                  indeterminate={someSelected && !allSelected}
+                  onChange={toggleSelectAll}
+                  title={allSelected ? "Desmarcar todos" : "Seleccionar todos en esta tarjeta"}
+                  aria-label="Seleccionar todos los cargos pendientes de esta tarjeta"
+                />
+              </th>
               {orderedVisibleBankingTxColumns.map((colKey) => (
                 <th
                   key={colKey}
@@ -1240,8 +1461,16 @@ function BankingCcPendingChargesTable({
                     ? "Sí"
                     : "No";
               const accountingLabel = formatBankingAccountingMonth(row.accounting_month);
+              const checked = selectedIds.has(row.id);
               return (
                 <tr key={row.id} className={BANKING_AUX_TX_TR_CLASS}>
+                  <td className="align-middle px-1 py-3 text-center sm:px-1.5">
+                    <BankingAuxRoundCheckbox
+                      checked={checked}
+                      onChange={() => toggleRow(row.id)}
+                      aria-label={`Seleccionar cargo ${row.description ?? row.id}`}
+                    />
+                  </td>
                   {orderedVisibleBankingTxColumns.map((colKey) => (
                     <BankingTxTd
                       key={colKey}
@@ -1258,9 +1487,9 @@ function BankingCcPendingChargesTable({
                       type="button"
                       disabled={markingPaidId === row.id}
                       onClick={() => void onMarkPaid(row)}
-                      className="rounded-md border border-emerald-600/45 bg-emerald-950/50 px-2 py-1 text-[11px] font-semibold text-emerald-200 transition hover:bg-emerald-900/55 disabled:cursor-wait disabled:opacity-40"
+                      className={bankingAuxActionBtnClass}
                     >
-                      {markingPaidId === row.id ? "…" : "Pagado"}
+                      {markingPaidId === row.id ? "…" : "Marcar Pagado"}
                     </button>
                   </td>
                   <td className="align-middle px-1.5 py-3 sm:px-2">
@@ -1330,12 +1559,6 @@ function BankingSharedPendingChargesTable({
   const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const allSelected = rowIds.length > 0 && rowIds.every((id) => selectedIds.has(id));
   const someSelected = rowIds.some((id) => selectedIds.has(id));
-  const headerCbRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const el = headerCbRef.current;
-    if (el) el.indeterminate = someSelected && !allSelected;
-  }, [someSelected, allSelected]);
 
   const selectedInSection = useMemo(() => rowIds.filter((id) => selectedIds.has(id)).length, [rowIds, selectedIds]);
 
@@ -1350,7 +1573,7 @@ function BankingSharedPendingChargesTable({
             type="button"
             disabled={bulkSettling || selectedInSection === 0}
             onClick={() => void onBulkSettle()}
-            className="rounded-lg border border-emerald-600/55 bg-emerald-950/45 px-3 py-1.5 text-xs font-semibold text-emerald-100 transition hover:bg-emerald-900/55 disabled:cursor-not-allowed disabled:opacity-40"
+            className={bankingAuxBulkBtnClass}
           >
             {bulkSettling ? "Liquidando…" : `Liquidar seleccionados (${selectedInSection})`}
           </button>
@@ -1369,11 +1592,9 @@ function BankingSharedPendingChargesTable({
           <thead className={BANKING_AUX_TX_THEAD_CLASS}>
             <tr>
               <th scope="col" className="px-1 py-2.5 text-center sm:px-1.5">
-                <input
-                  ref={headerCbRef}
-                  type="checkbox"
-                  className={BANKING_AUX_CHECKBOX_CLASS}
+                <BankingAuxRoundCheckbox
                   checked={allSelected}
+                  indeterminate={someSelected && !allSelected}
                   onChange={onToggleSelectAll}
                   title={allSelected ? "Desmarcar todos" : "Seleccionar todos en esta tabla"}
                   aria-label="Seleccionar todos los movimientos pendientes"
@@ -1413,9 +1634,7 @@ function BankingSharedPendingChargesTable({
               return (
                 <tr key={row.id} className={BANKING_AUX_TX_TR_CLASS}>
                   <td className="align-middle px-1 py-3 text-center sm:px-1.5">
-                    <input
-                      type="checkbox"
-                      className={BANKING_AUX_CHECKBOX_CLASS}
+                    <BankingAuxRoundCheckbox
                       checked={checked}
                       onChange={() => onToggleRow(row.id)}
                       aria-label={`Seleccionar movimiento ${row.description ?? row.id}`}
@@ -1437,7 +1656,7 @@ function BankingSharedPendingChargesTable({
                       type="button"
                       disabled={markingSettledId === row.id}
                       onClick={() => void onMarkSettled(row)}
-                      className="rounded-md border border-emerald-600/45 bg-emerald-950/50 px-2 py-1 text-[11px] font-semibold text-emerald-200 transition hover:bg-emerald-900/55 disabled:cursor-wait disabled:opacity-40"
+                      className={bankingAuxActionBtnClass}
                     >
                       {markingSettledId === row.id ? "…" : "Liquidado"}
                     </button>
@@ -1475,7 +1694,7 @@ function BankingSharedPendingChargesTable({
 }
 
 const dateInputClass =
-  "mt-1.5 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-white outline-none focus:border-[#58a6ff] [color-scheme:dark]";
+  "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 [color-scheme:light]";
 
 function pickDate(e: React.MouseEvent<HTMLInputElement>) {
   const el = e.currentTarget;
@@ -1542,7 +1761,7 @@ function accountingYearRange(centerY: number): number[] {
   return out;
 }
 
-/** Sí / No tipo píldora segmentada (sitio oscuro GitHub-like). */
+/** Sí / No — píldoras pastel (tema Banking). */
 function SiNoField({
   label,
   yesLabel = "Sí",
@@ -1558,16 +1777,16 @@ function SiNoField({
 }) {
   return (
     <div className="space-y-1.5">
-      <span className="text-xs text-[#8b949e]">{label}</span>
-      <div className="flex gap-2 rounded-xl border border-[#30363d] bg-[#0d1117] p-1">
+      <span className="text-xs text-slate-500">{label}</span>
+      <div className="flex gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-1">
         <button
           type="button"
           aria-pressed={value === true}
           onClick={() => onChange(true)}
           className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
             value === true
-              ? "border border-emerald-500/50 bg-emerald-950/55 text-emerald-100 shadow-[inset_0_0_0_1px_rgba(74,222,128,0.25)]"
-              : "border border-transparent text-[#8b949e] hover:bg-[#21262d] hover:text-[#e6edf3]"
+              ? "border border-teal-300 bg-teal-100 text-teal-900 shadow-sm"
+              : "border border-transparent text-slate-600 hover:bg-white hover:text-slate-900"
           }`}
         >
           {yesLabel}
@@ -1578,8 +1797,8 @@ function SiNoField({
           onClick={() => onChange(false)}
           className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
             value === false
-              ? "border border-rose-500/45 bg-rose-950/45 text-rose-100 shadow-[inset_0_0_0_1px_rgba(251,113,133,0.2)]"
-              : "border border-transparent text-[#8b949e] hover:bg-[#21262d] hover:text-[#e6edf3]"
+              ? "border border-rose-200 bg-rose-100 text-rose-900 shadow-sm"
+              : "border border-transparent text-slate-600 hover:bg-white hover:text-slate-900"
           }`}
         >
           {noLabel}
@@ -1951,7 +2170,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     if (movementTab === "credit_card") params.set("scope", "credit_card");
     if (movementTab === "shared") params.set("scope", "shared");
 
-    const [acc, cats, txList, debt] = await Promise.all([
+    const [acc, cats, txList, debt, ccUg] = await Promise.all([
       fetchJson<BankingAccountRow[]>("/banking/accounts"),
       fetchJson<BankingCategoryRow[]>("/banking/categories"),
       fetchJson<{
@@ -1961,12 +2180,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         page_size: number;
       }>(`/banking/transactions?${params.toString()}`),
       fetchJson<BankingDebtTotalsOut>("/banking/debt-totals"),
+      fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>("/banking/credit-card/unpaid-grouped"),
     ]);
-    let groups: BankingCreditCardUnpaidGroup[] = [];
-    if (movementTab === "credit_card") {
-      const ug = await fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>("/banking/credit-card/unpaid-grouped");
-      groups = ug.groups;
-    }
+    const groups = ccUg.groups;
     let sharedGroups: BankingSharedUnsettledGroup[] = [];
     if (movementTab === "shared") {
       const ug = await fetchJson<{ groups: BankingSharedUnsettledGroup[] }>("/banking/shared/unsettled-grouped");
@@ -2146,9 +2362,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     [orderedVisibleBankingTxColumns],
   );
 
-  /** Ancho mínimo tabla pendientes TC (menos columnas + Pagado + acciones). */
+  /** Ancho mínimo tabla pendientes TC (checkbox + columnas + Pagado + acciones). */
   const pendingCcTableMinWidthPx = useMemo(
-    () => Math.max(440, bankingCcPendingVisibleColumns.length * 88 + 128 + 84),
+    () => Math.max(440, bankingCcPendingVisibleColumns.length * 88 + 128 + 84 + 44),
     [bankingCcPendingVisibleColumns],
   );
 
@@ -2171,6 +2387,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     const byId = new Map(rows.map((r) => [r.id, r]));
     return mergedIds.map((id) => byId.get(id)).filter((x): x is BankingAccountRow => x != null);
   }, [accounts, balanceCardOrderIds]);
+
+  const { byCheckingId: ccUnpaidByCheckingId, totalLinkedUnpaidClp } = useMemo(
+    () => creditCardUnpaidAllocatedByChecking(accounts, ccUnpaidGroups),
+    [accounts, ccUnpaidGroups],
+  );
 
   useEffect(() => {
     const rows = bankingNonCreditAccounts(accounts);
@@ -2700,19 +2921,22 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   }
 
   return (
+    <div className="banking-theme min-h-full bg-gradient-to-br from-slate-50 via-cyan-50/90 to-indigo-50/70 text-slate-800">
     <div className="mx-auto w-full max-w-[min(100%,1560px)] space-y-6 px-4 pb-28 pt-4 md:px-10 md:pt-6">
       {accounts.length > 0 ? (
         <section aria-labelledby="banking-account-balances-heading">
-          <h2 id="banking-account-balances-heading" className="mb-3 text-lg font-semibold text-white">
+          <h2 id="banking-account-balances-heading" className="mb-3 text-lg font-semibold text-slate-800">
             Saldos cuentas
           </h2>
           <DndContext sensors={columnDndSensors} collisionDetection={closestCenter} onDragEnd={handleBalanceCardDragEnd}>
             <div className="space-y-3 md:space-y-4">
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
                 {bankingNonCreditBalances.length > 0 ? (
-                  <BankingNonCreditTotalBalanceCard accounts={bankingNonCreditBalances} />
+                  <BankingNonCreditTotalBalanceCard
+                    liquidAccounts={bankingNonCreditBalances}
+                    creditCardUnpaidLinkedTotalClp={totalLinkedUnpaidClp}
+                  />
                 ) : null}
-                <BankingCreditCardUnpaidDebtCard amountClp={bankingDebtTotals.credit_card_unpaid_clp} />
                 <BankingSharedUnsettledDebtCard amountClp={bankingDebtTotals.shared_unsettled_clp} />
               </div>
               {bankingNonCreditBalances.length > 0 ? (
@@ -2722,7 +2946,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 >
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
                     {bankingNonCreditBalances.map((a) => (
-                      <SortableBankingBalanceCard key={a.id} account={a} />
+                      <SortableBankingBalanceCard
+                        key={a.id}
+                        account={a}
+                        creditCardUnpaidAllocatedClp={ccUnpaidByCheckingId.get(a.id) ?? 0}
+                      />
                     ))}
                   </div>
                 </SortableContext>
@@ -2739,10 +2967,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             role="tab"
             aria-selected={movementTab === "all"}
             onClick={() => setMovementTab("all")}
-            className={`rounded-t-lg px-4 py-2.5 text-sm font-medium transition ${
+            className={`rounded-t-xl px-5 py-2.5 text-sm font-medium transition ${
               movementTab === "all"
-                ? "border border-b-0 border-slate-600 bg-slate-900 text-white"
-                : "border border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                ? "border border-b-0 border-teal-200 bg-white text-teal-900 shadow-sm"
+                : "rounded-xl border border-transparent text-slate-600 hover:bg-white/70 hover:text-teal-800"
             }`}
           >
             Movimientos bancarios
@@ -2752,10 +2980,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             role="tab"
             aria-selected={movementTab === "credit_card"}
             onClick={() => setMovementTab("credit_card")}
-            className={`rounded-t-lg px-4 py-2.5 text-sm font-medium transition ${
+            className={`rounded-t-xl px-5 py-2.5 text-sm font-medium transition ${
               movementTab === "credit_card"
-                ? "border border-b-0 border-slate-600 bg-slate-900 text-white"
-                : "border border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                ? "border border-b-0 border-teal-200 bg-white text-teal-900 shadow-sm"
+                : "rounded-xl border border-transparent text-slate-600 hover:bg-white/70 hover:text-teal-800"
             }`}
           >
             Tarjeta de crédito
@@ -2765,10 +2993,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             role="tab"
             aria-selected={movementTab === "shared"}
             onClick={() => setMovementTab("shared")}
-            className={`rounded-t-lg px-4 py-2.5 text-sm font-medium transition ${
+            className={`rounded-t-xl px-5 py-2.5 text-sm font-medium transition ${
               movementTab === "shared"
-                ? "border border-b-0 border-slate-600 bg-slate-900 text-white"
-                : "border border-transparent text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+                ? "border border-b-0 border-teal-200 bg-white text-teal-900 shadow-sm"
+                : "rounded-xl border border-transparent text-slate-600 hover:bg-white/70 hover:text-teal-800"
             }`}
           >
             Pago compartido
@@ -2778,14 +3006,14 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         <div className="space-y-5 p-4 md:p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-semibold text-slate-800">
             {movementTab === "credit_card"
               ? "Tarjeta de crédito"
               : movementTab === "shared"
                 ? "Pago compartido"
                 : "Movimientos bancarios"}
           </h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-slate-600">
             {movementTab === "credit_card"
               ? "Cargos y pagos de TC; arriba, cargos pendientes por tarjeta para marcarlos pagados al liquidar."
               : movementTab === "shared"
@@ -2801,7 +3029,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               aria-haspopup="dialog"
               aria-controls="banking-tx-column-picker"
               onClick={() => setColumnPickerOpen((o) => !o)}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-white transition hover:border-slate-500 hover:bg-slate-700"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50/80"
             >
               <IconColumns className="h-4 w-4 text-slate-300" aria-hidden />
               Columnas
@@ -2811,7 +3039,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 id="banking-tx-column-picker"
                 role="dialog"
                 aria-label="Columnas de la tabla"
-                className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(calc(100vw-2rem),21rem)] rounded-xl border border-slate-600 bg-slate-900 p-3 shadow-2xl ring-1 ring-black/30"
+                className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(calc(100vw-2rem),21rem)] rounded-xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-300/40 ring-1 ring-slate-100"
               >
                 <p className="mb-1 text-[12px] font-medium uppercase tracking-wide text-slate-400">
                   Orden y visibilidad
@@ -2844,7 +3072,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 <button
                   type="button"
                   onClick={resetBankingTxColumns}
-                  className="mt-3 w-full rounded-lg border border-slate-600 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-slate-500 hover:bg-slate-800 hover:text-white"
+                  className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-900"
                 >
                   Restablecer orden y columnas
                 </button>
@@ -2853,7 +3081,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
           </div>
           <Link
             to="/banking/settings"
-            className="rounded-lg border border-slate-600 bg-slate-800 px-4 py-2 text-sm text-white transition hover:border-slate-500 hover:bg-slate-700"
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50"
           >
             Cuentas
           </Link>
@@ -2861,7 +3089,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             type="button"
             disabled={!hasVisibleAccount}
             onClick={openNew}
-            className="rounded-lg border border-[#166534] bg-[#22c55e]/90 px-4 py-2 text-sm font-medium text-white hover:bg-[#16a34a] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-xl border border-teal-400/80 bg-gradient-to-r from-teal-400 to-emerald-400 px-5 py-2 text-sm font-semibold text-white shadow-[0_6px_24px_-6px_rgba(20,184,166,0.45)] hover:from-teal-500 hover:to-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Nuevo movimiento
           </button>
@@ -2869,18 +3097,18 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       </div>
 
       {accounts.length === 0 && !loading && (
-        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200/90">
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900/90">
           Primero crea al menos un producto en{" "}
-          <Link to="/banking/settings" className="text-[#58a6ff] underline">
+          <Link to="/banking/settings" className="font-medium text-teal-700 underline decoration-teal-300 hover:text-teal-800">
             Cuentas
           </Link>
           .
         </p>
       )}
       {accounts.length > 0 && !hasVisibleAccount && !loading && (
-        <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200/90">
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900/90">
           Ningún producto está visible para movimientos. Activa al menos uno en{" "}
-          <Link to="/banking/settings" className="text-[#58a6ff] underline">
+          <Link to="/banking/settings" className="font-medium text-teal-700 underline decoration-teal-300 hover:text-teal-800">
             Cuentas
           </Link>
           .
@@ -2942,18 +3170,18 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 {bankingTxTotalPages > 1 ? (
                   <>
                     Página{" "}
-                    <strong className="tabular-nums text-slate-100">{bankingTxPage}</strong>/
-                    <strong className="tabular-nums text-slate-100">{bankingTxTotalPages}</strong>
+                    <strong className="tabular-nums text-slate-800">{bankingTxPage}</strong>/
+                    <strong className="tabular-nums text-slate-800">{bankingTxTotalPages}</strong>
                     {" · "}
                   </>
                 ) : null}
-                <strong className="tabular-nums text-slate-100">{bankingTxTotal}</strong> movimientos
+                <strong className="tabular-nums text-slate-800">{bankingTxTotal}</strong> movimientos
                 {filteredBankingTxItems.length !== items.length && items.length > 0 ? (
                   <>
                     {" · "}
-                    <strong className="tabular-nums text-emerald-400">{filteredBankingTxItems.length}</strong>
+                    <strong className="tabular-nums text-teal-700">{filteredBankingTxItems.length}</strong>
                     {" / "}
-                    <strong className="tabular-nums text-slate-100">{items.length}</strong>
+                    <strong className="tabular-nums text-slate-800">{items.length}</strong>
                     <span className="text-slate-500"> en esta página</span>
                   </>
                 ) : null}
@@ -2962,7 +3190,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 <button
                   type="button"
                   onClick={clearBankingTxFilters}
-                  className="rounded-md border border-slate-600 bg-slate-800 px-2.5 py-1 text-xs font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-700"
+                  className={bankingToolbarGhostBtnClass}
                 >
                   Limpiar filtros
                 </button>
@@ -2970,12 +3198,12 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             </div>
             {filteredBankingTxItems.length === 0 ? (
               <div className="px-6 py-14 text-center">
-                <p className="text-sm font-medium text-slate-100">Ningún movimiento coincide con los filtros</p>
+                <p className="text-sm font-medium text-slate-800">Ningún movimiento coincide con los filtros</p>
                 <p className="mt-1 text-xs text-slate-400">Ajusta los filtros en los encabezados o pulsa «Limpiar filtros».</p>
                 <button
                   type="button"
                   onClick={clearBankingTxFilters}
-                  className="mt-4 rounded-lg border border-[#58a6ff]/40 bg-[#58a6ff]/10 px-4 py-2 text-sm font-medium text-[#58a6ff] transition hover:bg-[#58a6ff]/20"
+                  className="mt-4 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-900 shadow-sm transition hover:bg-teal-100"
                 >
                   Limpiar filtros
                 </button>
@@ -2997,7 +3225,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       {orderedVisibleBankingTxColumns.map((colKey) => (
                         <BankingTxColumnHeader key={colKey} colKey={colKey} />
                       ))}
-                      <th className="px-1.5 py-3 text-center text-[12px] font-semibold uppercase tracking-wide text-slate-400 sm:px-2" aria-label="Acciones" />
+                      <th className="px-1.5 py-3 text-center text-[12px] font-semibold uppercase tracking-wide text-teal-900/75 sm:px-2" aria-label="Acciones" />
                     </tr>
                   </thead>
                   <tbody className={BANKING_MAIN_TX_TBODY_CLASS}>
@@ -3062,7 +3290,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 </table>
                 <div className={BANKING_MAIN_TX_FOOTER_CLASS}>
                   <p className="text-[12px] leading-snug text-slate-400">
-                    Hasta <strong className="text-slate-100">{BANKING_TX_PAGE_SIZE}</strong> movimientos por página.
+                    Hasta <strong className="text-slate-800">{BANKING_TX_PAGE_SIZE}</strong> movimientos por página.
                     {filterAccountId !== "" ? (
                       <span className="text-slate-500"> Cuenta acotada en servidor.</span>
                     ) : null}
@@ -3072,19 +3300,19 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       type="button"
                       disabled={loading || bankingTxPage <= 1}
                       onClick={() => void goBankingTxPage(bankingTxPage - 1)}
-                      className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-35"
+                      className={bankingToolbarGhostBtnMdClass}
                     >
                       Anterior
                     </button>
-                    <span className="text-xs tabular-nums text-slate-300">
-                      Página <strong className="text-white">{bankingTxPage}</strong> /{" "}
-                      <strong className="text-white">{bankingTxTotalPages}</strong>
+                    <span className="text-xs tabular-nums text-slate-600">
+                      Página <strong className="text-slate-800">{bankingTxPage}</strong> /{" "}
+                      <strong className="text-slate-800">{bankingTxTotalPages}</strong>
                     </span>
                     <button
                       type="button"
                       disabled={loading || bankingTxPage >= bankingTxTotalPages}
                       onClick={() => void goBankingTxPage(bankingTxPage + 1)}
-                      className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-100 transition hover:border-slate-500 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-35"
+                      className={bankingToolbarGhostBtnMdClass}
                     >
                       Siguiente
                     </button>
@@ -3098,7 +3326,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     ref={filterPopoverPanelRef}
                     role="dialog"
                     aria-label={`Filtro: ${BANKING_TX_COLUMN_LABELS[headerFilterOpen]}`}
-                    className="rounded-xl border border-slate-600 bg-slate-900 p-3 shadow-xl ring-1 ring-black/30"
+                    className="rounded-xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-900/10 ring-1 ring-slate-100"
                     style={{
                       position: "fixed",
                       top: headerFilterPopoverPos.top,
@@ -3123,19 +3351,19 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
       {modalOpen && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[2px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="banking-tx-modal-title"
         >
-          <div className="tx-scroll max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-[#30363d] bg-[#161b22] p-6 shadow-xl">
-            <h3 id="banking-tx-modal-title" className="text-base font-semibold text-white">
+          <div className="tx-scroll max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-2xl shadow-teal-900/10">
+            <h3 id="banking-tx-modal-title" className="text-base font-semibold text-slate-900">
               {editing ? "Editar movimiento" : "Nuevo movimiento"}
             </h3>
 
             <div className="mt-5 space-y-4">
               <label className="block">
-                <span className="text-xs text-[#8b949e]">Fecha de la transacción</span>
+                <span className="text-xs text-slate-500">Fecha de la transacción</span>
                 <input
                   type="date"
                   value={fecha}
@@ -3150,11 +3378,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               </label>
 
               <label className="block">
-                <span className="text-xs text-[#8b949e]">Producto o cuenta</span>
+                <span className="text-xs text-slate-500">Producto o cuenta</span>
                 <select
                   value={accountId === "" ? "" : String(accountId)}
                   onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
-                  className="mt-1.5 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-white outline-none focus:border-[#58a6ff]"
+                  className={bankingModalControlClass}
                 >
                   {accountOptions.map((a) => (
                     <option key={a.id} value={a.id}>
@@ -3165,29 +3393,29 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               </label>
 
               <label className="block">
-                <span className="text-xs text-[#8b949e]">Descripción</span>
+                <span className="text-xs text-slate-500">Descripción</span>
                 <input
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-white outline-none focus:border-[#58a6ff]"
+                  className={bankingModalControlClass}
                   placeholder="Ej. Supermercado, transferencia…"
                   required
                 />
               </label>
 
               <label className="block">
-                <span className="text-xs text-[#8b949e]">Monto (positivo = ingreso, negativo = egreso)</span>
+                <span className="text-xs text-slate-500">Monto (positivo = ingreso, negativo = egreso)</span>
                 <input
                   inputMode="decimal"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-white outline-none focus:border-[#58a6ff]"
+                  className={bankingModalControlClass}
                   placeholder="Ej. 50000 o -12000"
                 />
               </label>
 
               <div ref={categoryMenuRef} className="space-y-1.5">
-                <span id="banking-tx-category-label" className="text-xs text-[#8b949e]">
+                <span id="banking-tx-category-label" className="text-xs text-slate-500">
                   Categoría
                 </span>
                 <button
@@ -3198,10 +3426,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   aria-labelledby="banking-tx-category-label"
                   disabled={categoryOptions.length === 0}
                   onClick={() => categoryOptions.length > 0 && setCategoryMenuOpen((o) => !o)}
-                  className="flex w-full items-center justify-between gap-2 overflow-hidden rounded-lg border border-slate-600 bg-slate-950 py-2 pl-3 pr-3 text-left text-sm outline-none transition hover:border-slate-500 focus:border-sky-500 disabled:cursor-not-allowed disabled:opacity-40"
+                  className={bankingModalCategoryTriggerClass}
                 >
                   <span
-                    className={`min-w-0 flex-1 truncate font-semibold ${selectedCategory ? "text-slate-100" : "text-slate-500"}`}
+                    className={`min-w-0 flex-1 truncate font-semibold ${selectedCategory ? "text-slate-800" : "text-slate-500"}`}
                   >
                     {selectedCategory?.name ?? "Selecciona categoría"}
                   </span>
@@ -3209,7 +3437,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden
-                    className={`h-5 w-5 shrink-0 text-[#8b949e] transition ${categoryMenuOpen ? "rotate-180" : ""}`}
+                    className={`h-5 w-5 shrink-0 text-slate-500 transition ${categoryMenuOpen ? "rotate-180" : ""}`}
                   >
                     <path
                       fillRule="evenodd"
@@ -3222,11 +3450,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
               {categoryId !== "" && (
                 <label className="block">
-                  <span className="text-xs text-[#8b949e]">Subcategoría</span>
+                  <span className="text-xs text-slate-500">Subcategoría</span>
                   <select
                     value={subcategoryId === "" ? "" : String(subcategoryId)}
                     onChange={(e) => setSubcategoryId(e.target.value ? Number(e.target.value) : "")}
-                    className="mt-1.5 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-white outline-none focus:border-[#58a6ff]"
+                    className={bankingModalControlClass}
                     disabled={subOptions.length === 0}
                   >
                     {subOptions.map((s) => (
@@ -3240,13 +3468,13 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
               {isOwnAccountsTransfer && !editing && (
                 <label className="block">
-                  <span className="text-xs text-[#8b949e]">¿A qué producto va la transferencia?</span>
+                  <span className="text-xs text-slate-500">¿A qué producto va la transferencia?</span>
                   <select
                     value={transferDestinationAccountId === "" ? "" : String(transferDestinationAccountId)}
                     onChange={(e) =>
                       setTransferDestinationAccountId(e.target.value ? Number(e.target.value) : "")
                     }
-                    className="mt-1.5 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-white outline-none focus:border-[#58a6ff]"
+                    className={bankingModalControlClass}
                     disabled={transferDestinationOptions.length === 0}
                   >
                     <option value="">Selecciona cuenta destino…</option>
@@ -3256,12 +3484,12 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       </option>
                     ))}
                   </select>
-                  <p className="mt-1.5 text-[12px] leading-snug text-[#8b949e]">
+                  <p className="mt-1.5 text-[12px] leading-snug text-slate-500">
                     No puede ser la cuenta de este movimiento ni una tarjeta de crédito. Se creará un segundo
                     movimiento en la cuenta destino con el monto de signo contrario.
                   </p>
                   {transferDestinationOptions.length === 0 && (
-                    <p className="mt-1 text-[12px] text-amber-200/90">
+                    <p className="mt-1 text-[12px] text-amber-800/90">
                       No hay otra cuenta disponible. Crea otra cuenta (no tarjeta) en Cuentas.
                     </p>
                   )}
@@ -3269,7 +3497,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               )}
 
               <div ref={scopeMenuRef} className="relative space-y-1.5">
-                <span id="banking-tx-scope-label" className="text-xs text-[#8b949e]">
+                <span id="banking-tx-scope-label" className="text-xs text-slate-500">
                   Tipo de movimiento
                 </span>
                 <button
@@ -3279,10 +3507,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   aria-haspopup="listbox"
                   aria-labelledby="banking-tx-scope-label"
                   onClick={() => setScopeMenuOpen((o) => !o)}
-                  className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-[#58a6ff]/35 ${
+                  className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-teal-300/50 ${
                     isShared
-                      ? "border-violet-500/40 bg-gradient-to-br from-violet-950/50 to-[#0d1117] text-violet-100 ring-1 ring-violet-500/20"
-                      : "border-emerald-500/35 bg-gradient-to-br from-emerald-950/40 to-[#0d1117] text-emerald-50 ring-1 ring-emerald-500/15"
+                      ? "border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 text-violet-900 ring-1 ring-violet-100"
+                      : "border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50 text-teal-900 ring-1 ring-teal-100"
                   }`}
                 >
                   <span>
@@ -3310,15 +3538,15 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 </button>
 
                 {isShared && (
-                  <div className="space-y-4 border-t border-[#30363d]/50 pt-4">
-                    <div className="overflow-hidden rounded-xl border border-[#30363d] bg-[#0d1117]/80">
+                  <div className="space-y-4 border-t border-slate-200 pt-4">
+                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
                       <table className="w-full border-collapse text-sm">
                         <thead>
-                          <tr className="border-b border-[#30363d] bg-[#21262d]/90">
-                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[#8b949e]">
+                          <tr className="border-b border-slate-200 bg-white">
+                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                               Personas
                             </th>
-                            <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[#8b949e]">
+                            <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
                               Monto P/P
                             </th>
                           </tr>
@@ -3332,10 +3560,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                                 min={1}
                                 value={splitParticipants}
                                 onChange={(e) => setSplitParticipants(e.target.value)}
-                                className="w-[4.25rem] rounded-lg border border-[#30363d] bg-[#161b22] px-2 py-1.5 text-center font-mono text-sm text-white outline-none focus:border-[#58a6ff]"
+                                className="w-[4.25rem] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center font-mono text-sm text-slate-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 [color-scheme:light]"
                               />
                             </td>
-                            <td className="px-3 py-2 text-right font-mono text-[#e6edf3]">
+                            <td className="px-3 py-2 text-right font-mono text-slate-800">
                               {amountPerPersonLabel}
                             </td>
                           </tr>
@@ -3369,19 +3597,19 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               )}
 
               <div ref={accountingMonthWrapRef} className="block">
-                <span id="banking-tx-accounting-month-label" className="text-xs text-[#8b949e]">
+                <span id="banking-tx-accounting-month-label" className="text-xs text-slate-500">
                   Mes contable
                 </span>
                 <div
                   ref={accountingMonthTriggerRef}
                   role="group"
                   aria-labelledby="banking-tx-accounting-month-label"
-                  className="mt-1.5 flex min-h-[42px] items-center justify-between gap-2 rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm outline-none transition hover:border-[#484f58] focus-within:border-[#58a6ff] focus-within:ring-2 focus-within:ring-[#58a6ff]/25 [color-scheme:dark]"
+                  className="mt-1.5 flex min-h-[42px] items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none shadow-sm transition hover:border-slate-300 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-400/20 [color-scheme:light]"
                 >
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                     <button
                       type="button"
-                      className="rounded-md px-2 py-1 text-left text-[#e6edf3] transition hover:bg-[#21262d] hover:text-[#58a6ff] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff]/40"
+                      className="rounded-md px-2 py-1 text-left text-slate-800 transition hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60"
                       aria-label={`Mes: ${ACCOUNTING_MONTH_ABBR_ES[accountingYmParts.m - 1]}`}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -3392,7 +3620,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     </button>
                     <button
                       type="button"
-                      className="rounded-md px-2 py-1 tabular-nums text-[#e6edf3] transition hover:bg-[#21262d] hover:text-[#58a6ff] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff]/40"
+                      className="rounded-md px-2 py-1 tabular-nums text-slate-800 transition hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60"
                       aria-label={`Año: ${accountingYmParts.y}`}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -3404,7 +3632,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   </div>
                   <button
                     type="button"
-                    className="shrink-0 rounded-md p-1 text-[#8b949e] outline-none transition hover:bg-[#21262d] hover:text-[#58a6ff] focus-visible:ring-2 focus-visible:ring-[#58a6ff]/40"
+                    className="shrink-0 rounded-md p-1 text-slate-500 outline-none transition hover:bg-teal-50 hover:text-teal-700 focus-visible:ring-2 focus-visible:ring-teal-300/60"
                     aria-label="Elegir mes"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -3414,7 +3642,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     <IconCalendar className="h-5 w-5" />
                   </button>
                 </div>
-                <span className="mt-1 block text-[12px] text-[#8b949e]">
+                <span className="mt-1 block text-[12px] text-slate-500">
                   Por defecto coincide con el mes de la fecha de la transacción (útil para filtros y reportes). Pulsa el
                   mes o el ícono para los meses; pulsa el año para elegir año.
                 </span>
@@ -3432,7 +3660,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   setAccountingPickMode(null);
                   setProvisionReversalOnSave(false);
                 }}
-                className="rounded-lg border border-[#30363d] px-4 py-2 text-sm text-[#e6edf3] hover:bg-[#21262d]"
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50"
               >
                 Cancelar
               </button>
@@ -3449,7 +3677,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     (transferDestinationAccountId === "" || transferDestinationOptions.length === 0))
                 }
                 onClick={() => void saveModal()}
-                className="rounded-lg border border-[#166534] bg-[#22c55e]/90 px-4 py-2 text-sm font-medium text-white hover:bg-[#16a34a] disabled:opacity-40"
+                className="rounded-xl border border-teal-400/80 bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:from-teal-600 hover:to-emerald-600 disabled:opacity-40"
               >
                 {saving ? "Guardando…" : editing ? "Guardar cambios" : "Registrar"}
               </button>
@@ -3471,25 +3699,25 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: scopePanelBox.width,
               zIndex: 9999,
             }}
-            className="overflow-hidden rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl ring-1 ring-black/40"
+            className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 ring-1 ring-slate-100"
           >
             <div className="grid gap-2 p-2 sm:grid-cols-2">
               <button
                 type="button"
                 role="option"
                 aria-selected={!isShared}
-                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-emerald-500/40 ${
+                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-teal-300/60 ${
                   !isShared
-                    ? "border-emerald-400/55 bg-emerald-950/55 ring-2 ring-emerald-500/30"
-                    : "border-emerald-600/25 bg-emerald-950/20 hover:border-emerald-500/45 hover:bg-emerald-950/35"
+                    ? "border-teal-300 bg-teal-50 ring-2 ring-teal-200"
+                    : "border-slate-200 bg-white hover:border-teal-200 hover:bg-teal-50/50"
                 }`}
                 onClick={() => {
                   setIsShared(false);
                   setScopeMenuOpen(false);
                 }}
               >
-                <span className="block text-sm font-semibold text-emerald-100">Personal</span>
-                <span className="mt-1 block text-[12px] leading-snug text-emerald-200/75">
+                <span className="block text-sm font-semibold text-teal-900">Personal</span>
+                <span className="mt-1 block text-[12px] leading-snug text-teal-700/85">
                   Movimiento individual
                 </span>
               </button>
@@ -3497,18 +3725,18 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 type="button"
                 role="option"
                 aria-selected={isShared}
-                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-500/40 ${
+                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-300/60 ${
                   isShared
-                    ? "border-violet-400/55 bg-violet-950/55 ring-2 ring-violet-500/35"
-                    : "border-violet-600/25 bg-violet-950/25 hover:border-violet-500/45 hover:bg-violet-950/45"
+                    ? "border-violet-300 bg-violet-50 ring-2 ring-violet-200"
+                    : "border-slate-200 bg-white hover:border-violet-200 hover:bg-violet-50/50"
                 }`}
                 onClick={() => {
                   setIsShared(true);
                   setScopeMenuOpen(false);
                 }}
               >
-                <span className="block text-sm font-semibold text-violet-100">Compartido</span>
-                <span className="mt-1 block text-[12px] leading-snug text-violet-200/75">
+                <span className="block text-sm font-semibold text-violet-900">Compartido</span>
+                <span className="mt-1 block text-[12px] leading-snug text-violet-700/85">
                   Reparto entre personas
                 </span>
               </button>
@@ -3531,7 +3759,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: categoryPanelBox.width,
               zIndex: 10000,
             }}
-            className="tx-scroll max-h-56 overflow-y-auto rounded-xl border border-slate-600 bg-slate-900 py-1 shadow-2xl ring-1 ring-black/40"
+            className="tx-scroll max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-100"
           >
             {categoryOptions.map((c) => {
               const sel = c.id === categoryId;
@@ -3541,8 +3769,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   type="button"
                   role="option"
                   aria-selected={sel}
-                  className={`flex w-full border-b border-slate-700/60 py-2.5 pl-3 pr-3 text-left text-sm font-semibold transition last:border-b-0 ${
-                    sel ? "bg-slate-800 text-sky-400" : "text-slate-100 hover:bg-slate-800/80"
+                  className={`flex w-full border-b border-slate-100 py-2.5 pl-3 pr-3 text-left text-sm font-semibold transition last:border-b-0 ${
+                    sel ? "bg-teal-50 text-teal-900" : "text-slate-800 hover:bg-slate-50"
                   }`}
                   onClick={() => {
                     setCategoryId(c.id);
@@ -3572,7 +3800,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: accountingMonthPanelBox.width,
               zIndex: 10001,
             }}
-            className="overflow-hidden rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl ring-1 ring-black/40"
+            className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 ring-1 ring-slate-100"
           >
             {accountingPickMode === "month" ? (
               <div className="grid grid-cols-3 gap-1 p-2">
@@ -3585,8 +3813,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       type="button"
                       className={`rounded-lg px-2 py-2 text-sm font-medium transition ${
                         sel
-                          ? "bg-[#21262d] text-[#58a6ff] ring-2 ring-[#58a6ff]/35"
-                          : "text-[#e6edf3] hover:bg-[#21262d]"
+                          ? "bg-teal-100 text-teal-900 ring-2 ring-teal-300"
+                          : "text-slate-800 hover:bg-slate-50"
                       }`}
                       onClick={() => {
                         setAccountingMonthYm(buildYm(accountingYmParts.y, mi));
@@ -3609,8 +3837,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                         type="button"
                         className={`rounded-lg px-2 py-2 text-sm tabular-nums transition ${
                           sel
-                            ? "bg-[#21262d] text-[#58a6ff] ring-2 ring-[#58a6ff]/35"
-                            : "text-[#e6edf3] hover:bg-[#21262d]"
+                            ? "bg-teal-100 text-teal-900 ring-2 ring-teal-300"
+                            : "text-slate-800 hover:bg-slate-50"
                         }`}
                         onClick={() => {
                           setAccountingMonthYm(buildYm(yy, accountingYmParts.m));
@@ -3627,6 +3855,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
           </div>,
           document.body,
         )}
+    </div>
     </div>
   );
 }
