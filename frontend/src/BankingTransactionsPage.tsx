@@ -55,6 +55,11 @@ function bankingNonCreditAccounts(accounts: BankingAccountRow[]): BankingAccount
   return accounts.filter((a) => (a.enabled ?? true) && a.product_type !== "tarjeta_credito");
 }
 
+/** Configuración: cuenta líquida incluida en la tarjeta «Saldo real» del resumen. */
+function bankingAccountIncludedInTotalBalance(a: BankingAccountRow): boolean {
+  return (a.include_in_total_balance ?? true) !== false;
+}
+
 function bankingAccountAtBank(a: BankingAccountRow): number {
   const p = a.provision_net_sum ?? 0;
   return a.balance_at_bank !== undefined ? a.balance_at_bank : a.balance - p;
@@ -281,8 +286,9 @@ function BankingAccountBalanceCard({
 }
 
 /**
- * Saldo real (libro neto TC): suma saldos libro líquidos − deuda pendiente solo de TC con cuenta asociada.
- * Saldo actual: suma saldos «en banco» (libro − neto provisiones), sin restar TC.
+ * Saldo real (libro neto TC): suma saldos libro de cuentas líquidas **incluidas en total**
+ * menos deuda TC solo de tarjetas cuya cuenta corriente enlazada está incluida.
+ * Saldo actual: suma saldos «en banco» en esas mismas cuentas.
  */
 function BankingNonCreditTotalBalanceCard({
   liquidAccounts,
@@ -323,7 +329,7 @@ function BankingNonCreditTotalBalanceCard({
 
       <p
         className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-emerald-950"
-        title="Suma de saldos libro (incluye provisiones en libro) en cuentas líquidas, menos cargos TC no pagados solo en tarjetas con cuenta corriente asociada."
+        title="Suma de saldos libro (provisiones incluidas) solo en cuentas líquidas marcadas «incluir en saldo total» en Configuración; menos cargos TC no pagados asociados a cuentas corrientes igualmente incluidas."
       >
         {formatClpDots(totalReal)}
       </p>
@@ -335,7 +341,7 @@ function BankingNonCreditTotalBalanceCard({
             <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-950/90">Saldo actual</p>
             <p
               className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-700"
-              title="Suma de saldos «en banco» por cuenta líquida (movimientos sin efecto neto de categoría Provisiones)."
+              title="Suma de saldos «en banco» solo en cuentas incluidas en el total (sin efecto neto de Provisiones)."
             >
               {formatClpDots(totalAtBank)}
             </p>
@@ -345,7 +351,7 @@ function BankingNonCreditTotalBalanceCard({
               <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-950/90">Deuda TC</p>
               <p
                 className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-600"
-                title="Suma de cargos en tarjetas con cuenta corriente asociada marcados como no pagados."
+                title="Suma de cargos TC no pagados solo si la cuenta corriente de liquidación está incluida en el total (Configuración)."
               >
                 {formatClpDots(unpaidLinked)}
               </p>
@@ -355,7 +361,7 @@ function BankingNonCreditTotalBalanceCard({
             <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-950/90">Provisiones</p>
             <p
               className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-600"
-              title="Suma por cuenta del valor absoluto del neto en Provisiones."
+              title="Suma del valor absoluto del neto en Provisiones solo en cuentas incluidas en el total."
             >
               {formatClpDots(provisionSumDisplay)}
             </p>
@@ -2564,7 +2570,26 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     return mergedIds.map((id) => byId.get(id)).filter((x): x is BankingAccountRow => x != null);
   }, [accounts, balanceCardOrderIds]);
 
-  const { byCheckingId: ccUnpaidByCheckingId, totalLinkedUnpaidClp } = useMemo(
+  /** Solo cuentas marcadas para sumar en la tarjeta Total (Configuración → Productos). */
+  const bankingNonCreditBalancesForTotal = useMemo(
+    () => bankingNonCreditBalances.filter(bankingAccountIncludedInTotalBalance),
+    [bankingNonCreditBalances],
+  );
+
+  const totalLinkedUnpaidForTotalCard = useMemo(() => {
+    const includedCheckingIds = new Set(bankingNonCreditBalancesForTotal.map((a) => a.id));
+    let s = 0;
+    for (const g of ccUnpaidGroups) {
+      const tc = accounts.find((x) => x.id === g.account_id);
+      if (!tc || tc.product_type !== "tarjeta_credito") continue;
+      const lid = tc.linked_checking_account_id;
+      if (lid == null || !includedCheckingIds.has(lid)) continue;
+      s += sumUnpaidTcDebtFromItems(g.items);
+    }
+    return s;
+  }, [accounts, ccUnpaidGroups, bankingNonCreditBalancesForTotal]);
+
+  const { byCheckingId: ccUnpaidByCheckingId } = useMemo(
     () => creditCardUnpaidAllocatedByChecking(accounts, ccUnpaidGroups),
     [accounts, ccUnpaidGroups],
   );
@@ -3108,8 +3133,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
                 {bankingNonCreditBalances.length > 0 ? (
                   <BankingNonCreditTotalBalanceCard
-                    liquidAccounts={bankingNonCreditBalances}
-                    creditCardUnpaidLinkedTotalClp={totalLinkedUnpaidClp}
+                    liquidAccounts={bankingNonCreditBalancesForTotal}
+                    creditCardUnpaidLinkedTotalClp={totalLinkedUnpaidForTotalCard}
                   />
                 ) : null}
                 <BankingSharedUnsettledDebtCard amountClp={bankingDebtTotals.shared_unsettled_clp} />

@@ -233,6 +233,11 @@ export interface BankingAccountRow {
   linked_checking_account_name: string | null;
   /** Si aparece en el selector de cuenta al crear movimientos. */
   enabled: boolean;
+  /**
+   * Si la cuenta líquida suma en la tarjeta «Saldo real» (total) del resumen en Movimientos.
+   * Tarjeta de crédito no aplica al total líquido; el valor puede ignorarse en UI.
+   */
+  include_in_total_balance?: boolean;
   /** Si tiene movimientos registrados no se puede eliminar (solo desactivar). */
   has_transactions?: boolean;
 }

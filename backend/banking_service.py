@@ -1407,6 +1407,7 @@ def banking_account_to_out(
         "linked_checking_account_id": linked_id,
         "linked_checking_account_name": linked_name,
         "enabled": bool(getattr(acc, "enabled", True)),
+        "include_in_total_balance": bool(getattr(acc, "include_in_total_balance", True)),
         "has_transactions": n_tx > 0,
     }
 

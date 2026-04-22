@@ -197,6 +197,8 @@ class BankingAccount(Base):
     linked_checking_account_id = Column(Integer, ForeignKey("banking_accounts.id"), nullable=True, index=True)
     # Si False, no aparece en selectores de nuevos movimientos (el saldo sigue en backend).
     enabled = Column(Boolean, nullable=False, default=True)
+    # Si False, no suma en el total «Saldo real» del resumen (p. ej. cuenta respaldo / transitoria).
+    include_in_total_balance = Column(Boolean, nullable=False, default=True)
     # Saldo del libro: opening_balance + sum(movimientos). Se recalcula tras cada movimiento.
     opening_balance = Column(Float, nullable=False, default=0.0)
     balance = Column(Float, nullable=False, default=0.0)

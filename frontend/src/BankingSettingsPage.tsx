@@ -327,6 +327,8 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
   const [productName, setProductName] = useState("");
   /** Visible en selector de movimientos (solo CLP en backend). */
   const [accountEnabledModal, setAccountEnabledModal] = useState(true);
+  /** Solo cuentas líquidas: si suma en la tarjeta «Saldo real» del resumen en Movimientos. */
+  const [includeInTotalModal, setIncludeInTotalModal] = useState(true);
   const [productType, setProductType] = useState<BankingProductType>("cuenta_corriente");
   const [bankSbif, setBankSbif] = useState("");
   const [linkedCheckingId, setLinkedCheckingId] = useState<number | "">("");
@@ -525,6 +527,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
     setEditingAccount(null);
     setProductName("");
     setAccountEnabledModal(true);
+    setIncludeInTotalModal(true);
     setProductType("cuenta_corriente");
     setBankSbif("");
     setLinkedCheckingId("");
@@ -535,6 +538,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
     setEditingAccount(a);
     setProductName(a.name);
     setAccountEnabledModal(a.enabled ?? true);
+    setIncludeInTotalModal(a.include_in_total_balance !== false);
     setProductType(a.product_type ?? "cuenta_corriente");
     setBankSbif(a.bank_sbif ?? "");
     setLinkedCheckingId(a.linked_checking_account_id ?? "");
@@ -559,6 +563,8 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
     }
     setSaving(true);
     try {
+      const liquidExtras =
+        productType !== "tarjeta_credito" ? { include_in_total_balance: includeInTotalModal } : {};
       if (editingAccount) {
         await patchJson<BankingAccountRow>(`/banking/accounts/${editingAccount.id}`, {
           name: n,
@@ -567,6 +573,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
           enabled: accountEnabledModal,
           linked_checking_account_id:
             productType === "tarjeta_credito" ? Number(linkedCheckingId) : null,
+          ...liquidExtras,
         });
         onToast("Producto actualizado ✅");
       } else {
@@ -578,6 +585,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
           enabled: accountEnabledModal,
           linked_checking_account_id:
             productType === "tarjeta_credito" ? Number(linkedCheckingId) : null,
+          ...liquidExtras,
         });
         onToast("Producto creado ✅");
       }
@@ -595,6 +603,18 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
     setBusyKey(`acc-en-${a.id}`);
     try {
       await patchJson(`/banking/accounts/${a.id}`, { enabled: next });
+      await load();
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : "No se pudo actualizar");
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function setAccountIncludeInTotalRow(a: BankingAccountRow, next: boolean) {
+    setBusyKey(`acc-tot-${a.id}`);
+    try {
+      await patchJson(`/banking/accounts/${a.id}`, { include_in_total_balance: next });
       await load();
     } catch (e) {
       onToast(e instanceof Error ? e.message : "No se pudo actualizar");
@@ -784,7 +804,8 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
               Productos
             </h3>
             <p className="mt-1 text-sm text-slate-500">
-              Activa o desactiva la visibilidad en «Nuevo movimiento». El saldo se gestiona solo en el backend.
+              Activa la visibilidad en «Nuevo movimiento» y, en cuentas líquidas, si suman en el «Saldo real» del
+              resumen en Movimientos (excluye respaldos o cuentas transitorias). El saldo se gestiona en el backend.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -815,12 +836,18 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <div
-                      className="flex items-center"
+                      className="flex items-center gap-1"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                       }}
                     >
+                      <span
+                        className="max-w-[3.25rem] shrink-0 text-[10px] leading-tight text-slate-500"
+                        title="Visible al registrar movimientos"
+                      >
+                        Activa
+                      </span>
                       <BankingEnabledToggle
                         enabled={a.enabled ?? true}
                         disabled={busyKey !== null}
@@ -833,6 +860,33 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                         ariaLabel={`Producto «${a.name}»: ${(a.enabled ?? true) ? "visible en movimientos" : "oculto"}`}
                       />
                     </div>
+                    {a.product_type !== "tarjeta_credito" ? (
+                      <div
+                        className="flex items-center gap-1"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                      >
+                        <span
+                          className="max-w-[3.25rem] shrink-0 text-[10px] leading-tight text-slate-500"
+                          title="Incluir en saldo total del resumen en Movimientos"
+                        >
+                          En total
+                        </span>
+                        <BankingEnabledToggle
+                          enabled={a.include_in_total_balance !== false}
+                          disabled={busyKey !== null}
+                          onChange={(next) => void setAccountIncludeInTotalRow(a, next)}
+                          title={
+                            (a.include_in_total_balance !== false)
+                              ? "Incluida en el saldo total del resumen"
+                              : "Excluida del saldo total (respaldos / transitorias)"
+                          }
+                          ariaLabel={`«${a.name}»: ${a.include_in_total_balance !== false ? "incluida en saldo total" : "excluida del saldo total"}`}
+                        />
+                      </div>
+                    ) : null}
                     <button
                       type="button"
                       title="Editar producto"
@@ -1621,9 +1675,10 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
               ) : null}
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-3 shadow-sm">
                 <div className="min-w-0">
-                  <span className="text-xs font-medium text-slate-800">Visible al registrar movimientos</span>
+                  <span className="text-xs font-medium text-slate-800">Activa</span>
                   <p className="mt-1 text-[11px] leading-snug text-slate-500">
-                    Si está desactivado, no aparece al elegir cuenta en movimientos (solo CLP en el sistema).
+                    Visible al registrar movimientos. Si está desactivado, no aparece al elegir cuenta (solo CLP en el
+                    sistema).
                   </p>
                 </div>
                 <BankingEnabledToggle
@@ -1634,6 +1689,33 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                   ariaLabel={accountEnabledModal ? "Producto visible al registrar movimientos" : "Producto oculto"}
                 />
               </div>
+              {productType !== "tarjeta_credito" ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-3 shadow-sm">
+                  <div className="min-w-0">
+                    <span className="text-xs font-medium text-slate-800">En total</span>
+                    <p className="mt-1 text-[11px] leading-snug text-slate-500">
+                      Incluir en «Saldo real» del resumen en Movimientos. Si está desactivado, la cuenta no suma en la
+                      tarjeta Total (útil para respaldos o transitorias). La deuda de tarjeta asociada a esta cuenta
+                      tampoco descuenta ese total.
+                    </p>
+                  </div>
+                  <BankingEnabledToggle
+                    enabled={includeInTotalModal}
+                    disabled={saving}
+                    onChange={(next) => setIncludeInTotalModal(next)}
+                    title={
+                      includeInTotalModal
+                        ? "Suma en el total del resumen en Movimientos"
+                        : "No suma en el total del resumen"
+                    }
+                    ariaLabel={
+                      includeInTotalModal
+                        ? "Incluir esta cuenta líquida en el saldo total del resumen"
+                        : "Excluir esta cuenta del saldo total del resumen"
+                    }
+                  />
+                </div>
+              ) : null}
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button

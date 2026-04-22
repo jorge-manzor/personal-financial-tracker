@@ -394,6 +394,16 @@ def _migrate_banking_schema() -> None:
                     text("ALTER TABLE banking_accounts ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1")
                 )
                 logger.info("Migración banking_accounts: columna enabled añadida")
+            r = conn.execute(text("PRAGMA table_info(banking_accounts)"))
+            acols_tot = {row[1] for row in r.fetchall()}
+            if "include_in_total_balance" not in acols_tot:
+                conn.execute(
+                    text(
+                        "ALTER TABLE banking_accounts ADD COLUMN include_in_total_balance "
+                        "INTEGER NOT NULL DEFAULT 1"
+                    )
+                )
+                logger.info("Migración banking_accounts: columna include_in_total_balance añadida")
             # Esquema antiguo local: NOT NULL sin valor en INSERT actual (el tipo de producto es product_type).
             r = conn.execute(text("PRAGMA table_info(banking_accounts)"))
             acols_legacy = {row[1] for row in r.fetchall()}

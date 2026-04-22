@@ -136,6 +136,7 @@ def banking_create_account(
         else None,
         opening_balance=bal,
         balance=bal,
+        include_in_total_balance=bool(body.include_in_total_balance),
         created_at=now,
     )
     db.add(a)
@@ -161,6 +162,7 @@ def banking_patch_account(
         and body.bank_sbif is None
         and body.linked_checking_account_id is None
         and body.enabled is None
+        and body.include_in_total_balance is None
     ):
         raise HTTPException(status_code=400, detail="Nada que actualizar")
 
@@ -232,6 +234,8 @@ def banking_patch_account(
         a.linked_checking_account_id = None
     if body.enabled is not None:
         a.enabled = bool(body.enabled)
+    if body.include_in_total_balance is not None:
+        a.include_in_total_balance = bool(body.include_in_total_balance)
 
     db.commit()
     db.refresh(a)

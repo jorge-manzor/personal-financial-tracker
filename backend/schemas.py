@@ -289,6 +289,10 @@ class BankingAccountOut(BaseModel):
     linked_checking_account_id: int | None = None
     linked_checking_account_name: str | None = None
     enabled: bool = True
+    include_in_total_balance: bool = Field(
+        True,
+        description="Si suma en el total «Saldo real» del resumen (cuentas líquidas).",
+    )
     has_transactions: bool = False
 
     class Config:
@@ -315,6 +319,7 @@ class BankingAccountCreate(BaseModel):
     bank_sbif: str = Field(..., min_length=1, max_length=8)
     linked_checking_account_id: int | None = None
     enabled: bool = True
+    include_in_total_balance: bool = True
 
     @model_validator(mode="after")
     def tarjeta_credito_requiere_cuenta(self) -> "BankingAccountCreate":
@@ -334,6 +339,7 @@ class BankingAccountPatch(BaseModel):
     bank_sbif: str | None = Field(default=None, min_length=1, max_length=8)
     linked_checking_account_id: int | None = None
     enabled: bool | None = None
+    include_in_total_balance: bool | None = None
 
 
 class BankingBankOut(BaseModel):
