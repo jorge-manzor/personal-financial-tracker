@@ -308,7 +308,10 @@ class BankingDebtTotalsOut(BaseModel):
     )
     shared_unsettled_clp: float = Field(
         ...,
-        description="Suma de valores absolutos de movimientos compartidos aún sin liquidar.",
+        description=(
+            "Suma de (|monto| / participantes) en gastos compartidos sin liquidar: "
+            "equivalente a sumar lo que corresponde por persona en cada movimiento."
+        ),
     )
 
 
@@ -354,6 +357,10 @@ class BankingSubcategoryOut(BaseModel):
     enabled: bool = True
     sort_order: int = 0
     has_transactions: bool = False
+    template_sub_id: int | None = Field(
+        default=None,
+        description="Id en plantilla seed; null en subcategorías creadas por el usuario.",
+    )
 
     class Config:
         from_attributes = True

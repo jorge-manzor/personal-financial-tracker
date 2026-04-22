@@ -29,7 +29,7 @@ import {
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { apiFetch, fetchJson, patchJson, postJson } from "./api";
-import { formatBankingClpSigned, formatClpDots } from "./format";
+import { formatBankingClpSigned, formatClpDots, parseChileanAmountInput } from "./format";
 import type {
   BankingAccountRow,
   BankingCategoryRow,
@@ -376,7 +376,7 @@ function BankingNonCreditTotalBalanceCard({
 const BANKING_SHARED_DEBT_CARD_CLASS =
   "flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50/75 p-3.5 shadow-[0_10px_36px_-12px_rgba(139,92,246,0.2)] ring-1 ring-violet-100/80 backdrop-blur-sm";
 
-/** Movimientos compartidos aún sin marcar como liquidados (suma de |monto|). */
+/** Gastos compartidos sin liquidar: suma de la parte por persona (|monto| ÷ participantes). */
 function BankingSharedUnsettledDebtCard({ amountClp }: { amountClp: number }) {
   const inactive = Math.abs(amountClp) < 1e-9;
   return (
@@ -401,9 +401,12 @@ function BankingSharedUnsettledDebtCard({ amountClp }: { amountClp: number }) {
       <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-bold leading-snug text-slate-800">Deuda Pago Compartido</p>
       <p
         className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-slate-900"
-        title="Suma de valores absolutos de movimientos compartidos con liquidación pendiente."
+        title="Suma de |monto| ÷ número de participantes en cada movimiento compartido sin liquidar. Equivale a sumar lo que corresponde por persona en cada gasto (reparto equitativo)."
       >
         {formatClpDots(amountClp)}
+      </p>
+      <p className="mt-1 line-clamp-3 text-[11px] italic leading-snug text-slate-600">
+        Suma por persona (tu parte en cada gasto; para repartir transferencias).
       </p>
     </div>
   );
@@ -2482,7 +2485,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   );
 
   const amountPerPersonLabel = useMemo(() => {
-    const amt = parseFloat(amount.replace(",", "."));
+    const amt = parseChileanAmountInput(amount);
     const n = parseInt(splitParticipants, 10);
     if (!isShared || Number.isNaN(amt) || Number.isNaN(n) || n < 1) return "—";
     const per = Math.abs(amt) / n;
@@ -2654,7 +2657,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
   const filteredBankingTxItems = useMemo(() => {
     const parseAmt = (s: string) => {
-      const n = parseFloat(s.replace(",", ".").trim());
+      const n = parseChileanAmountInput(s);
       return Number.isFinite(n) ? n : NaN;
     };
     const descQ = filterDescription.trim().toLowerCase();
@@ -2926,7 +2929,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       onToast("La descripción es obligatoria");
       return;
     }
-    const amt = parseFloat(amount.replace(",", "."));
+    const amt = parseChileanAmountInput(amount);
     if (Number.isNaN(amt) || amt === 0) {
       onToast("El monto debe ser distinto de cero (positivo = ingreso, negativo = egreso)");
       return;
@@ -3615,7 +3618,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   className={bankingModalControlClass}
-                  placeholder="Ej. 50000 o -12000"
+                  placeholder="Ej. -12000 o -12.000 (miles con punto)"
+                  title="Formato Chile: miles con punto (ej. 4.572). Decimales con coma (ej. 1.234,50). También puedes usar sin separadores."
                 />
               </label>
 

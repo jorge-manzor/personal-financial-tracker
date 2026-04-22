@@ -269,6 +269,16 @@ def _subcategory_matches_default_for_category(
     return s.name.strip().lower() in expected_names_lower
 
 
+def _subcategory_is_user_custom_name(
+    s: BankingSubcategory,
+    expected_names_lower: set[str],
+) -> bool:
+    """Usuario añadió esta sub (`template_sub_id` nulo y nombre no coincide con la plantilla por nombre solo)."""
+    if getattr(s, "template_sub_id", None) is not None:
+        return False
+    return s.name.strip().lower() not in expected_names_lower
+
+
 def _realign_bank_subcategories_by_template(db: Session, user_id: int, raw: list) -> None:
     """
     Mueve subcategorías a la categoría plantilla que indica el JSON (p. ej. filas heredadas
@@ -406,6 +416,8 @@ def _prune_bank_subcategories_not_in_default_json(db: Session, user_id: int) -> 
 
         for s in list(subs):
             if _subcategory_matches_default_for_category(s, expected_tpl_ids, expected_names_lower):
+                continue
+            if _subcategory_is_user_custom_name(s, expected_names_lower):
                 continue
             n_tx = (
                 db.query(func.count(BankingTransaction.id))
@@ -1175,17 +1187,28 @@ def banking_sum_unpaid_credit_card_charges_clp(db: Session, user_id: int) -> flo
 
 
 def banking_sum_shared_unsettled_clp(db: Session, user_id: int) -> float:
-    """Suma de |amount| en movimientos compartidos con liquidación pendiente."""
-    total = (
-        db.query(func.coalesce(func.sum(func.abs(BankingTransaction.amount)), 0.0))
+    """
+    Suma de (|monto| / participantes) en compartidos sin liquidar: total a reconocer «por persona»
+    (lo que corresponde que te transfieran los demás respecto del gasto compartido).
+    """
+    rows = (
+        db.query(BankingTransaction)
         .filter(
             BankingTransaction.user_id == user_id,
             BankingTransaction.is_shared.is_(True),
             BankingTransaction.shared_expense_settled.is_(False),
         )
-        .scalar()
+        .all()
     )
-    return float(total or 0.0)
+    total = 0.0
+    for t in rows:
+        n_raw = getattr(t, "split_participants", None)
+        if n_raw is None or int(n_raw) < 1:
+            n = 2
+        else:
+            n = int(n_raw)
+        total += abs(float(t.amount)) / float(n)
+    return round(total, 4)
 
 
 def banking_debt_totals_out(db: Session, user_id: int) -> dict[str, float]:
@@ -2412,10 +2435,10 @@ def create_subcategory_row(db: Session, user_id: int, *, category_id: int, name:
     c = get_category_for_user(db, user_id, category_id)
     if not c:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
-    if _names_locked(c):
+    if _category_is_internal_reserved(c):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No se pueden añadir subcategorías mientras la plantilla esté fijada.",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pueden añadir subcategorías a categorías reservadas para la aplicación.",
         )
     max_so = (
         db.query(func.coalesce(func.max(BankingSubcategory.sort_order), -1))
@@ -2457,29 +2480,41 @@ def patch_subcategory_row(
     locked = parent_old is not None and _names_locked(parent_old)
 
     if locked:
-        if name is not None or category_id is not None:
+        user_custom = getattr(sub, "template_sub_id", None) is None
+        if category_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No se puede cambiar la categoría de una subcategoría bajo plantilla fijada.",
+            )
+        if name is not None and not user_custom:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Los nombres de subcategorías vienen de la plantilla.",
             )
-        if enabled is None:
+        if name is not None and user_custom:
+            nm = name.strip()
+            if not nm:
+                raise HTTPException(status_code=400, detail="El nombre no puede estar vacío.")
+            sub.name = nm
+        if enabled is not None:
+            if not enabled:
+                n_tx = (
+                    db.query(func.count(BankingTransaction.id))
+                    .filter(
+                        BankingTransaction.user_id == user_id,
+                        BankingTransaction.subcategory_id == subcategory_id,
+                    )
+                    .scalar()
+                    or 0
+                )
+                if n_tx > 0:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="No puedes desactivar esta subcategoría: hay movimientos que la usan.",
+                    )
+            sub.enabled = enabled
+        if name is None and enabled is None:
             raise HTTPException(status_code=400, detail="Nada que actualizar")
-        if not enabled:
-            n_tx = (
-                db.query(func.count(BankingTransaction.id))
-                .filter(
-                    BankingTransaction.user_id == user_id,
-                    BankingTransaction.subcategory_id == subcategory_id,
-                )
-                .scalar()
-                or 0
-            )
-            if n_tx > 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="No puedes desactivar esta subcategoría: hay movimientos que la usan.",
-                )
-        sub.enabled = enabled
         db.commit()
         db.refresh(sub)
         return sub
@@ -2524,7 +2559,7 @@ def delete_subcategory_row(db: Session, user_id: int, subcategory_id: int) -> No
     if not sub:
         raise HTTPException(status_code=404, detail="Subcategoría no encontrada")
     parent = get_category_for_user(db, user_id, sub.category_id)
-    if parent and _names_locked(parent):
+    if parent and _names_locked(parent) and getattr(sub, "template_sub_id", None) is not None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No se puede eliminar una subcategoría fijada por la plantilla.",

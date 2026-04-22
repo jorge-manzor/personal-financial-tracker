@@ -63,6 +63,60 @@ export function formatBankingClpSigned(amount: number): string {
   return `$${body}`;
 }
 
+/**
+ * Convierte texto de monto al estilo chileno: miles con punto, decimales con coma.
+ * Útil al pegar montos del banco (p. ej. `4.572` → 4572, no 4,572).
+ * - `1.234,56` → 1234.56
+ * - `1.234.567` → 1234567
+ * - `4.572` (un solo punto y 3 cifras tras el punto) → 4572
+ * - `4,5` o `4,57` con coma → decimal
+ * Acepta `-` (y `+`) al inicio.
+ */
+export function parseChileanAmountInput(raw: string): number {
+  let s = raw.trim();
+  if (!s) return Number.NaN;
+  let sign = 1;
+  if (s.startsWith("-")) {
+    sign = -1;
+    s = s.slice(1).trim();
+  } else if (s.startsWith("+")) {
+    s = s.slice(1).trim();
+  }
+  if (!s) return Number.NaN;
+
+  if (s.includes(",")) {
+    const noThousands = s.replace(/\./g, "");
+    const normalized = noThousands.replace(",", ".");
+    const n = Number.parseFloat(normalized);
+    return Number.isFinite(n) ? sign * n : Number.NaN;
+  }
+
+  const dotCount = (s.match(/\./g) ?? []).length;
+  if (dotCount === 0) {
+    const n = Number.parseFloat(s);
+    return Number.isFinite(n) ? sign * n : Number.NaN;
+  }
+  if (dotCount >= 2) {
+    const n = Number.parseFloat(s.replace(/\./g, ""));
+    return Number.isFinite(n) ? sign * n : Number.NaN;
+  }
+
+  const dotIdx = s.indexOf(".");
+  const intPart = s.slice(0, dotIdx);
+  const fracPart = s.slice(dotIdx + 1);
+  if (
+    fracPart.length === 3 &&
+    /^\d*$/.test(intPart) &&
+    intPart !== "" &&
+    /^\d{3}$/.test(fracPart)
+  ) {
+    const n = Number.parseFloat(intPart + fracPart);
+    return Number.isFinite(n) ? sign * n : Number.NaN;
+  }
+  const n = Number.parseFloat(`${intPart}.${fracPart}`);
+  return Number.isFinite(n) ? sign * n : Number.NaN;
+}
+
 /** USD label style: USD $1,092.77 */
 export function formatMoneyUSDLabel(n: number): string {
   const x = formatMoney(n).replace("$", "").trim();

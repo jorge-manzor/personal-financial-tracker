@@ -315,6 +315,12 @@ function productTypeLabel(t: BankingProductType | null | undefined): string {
   return PRODUCT_TYPE_OPTIONS.find((o) => o.value === t)?.label ?? t;
 }
 
+/** Subcategorías de plantilla no renombrables; las añadidas por el usuario (`template_sub_id` nulo) sí. */
+function bankingSubcategoryAllowsRename(cat: BankingCategoryRow, sub: BankingSubcategoryRow): boolean {
+  if (!cat.names_locked) return true;
+  return sub.template_sub_id == null;
+}
+
 export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null) => void }) {
   const [accounts, setAccounts] = useState<BankingAccountRow[]>([]);
   const [banks, setBanks] = useState<BankingBankRow[]>([]);
@@ -924,8 +930,9 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
             </h3>
             <p className="mt-1 text-sm text-slate-500">
               Categorías iniciales desde el servidor; puedes añadir las tuyas, editar nombre y color (salvo plantilla
-              fijada) y crear subcategorías. El interruptor controla visibilidad en movimientos; con movimientos
-              asociados, el apagado queda bloqueado. Las categorías reservadas al final solo permiten color.
+              fijada) y crear subcategorías en cualquier categoría manual o de plantilla. Las subcategorías propias se
+              pueden renombrar aunque la categoría esté fijada por plantilla. El interruptor controla visibilidad en
+              movimientos. Las categorías reservadas al final solo permiten color.
             </p>
           </div>
           <button
@@ -1285,7 +1292,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                     >
                                       <IconGripVertical className="block h-3.5 w-3.5" />
                                     </CategoryDragHandleButton>
-                                    {!cat.names_locked && subNameEdit?.id === s.id ? (
+                                    {bankingSubcategoryAllowsRename(cat, s) && subNameEdit?.id === s.id ? (
                                       <input
                                         type="text"
                                         className="min-w-0 flex-1 rounded border border-teal-300 bg-white px-1.5 py-1 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-teal-400/35"
@@ -1301,7 +1308,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                         {s.name}
                                       </span>
                                     )}
-                                    {!cat.names_locked && subNameEdit?.id !== s.id ? (
+                                    {bankingSubcategoryAllowsRename(cat, s) && subNameEdit?.id !== s.id ? (
                                       <button
                                         type="button"
                                         title="Renombrar subcategoría"
@@ -1315,7 +1322,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                         <IconPencil className="h-3.5 w-3.5" />
                                       </button>
                                     ) : null}
-                                    {!cat.names_locked && subNameEdit?.id === s.id ? (
+                                    {bankingSubcategoryAllowsRename(cat, s) && subNameEdit?.id === s.id ? (
                                       <div className="flex shrink-0 gap-1">
                                         <button
                                           type="button"
@@ -1372,33 +1379,31 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           );
                         })}
                       </SortableContext>
-                      {!cat.names_locked ? (
-                        <li className="mt-2 flex list-none flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-                          <input
-                            type="text"
-                            placeholder="Nueva subcategoría…"
-                            className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
-                            value={newSubDraft[cat.id] ?? ""}
-                            onChange={(e) =>
-                              setNewSubDraft((d) => ({ ...d, [cat.id]: e.target.value }))
+                      <li className="mt-2 flex list-none flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                        <input
+                          type="text"
+                          placeholder="Nueva subcategoría…"
+                          className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
+                          value={newSubDraft[cat.id] ?? ""}
+                          onChange={(e) =>
+                            setNewSubDraft((d) => ({ ...d, [cat.id]: e.target.value }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              void createSubcategory(cat.id);
                             }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                void createSubcategory(cat.id);
-                              }
-                            }}
-                          />
-                          <button
-                            type="button"
-                            disabled={busyKey !== null}
-                            className={`${btnGreenBanking} shrink-0 px-3 py-1.5 text-xs`}
-                            onClick={() => void createSubcategory(cat.id)}
-                          >
-                            Añadir
-                          </button>
-                        </li>
-                      ) : null}
+                          }}
+                        />
+                        <button
+                          type="button"
+                          disabled={busyKey !== null}
+                          className={`${btnGreenBanking} shrink-0 px-3 py-1.5 text-xs`}
+                          onClick={() => void createSubcategory(cat.id)}
+                        >
+                          Añadir
+                        </button>
+                      </li>
                     </DndContext>
                   </ul>
                         </details>

@@ -245,6 +245,7 @@ export interface BankingAccountRow {
 /** Respuesta GET /banking/debt-totals */
 export interface BankingDebtTotalsOut {
   credit_card_unpaid_clp: number;
+  /** Suma de |monto|/participantes en compartidos sin liquidar (parte por persona). */
   shared_unsettled_clp: number;
 }
 
