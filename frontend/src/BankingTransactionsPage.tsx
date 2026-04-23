@@ -30,6 +30,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
+import { BankingThemeToggle, useBankingTheme } from "./BankingThemeContext";
 import { apiFetch, fetchJson, patchJson, postJson } from "./api";
 import { formatBankingClpSigned, formatClpDots, parseChileanAmountInput } from "./format";
 import { localDateISOString, localYearMonthString } from "./localDate";
@@ -70,33 +71,47 @@ function bankingPickerSearchMatches(haystack: string, needle: string): boolean {
   return normalizeBankingPickerSearch(haystack).includes(normalizeBankingPickerSearch(needle));
 }
 
-/** Alineado con el backend: desde hoy − 60 días hasta hoy (`YYYY-MM-DD`, fecha del movimiento). */
-function defaultBankingTxDateRangeIso(): { from: string; to: string } {
+/** `YYYY-MM-DD` en fecha local del usuario (fecha del movimiento). */
+function isoDateLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Desde el día 1 de hace dos meses hasta hoy (valor inicial del filtro servidor). */
+function bankingTxRangeForLastTwoMonths(): { from: string; to: string } {
   const to = new Date();
-  const from = new Date(to);
-  from.setDate(from.getDate() - 60);
-  const iso = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  return { from: iso(from), to: iso(to) };
+  const from = new Date(to.getFullYear(), to.getMonth() - 2, 1);
+  return { from: isoDateLocal(from), to: isoDateLocal(to) };
+}
+
+function normalizeBankingTxCustomRange(from: string, to: string): { from: string; to: string } {
+  let df = from;
+  let dt = to;
+  if (df && dt && df > dt) [df, dt] = [dt, df];
+  return { from: df, to: dt };
+}
+
+/** Fechas efectivas para la petición (si falta alguna, se usa «últimos 2 meses»). */
+function resolveBankingTxMovementDateRange(from: string, to: string): { from: string; to: string } {
+  const n = normalizeBankingTxCustomRange(from, to);
+  if (!n.from.trim() || !n.to.trim()) return bankingTxRangeForLastTwoMonths();
+  return n;
 }
 
 /** Vista de movimientos (tabs); alinea con query `scope`. */
 type BankingMovementTabScope = "all" | "credit_card" | "shared" | "provisiones";
 
-/** Cache SWR: misma semántica que los params de lista en servidor. */
+/** Cache SWR: misma semántica que los params de lista en servidor (`df`/`dt` = rango efectivo enviado al API). */
 function bankingTabCacheKey(
   scope: BankingMovementTabScope,
   filterAccountIds: number[],
-  fullHistory: boolean,
-  dateFrom: string,
-  dateTo: string,
+  effectiveDateFrom: string,
+  effectiveDateTo: string,
 ): string {
   return JSON.stringify({
     s: scope,
     a: [...filterAccountIds].sort((x, y) => x - y),
-    fh: fullHistory,
-    df: dateFrom,
-    dt: dateTo,
+    df: effectiveDateFrom,
+    dt: effectiveDateTo,
   });
 }
 
@@ -300,16 +315,16 @@ function BankingAccountBalanceCard({
 
   return (
     <div
-      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-cyan-50/80 p-3.5 shadow-[0_10px_36px_-12px_rgba(14,165,233,0.2)] ring-1 ring-sky-100/80 ${
+      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-slate-300/95 bg-gradient-to-br from-slate-50/95 via-white to-sky-50/35 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-slate-300/50 banking-dark:border-zinc-700/80 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-zinc-950 banking-dark:shadow-[0_6px_28px_-12px_rgba(0,0,0,0.55)] banking-dark:ring-amber-950/25 ${
         inactive ? "opacity-[0.88]" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-1.5">
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-100 ring-1 ring-sky-200/80"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200/95 ring-1 ring-slate-300/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-zinc-600 banking-dark:shadow-none"
           aria-hidden
         >
-          <svg className="h-4 w-4 text-sky-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 text-slate-700 banking-dark:text-amber-200/75" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -317,15 +332,15 @@ function BankingAccountBalanceCard({
             />
           </svg>
         </div>
-        <span className="max-w-[55%] shrink-0 truncate rounded-full bg-sky-100/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-800">
+        <span className="max-w-[55%] shrink-0 truncate rounded-full bg-slate-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-700 ring-1 ring-slate-300/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-200/85 banking-dark:ring-amber-950/50">
           {bankingProductBadgeLabel(a.product_type)}
         </span>
       </div>
 
-      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-bold leading-snug text-slate-800">{a.name}</p>
+      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-200">{a.name}</p>
 
       <p
-        className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-slate-900"
+        className="mt-1.5 text-lg font-semibold tabular-nums tracking-tight text-slate-800 banking-dark:text-zinc-100"
         title={
           liquid
             ? `Saldo real (libro): incluye provisiones en el saldo libro; menos cargos en TC no pagados asociados a esta cuenta (${formatClpDots(unpaidCut)}).`
@@ -334,14 +349,14 @@ function BankingAccountBalanceCard({
       >
         {formatClpDots(saldoReal)}
       </p>
-      <div className="mt-1 border-t border-sky-100 pt-1">
+      <div className="mt-1 border-t border-slate-300 pt-1 banking-dark:border-zinc-700">
         <div
           className={`grid gap-x-2 gap-y-0 leading-none ${unpaidCut > 0 ? "grid-cols-3" : "grid-cols-2"}`}
         >
           <div className="min-w-0">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-sky-600/90">Saldo actual</p>
+            <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Saldo actual</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-700"
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-600 banking-dark:text-zinc-200"
               title="Efectivo en cuenta (libro menos neto de Provisiones)."
             >
               {formatClpDots(atBank)}
@@ -349,9 +364,9 @@ function BankingAccountBalanceCard({
           </div>
           {unpaidCut > 0 ? (
             <div className="min-w-0 text-right">
-              <p className="text-[9px] font-medium uppercase tracking-wide text-sky-600/90">Deuda TC</p>
+              <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Deuda TC</p>
               <p
-                className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-600"
+                className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400/85"
                 title="Cargos en tarjeta(s) asociada(s) a esta cuenta marcados como no pagados."
               >
                 {formatClpDots(unpaidCut)}
@@ -359,9 +374,9 @@ function BankingAccountBalanceCard({
             </div>
           ) : null}
           <div className="min-w-0 text-right">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-sky-600/90">Provisiones</p>
+            <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Provisiones</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-600"
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400/85"
               title="Monto neto en categoría Provisiones (reversas netean)."
             >
               {formatClpDots(Math.abs(prov))}
@@ -395,40 +410,40 @@ function BankingNonCreditTotalBalanceCard({
 
   return (
     <div
-      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-emerald-300 bg-gradient-to-br from-emerald-200/95 via-emerald-100 to-teal-200/90 p-3.5 shadow-[0_10px_36px_-12px_rgba(5,150,105,0.3)] ring-1 ring-emerald-300/70 ${
+      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-emerald-300/85 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/50 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-emerald-200/65 banking-dark:border-amber-950/35 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-amber-950/[0.12] banking-dark:shadow-[0_6px_28px_-12px_rgba(0,0,0,0.55)] banking-dark:ring-amber-950/30 ${
         inactive ? "opacity-[0.88]" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-1.5">
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-600/95 ring-1 ring-emerald-700/50"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-200/90 ring-1 ring-emerald-300/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-amber-950/40 banking-dark:shadow-none"
           aria-hidden
         >
-          <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 text-emerald-800/90 banking-dark:text-amber-200/75" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-emerald-800 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-50 shadow-sm">
+        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-emerald-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-900/85 ring-1 ring-emerald-300/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-200/90 banking-dark:ring-amber-950/45">
           Total
         </span>
       </div>
 
-      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-bold leading-snug text-emerald-950">Saldo real</p>
+      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-200">Saldo real</p>
 
       <p
-        className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-emerald-950"
+        className="mt-1.5 text-lg font-semibold tabular-nums tracking-tight text-slate-800 banking-dark:text-zinc-50"
         title="Suma de saldos libro (provisiones incluidas) solo en cuentas líquidas marcadas «incluir en saldo total» en Configuración; menos cargos TC no pagados asociados a cuentas corrientes igualmente incluidas."
       >
         {formatClpDots(totalReal)}
       </p>
-      <div className="mt-1 border-t border-emerald-500/35 pt-1">
+      <div className="mt-1 border-t border-emerald-400/75 pt-1 banking-dark:border-zinc-700">
         <div
           className={`grid gap-x-2 gap-y-0 leading-none ${unpaidLinked > 0 ? "grid-cols-3" : "grid-cols-2"}`}
         >
           <div className="min-w-0">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-950/90">Saldo actual</p>
+            <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Saldo actual</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-700"
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-700 banking-dark:text-zinc-200"
               title="Suma de saldos «en banco» solo en cuentas incluidas en el total (sin efecto neto de Provisiones)."
             >
               {formatClpDots(totalAtBank)}
@@ -436,9 +451,9 @@ function BankingNonCreditTotalBalanceCard({
           </div>
           {unpaidLinked > 0 ? (
             <div className="min-w-0 text-right">
-              <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-950/90">Deuda TC</p>
+              <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Deuda TC</p>
               <p
-                className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-600"
+                className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400/85"
                 title="Suma de cargos TC no pagados solo si la cuenta corriente de liquidación está incluida en el total (Configuración)."
               >
                 {formatClpDots(unpaidLinked)}
@@ -446,9 +461,9 @@ function BankingNonCreditTotalBalanceCard({
             </div>
           ) : null}
           <div className="min-w-0 text-right">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-emerald-950/90">Provisiones</p>
+            <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Provisiones</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-600"
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400/85"
               title="Suma del valor absoluto del neto en Provisiones solo en cuentas incluidas en el total."
             >
               {formatClpDots(provisionSumDisplay)}
@@ -460,9 +475,9 @@ function BankingNonCreditTotalBalanceCard({
   );
 }
 
-/** Deuda pago compartido — mismo lenguaje visual que tarjetas de cuenta (gradiente violeta suave). */
+/** Deuda pago compartido — gradiente violeta muy suave, alineado al resto de tarjetas de saldo. */
 const BANKING_SHARED_DEBT_CARD_CLASS =
-  "flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50/75 p-3.5 shadow-[0_10px_36px_-12px_rgba(139,92,246,0.2)] ring-1 ring-violet-100/80 backdrop-blur-sm";
+  "flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-slate-300/95 bg-gradient-to-br from-slate-50/95 via-white to-violet-50/40 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-slate-300/50 backdrop-blur-sm banking-dark:border-zinc-700/80 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-amber-950/[0.08] banking-dark:shadow-[0_6px_28px_-12px_rgba(0,0,0,0.55)] banking-dark:ring-amber-950/22";
 
 /** Gastos compartidos sin liquidar: suma de la parte por persona (|monto| ÷ participantes). */
 function BankingSharedUnsettledDebtCard({ amountClp }: { amountClp: number }) {
@@ -471,10 +486,10 @@ function BankingSharedUnsettledDebtCard({ amountClp }: { amountClp: number }) {
     <div className={`${BANKING_SHARED_DEBT_CARD_CLASS} ${inactive ? "opacity-[0.88]" : ""}`}>
       <div className="flex items-start justify-between gap-1.5">
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-100 ring-1 ring-violet-200/80"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-200/90 ring-1 ring-violet-300/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-amber-950/35 banking-dark:shadow-none"
           aria-hidden
         >
-          <svg className="h-4 w-4 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 text-violet-900/80 banking-dark:text-amber-200/75" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -482,18 +497,18 @@ function BankingSharedUnsettledDebtCard({ amountClp }: { amountClp: number }) {
             />
           </svg>
         </div>
-        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-violet-100/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-800">
+        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-violet-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-900/85 ring-1 ring-violet-300/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-200/88 banking-dark:ring-amber-950/45">
           Compartido
         </span>
       </div>
-      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-bold leading-snug text-slate-800">Deuda Pago Compartido</p>
+      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-200">Deuda Pago Compartido</p>
       <p
-        className="mt-1.5 text-lg font-bold tabular-nums tracking-tight text-slate-900"
+        className="mt-1.5 text-lg font-semibold tabular-nums tracking-tight text-slate-800 banking-dark:text-zinc-50"
         title="Suma de |monto| ÷ número de participantes en cada movimiento compartido sin liquidar. Equivale a sumar lo que corresponde por persona en cada gasto (reparto equitativo)."
       >
         {formatClpDots(amountClp)}
       </p>
-      <p className="mt-1 line-clamp-3 text-[11px] italic leading-snug text-slate-600">
+      <p className="mt-1 line-clamp-3 text-[11px] italic leading-snug text-slate-500 banking-dark:text-zinc-400">
         Suma por persona (tu parte en cada gasto; para repartir transferencias).
       </p>
     </div>
@@ -530,8 +545,7 @@ type BankingTxColumnKey =
   | "subcategoria"
   | "tipo_movimiento"
   | "compartido_liquidado"
-  | "cargo_tc"
-  | "mes_contable";
+  | "cargo_tc";
 
 const BANKING_TX_COLUMN_LABELS: Record<BankingTxColumnKey, string> = {
   fecha: "Fecha",
@@ -543,70 +557,88 @@ const BANKING_TX_COLUMN_LABELS: Record<BankingTxColumnKey, string> = {
   tipo_movimiento: "Tipo de movimiento",
   compartido_liquidado: "Compartido liquidado",
   cargo_tc: "Cargo TC pagado",
-  mes_contable: "Mes contable",
 };
 
 const BANKING_TX_COLUMN_KEYS = Object.keys(BANKING_TX_COLUMN_LABELS) as BankingTxColumnKey[];
 
 /** Filtros popover — inputs sobre fondo claro (fintech pastel). */
 const bankingMainTxFilterInputClass =
-  "mt-1 w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light]";
+  "mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:placeholder:text-zinc-500 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
 
 /** Modal nuevo/editar movimiento y toolbars secundarios — controles sobre blanco. */
 const bankingModalControlClass =
-  "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light]";
+  "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
+/** Etiquetas de campo en modal nuevo/editar movimiento — contraste legible en oscuro. */
+const bankingModalFieldLabelClass =
+  "text-xs font-medium text-slate-600 banking-dark:text-zinc-300";
+const bankingModalHelperTextClass =
+  "text-[12px] leading-snug text-slate-500 banking-dark:text-zinc-500";
+/** Fechas en barra de período — alineado con `dateInputClass` del modal (sin mt / w-full). */
+const bankingToolbarDateInputClass =
+  "rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
 const bankingModalCategoryTriggerClass =
-  "flex w-full items-center justify-between gap-2 overflow-hidden rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-3 text-left text-sm outline-none shadow-sm transition hover:border-teal-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 disabled:cursor-not-allowed disabled:opacity-40 [color-scheme:light]";
+  "flex w-full items-center justify-between gap-2 overflow-hidden rounded-xl border border-slate-300 bg-white py-2 pl-3 pr-3 text-left text-sm outline-none shadow-sm transition hover:border-teal-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 disabled:cursor-not-allowed disabled:opacity-40 [color-scheme:light] banking-dark:border-amber-900/45 banking-dark:bg-zinc-800 banking-dark:text-zinc-100 banking-dark:shadow-[inset_0_1px_0_0_rgba(254,243,199,0.06)] banking-dark:hover:border-amber-700/55 banking-dark:hover:bg-zinc-700/90 banking-dark:focus:border-amber-500/55 banking-dark:focus:ring-amber-500/25";
 /** Campo buscar en desplegables categoría / subcategoría (modal movimiento). */
 const bankingPickerSearchInputClass =
-  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light]";
+  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light] banking-dark:border-amber-800/45 banking-dark:bg-zinc-950 banking-dark:text-zinc-100 banking-dark:placeholder:text-zinc-500 banking-dark:focus:border-amber-500/55 banking-dark:focus:ring-amber-500/20";
 /** Lista del panel (el padre debe llevar `.banking-theme` para scrollbar claro en portales). */
 const bankingPickerListScrollClass =
   "tx-scroll max-h-[min(55vh,22rem)] min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-py-1 [-webkit-overflow-scrolling:touch]";
 const bankingToolbarGhostBtnClass =
-  "rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50/90";
+  "rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800";
 const bankingToolbarGhostBtnMdClass =
-  "rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50/90 disabled:cursor-not-allowed disabled:opacity-35";
+  "rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800";
 const bankingAuxActionBtnClass =
-  "rounded-lg border border-teal-200 bg-gradient-to-b from-teal-50 to-emerald-50 px-2 py-1 text-[11px] font-semibold text-teal-900 shadow-sm ring-1 ring-teal-100 transition hover:from-teal-100 hover:to-emerald-50 disabled:cursor-wait disabled:opacity-40";
+  "rounded-lg border border-slate-800 bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-40 banking-dark:border-amber-600/45 banking-dark:bg-amber-600 banking-dark:text-zinc-950 banking-dark:shadow-[0_1px_2px_rgba(0,0,0,0.28)] banking-dark:hover:border-amber-500/55 banking-dark:hover:bg-amber-500";
 const bankingAuxBulkBtnClass =
-  "rounded-xl border border-teal-200 bg-gradient-to-b from-teal-50 to-emerald-50 px-3.5 py-2 text-sm font-semibold text-teal-900 shadow-sm ring-1 ring-teal-100 transition hover:from-teal-100 hover:to-emerald-50 disabled:cursor-not-allowed disabled:opacity-40";
+  "rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 banking-dark:border-amber-600/45 banking-dark:bg-amber-600 banking-dark:text-zinc-950 banking-dark:shadow-[0_1px_2px_rgba(0,0,0,0.28)] banking-dark:hover:border-amber-500/55 banking-dark:hover:bg-amber-500";
 
-/** Tabla principal — sin backdrop-blur (mejor scroll en GPUs modestas). */
+/** Tabla principal — bordes y cabecera neutros, estilo “extracto” (pocas capas de color). */
 const BANKING_MAIN_TX_CARD_CLASS =
-  "rounded-2xl border border-teal-100 bg-white pb-2 shadow-sm ring-1 ring-teal-100/40";
+  "overflow-hidden rounded-xl border border-slate-300/95 bg-white pb-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)] banking-dark:border-zinc-700/70 banking-dark:bg-zinc-950 banking-dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)]";
 const BANKING_MAIN_TX_TOOLBAR_CLASS =
-  "sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-teal-100/90 bg-gradient-to-r from-teal-50/95 to-cyan-50/80 px-3 py-2.5";
+  "sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-slate-300 bg-white px-3 py-2.5 banking-dark:border-zinc-700/80 banking-dark:bg-zinc-950 banking-dark:text-zinc-300";
 const BANKING_MAIN_TX_THEAD_CLASS =
-  "border-b border-teal-100 bg-gradient-to-r from-teal-50 via-emerald-50/90 to-teal-50";
-const BANKING_MAIN_TX_TBODY_CLASS = "divide-y divide-slate-100";
+  "border-b border-slate-300 bg-white banking-dark:border-zinc-700 banking-dark:bg-zinc-950";
+/** Separador por fila (`border-b`): la tabla virtualizada usa `<tr>` de padding sin esta clase — no usar `divide-y` en `<tbody>`. */
 const BANKING_MAIN_TX_TR_CLASS =
-  "odd:bg-white even:bg-slate-50/90 text-slate-800 hover:bg-teal-50/70";
+  "border-b border-slate-300 bg-white text-slate-800 transition-colors hover:bg-slate-50/90 banking-dark:border-zinc-700/90 banking-dark:bg-zinc-950 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-900/85";
 const BANKING_MAIN_TX_FOOTER_CLASS =
-  "flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/95 px-3 py-2.5";
+  "flex flex-wrap items-center justify-between gap-3 border-t border-slate-300 bg-white px-3 py-2.5 banking-dark:border-zinc-700 banking-dark:bg-zinc-950 banking-dark:text-zinc-400";
 
-/** Pendientes TC / compartidos — violeta pastel sobre claro. */
+/** Pendientes TC / compartido / provisiones — mismo contenedor visual que la tabla principal. */
 const BANKING_AUX_TX_CARD_CLASS =
-  "banking-table-scroll overflow-x-auto rounded-2xl border border-violet-100 bg-white pb-2 shadow-[0_8px_40px_-12px_rgba(139,92,246,0.12)]";
+  "banking-table-scroll overflow-x-auto rounded-xl border border-slate-300/95 bg-white pb-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)] banking-dark:border-zinc-700/70 banking-dark:bg-zinc-950 banking-dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)]";
 const BANKING_AUX_TX_THEAD_CLASS =
-  "border-b border-violet-100 bg-gradient-to-r from-violet-50 via-fuchsia-50/70 to-violet-50";
-const BANKING_AUX_TX_TBODY_CLASS = "divide-y divide-slate-100";
+  "border-b border-slate-300 bg-white banking-dark:border-zinc-700 banking-dark:bg-zinc-950";
 const BANKING_AUX_TX_TR_CLASS =
-  "odd:bg-white even:bg-violet-50/40 text-slate-800 transition-colors hover:bg-violet-50/90";
+  "border-b border-slate-300 bg-white text-slate-800 transition-colors hover:bg-slate-50/90 banking-dark:border-zinc-700/90 banking-dark:bg-zinc-950 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-900/85";
 const BANKING_AUX_TX_TH_TEXT_CLASS =
-  "text-[12px] font-semibold uppercase tracking-wide text-violet-900/75";
-const BANKING_AUX_SECTION_HEADING_CLASS = "text-sm font-semibold text-slate-700";
+  "text-[12px] font-semibold uppercase tracking-wide text-slate-600 banking-dark:text-zinc-300";
+const BANKING_AUX_SECTION_HEADING_CLASS =
+  "text-sm font-semibold text-slate-700 banking-dark:text-zinc-200";
 
-/** Contenedor pestañas «Movimientos». Sin backdrop-blur: el blur forza recomposición en cada frame al hacer scroll (muy pesado en GPU integradas / Windows). */
+/** Banda tipo “ticket” cuando hay selección de movimientos: menta/teal en claro, ámbar en oscuro. */
+const BANKING_SELECTION_SUMMARY_TICKET_ACTIVE_CLASS =
+  "border border-teal-300/90 bg-gradient-to-r from-teal-50 via-emerald-50/95 to-teal-50/85 ring-1 ring-teal-200/85 shadow-sm banking-dark:border-amber-900/50 banking-dark:bg-gradient-to-r banking-dark:from-amber-950/48 banking-dark:via-amber-950/28 banking-dark:to-zinc-950 banking-dark:ring-amber-950/38 banking-dark:shadow-[0_0_34px_-12px_rgba(245,158,11,0.22)]";
+const BANKING_SELECTION_SUMMARY_TICKET_IDLE_CLASS =
+  "border border-slate-300 bg-slate-50 text-slate-600 shadow-sm banking-dark:border-zinc-700 banking-dark:bg-zinc-900/75 banking-dark:text-zinc-300 banking-dark:shadow-black/25";
+
+/** Contenedor sección «Movimientos» (pestañas + contenido). */
 const BANKING_MOVEMENTS_SECTION_CLASS =
-  "overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-[0_12px_48px_-16px_rgba(20,184,166,0.14)]";
-const BANKING_MOVEMENTS_TABLIST_CLASS =
-  "flex flex-wrap gap-2 border-b border-teal-100 bg-gradient-to-r from-teal-50/90 to-cyan-50/70 px-2 pt-3";
+  "overflow-hidden rounded-xl border border-slate-300/95 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)] banking-dark:border-zinc-700/70 banking-dark:bg-zinc-950 banking-dark:shadow-[0_1px_3px_rgba(0,0,0,0.35)]";
+/** Pestañas tipo solapa: la activa comparte borde y fondo con el panel de abajo. */
+const BANKING_MOVEMENTS_TAB_BAR_CLASS =
+  "flex flex-wrap gap-0 border-b border-slate-300 bg-slate-50/90 px-1.5 pt-1.5 md:px-3 md:pt-2 banking-dark:border-zinc-700 banking-dark:bg-zinc-950/95";
+const BANKING_MOVEMENTS_TAB_BTN_BASE =
+  "relative z-0 min-h-[2.75rem] rounded-t-lg px-3.5 py-2 text-sm font-medium transition outline-none focus-visible:z-[2] focus-visible:ring-2 focus-visible:ring-teal-400/35 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 md:px-4 banking-dark:focus-visible:ring-amber-500/25 banking-dark:focus-visible:ring-offset-zinc-950";
+const BANKING_MOVEMENTS_TAB_BTN_ACTIVE = `${BANKING_MOVEMENTS_TAB_BTN_BASE} z-[1] -mb-px border border-b-0 border-slate-300 bg-white font-semibold text-slate-900 banking-dark:border-amber-950/40 banking-dark:border-b-0 banking-dark:bg-zinc-900 banking-dark:text-zinc-100`;
+const BANKING_MOVEMENTS_TAB_BTN_IDLE = `${BANKING_MOVEMENTS_TAB_BTN_BASE} border border-transparent text-slate-600 hover:bg-white/80 hover:text-slate-900 banking-dark:text-zinc-500 banking-dark:hover:bg-zinc-900/70 banking-dark:hover:text-zinc-200`;
 
 /** Botones ícono filas auxiliares. */
 const txIconBtnAux =
-  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700";
-const txIconBtnAuxDanger = `${txIconBtnAux} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600`;
+  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-500 transition hover:border-slate-400 hover:bg-slate-100 hover:text-slate-800 banking-dark:text-zinc-500 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-200";
+const txIconBtnAuxDanger = `${txIconBtnAux} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 banking-dark:hover:border-rose-900/60 banking-dark:hover:bg-rose-950/50 banking-dark:hover:text-rose-300`;
 
 /** Casilla circular para pendientes TC / compartidos: borde gris → al marcar fondo verde con ✓ (parcial = guión). */
 function BankingAuxRoundCheckbox({
@@ -644,17 +676,17 @@ function BankingAuxRoundCheckbox({
       <span
         className={[
           "flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded-full border-2 transition-[background-color,border-color,box-shadow] duration-150",
-          "peer-focus-visible:ring-2 peer-focus-visible:ring-teal-400/40 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-white",
+          "peer-focus-visible:ring-2 peer-focus-visible:ring-teal-400/40 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-white banking-dark:peer-focus-visible:ring-amber-500/35 banking-dark:peer-focus-visible:ring-offset-zinc-950",
           partial
-            ? "border-amber-300 bg-amber-50 shadow-sm"
+            ? "border-amber-300 bg-amber-50 shadow-sm banking-dark:border-amber-700/70 banking-dark:bg-amber-950/45 banking-dark:shadow-none"
             : checked
-              ? "border-teal-500 bg-teal-400 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)]"
-              : "border-slate-300 bg-white hover:border-teal-300 hover:bg-teal-50/50",
+              ? "border-teal-500 bg-teal-400 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] banking-dark:border-amber-600 banking-dark:bg-amber-600/92 banking-dark:shadow-[inset_0_1px_0_0_rgba(254,243,199,0.12)]"
+              : "border-slate-300 bg-white hover:border-teal-300 hover:bg-teal-50/50 banking-dark:border-zinc-500 banking-dark:bg-zinc-900 banking-dark:hover:border-amber-700/55 banking-dark:hover:bg-amber-950/40",
         ].join(" ")}
         aria-hidden
       >
         {partial ? (
-          <span className="h-0.5 w-2 rounded-full bg-amber-100/95" />
+          <span className="h-0.5 w-2 rounded-full bg-amber-100/95 banking-dark:bg-amber-400/80" />
         ) : checked ? (
           <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
             <path
@@ -690,7 +722,6 @@ const BANKING_TX_COL_WIDTH: Record<BankingTxColumnKey, string> = {
   tipo_movimiento: "8.25rem",
   compartido_liquidado: "7.25rem",
   cargo_tc: "6.5rem",
-  mes_contable: "6rem",
 };
 
 /** Tabla «cargos pendientes por TC»: no muestra estas columnas. */
@@ -698,7 +729,6 @@ const BANKING_CC_PENDING_EXCLUDED_COLUMNS = new Set<BankingTxColumnKey>([
   "tipo_movimiento",
   "compartido_liquidado",
   "cargo_tc",
-  "mes_contable",
 ]);
 
 const DEFAULT_BANKING_TX_COLUMN_ORDER: BankingTxColumnKey[] = [...BANKING_TX_COLUMN_KEYS];
@@ -860,8 +890,10 @@ function BankingTxColumnVisibilityToggle({
         e.stopPropagation();
         if (!disabled) onToggle();
       }}
-      className={`inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border p-[3px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 ${
-        on ? "justify-end border-teal-400 bg-teal-400 shadow-inner" : "justify-start border-slate-300 bg-slate-200"
+      className={`inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border p-[3px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white banking-dark:focus-visible:ring-amber-500/40 banking-dark:focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 ${
+        on
+          ? "justify-end border-teal-400 bg-teal-400 shadow-inner banking-dark:border-amber-700 banking-dark:bg-amber-600/92"
+          : "justify-start border-slate-300 bg-slate-200 banking-dark:border-zinc-600 banking-dark:bg-zinc-800"
       }`}
     >
       <span className="pointer-events-none block h-3.5 w-3.5 shrink-0 rounded-full bg-white shadow" />
@@ -904,8 +936,6 @@ function bankingTxColumnFilterActive(colKey: BankingTxColumnKey, f: BankingTxFil
       return f.filterLiquidadoValues.length > 0;
     case "cargo_tc":
       return f.filterTcPaidValues.length > 0;
-    case "mes_contable":
-      return f.filterAccountingMonthYms.length > 0;
     default:
       return false;
   }
@@ -931,8 +961,6 @@ function bankingTxThBaseClass(colKey: BankingTxColumnKey): string {
       return "min-w-0 whitespace-normal leading-tight";
     case "cargo_tc":
       return "min-w-0 whitespace-normal leading-tight";
-    case "mes_contable":
-      return "whitespace-nowrap";
     default:
       return "";
   }
@@ -980,53 +1008,6 @@ function useBankingTxFilterUICtx(): BankingTxFilterUICtxValue {
   return v;
 }
 
-function BankingTxMesContableFilterBody() {
-  const ctx = useBankingTxFilterUICtx();
-  const sel = bankingMainTxFilterInputClass;
-  const [pickerKey, setPickerKey] = useState(0);
-
-  return (
-    <div className="space-y-2">
-      <span className="text-xs text-slate-500">Meses contables</span>
-      {ctx.filterAccountingMonthYms.length > 0 ? (
-        <div className="mt-1 flex flex-wrap gap-1.5">
-          {ctx.filterAccountingMonthYms.map((ym) => (
-            <button
-              key={ym}
-              type="button"
-              title="Quitar"
-              onClick={() =>
-                ctx.setFilterAccountingMonthYms((prev) => prev.filter((x) => x !== ym))
-              }
-              className="inline-flex items-center gap-1 rounded-lg border border-teal-200 bg-teal-50 px-2 py-1 text-[12px] font-medium text-teal-900 ring-1 ring-teal-100 transition hover:bg-teal-100/80"
-            >
-              <span className="tabular-nums">{ym}</span>
-              <span className="text-teal-600" aria-hidden>
-                ×
-              </span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-      <input
-        key={pickerKey}
-        type="month"
-        className={`${sel} mt-1 cursor-pointer`}
-        defaultValue=""
-        onChange={(e) => {
-          const v = e.target.value;
-          if (!v) return;
-          ctx.setFilterAccountingMonthYms((prev) =>
-            prev.includes(v) ? prev : [...prev, v].sort(),
-          );
-          setPickerKey((k) => k + 1);
-        }}
-      />
-      <p className="text-[11px] leading-snug text-slate-500">Elige meses con el selector; puedes combinar varios.</p>
-    </div>
-  );
-}
-
 function BankingTxCategoryFilterBody() {
   const ctx = useBankingTxFilterUICtx();
   const sel = bankingMainTxFilterInputClass;
@@ -1044,7 +1025,7 @@ function BankingTxCategoryFilterBody() {
         <button
           type="button"
           onClick={() => ctx.setFilterCategoryIds([])}
-          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-teal-50"
+          className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-teal-50"
         >
           Borrar selección
         </button>
@@ -1071,7 +1052,7 @@ function BankingTxCategoryFilterBody() {
                 ctx.setFilterCategoryIds((prev) => toggleNumInSortedList(prev, c.id))
               }
               className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-teal-50 ${
-                picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-200 bg-white"
+                picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-300 bg-white"
               }`}
             >
               {c.name}
@@ -1107,7 +1088,7 @@ function BankingTxSubcategoryFilterBody() {
         <button
           type="button"
           onClick={() => ctx.setFilterSubcategoryIds([])}
-          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-teal-50"
+          className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-teal-50"
         >
           Borrar selección
         </button>
@@ -1136,7 +1117,7 @@ function BankingTxSubcategoryFilterBody() {
                 ctx.setFilterSubcategoryIds((prev) => toggleNumInSortedList(prev, r.id))
               }
               className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-teal-50 ${
-                picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-200 bg-white"
+                picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-300 bg-white"
               }`}
             >
               {shortLabel}
@@ -1177,13 +1158,19 @@ function BankingTxColumnHeader({ colKey }: { colKey: BankingTxColumnKey }) {
         aria-expanded={open}
         aria-haspopup="dialog"
         className={`w-full px-2 py-2.5 text-center transition sm:px-2.5 ${
-          open ? "bg-teal-100/90 ring-1 ring-inset ring-teal-300/60" : "hover:bg-teal-50/80"
+          open
+            ? "bg-slate-100 ring-1 ring-inset ring-slate-300 banking-dark:bg-zinc-900 banking-dark:ring-zinc-600"
+            : "hover:bg-slate-50 banking-dark:hover:bg-zinc-900/80"
         }`}
       >
-        <span className={`block ${titleSize} font-semibold uppercase tracking-wide text-teal-900/85`}>{label}</span>
+        <span
+          className={`block ${titleSize} font-semibold uppercase tracking-wide text-slate-700 banking-dark:text-zinc-200`}
+        >
+          {label}
+        </span>
         <span
           className={`mt-0.5 block text-[9px] font-medium normal-case tracking-normal ${
-            active ? "text-teal-700" : "text-slate-500"
+            active ? "text-slate-600 banking-dark:text-zinc-400" : "text-slate-400 banking-dark:text-zinc-500"
           }`}
         >
           {active ? "Filtro activo" : "Filtrar"}
@@ -1243,7 +1230,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
             <button
               type="button"
               onClick={() => ctx.setFilterAccountIds([])}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-teal-50"
+              className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-teal-50"
             >
               Borrar selección
             </button>
@@ -1259,7 +1246,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
                     ctx.setFilterAccountIds((prev) => toggleNumInSortedList(prev, a.id))
                   }
                   className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
-                    picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-200 bg-white"
+                    picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-300 bg-white"
                   }`}
                 >
                   <span className={picked ? "font-semibold text-teal-900" : "text-slate-800"}>{a.name}</span>
@@ -1311,7 +1298,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
               className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
                 ctx.filterSharedScopes.includes("personal")
                   ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
-                  : "border-slate-200 bg-white"
+                  : "border-slate-300 bg-white"
               }`}
             >
               Solo personal
@@ -1324,7 +1311,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
               className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
                 ctx.filterSharedScopes.includes("shared_any")
                   ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
-                  : "border-slate-200 bg-white"
+                  : "border-slate-300 bg-white"
               }`}
             >
               Solo compartido
@@ -1354,7 +1341,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
                 className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
                   ctx.filterLiquidadoValues.includes(val)
                     ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
-                    : "border-slate-200 bg-white"
+                    : "border-slate-300 bg-white"
                 }`}
               >
                 {label}
@@ -1383,7 +1370,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
                 className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
                   ctx.filterTcPaidValues.includes(val)
                     ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
-                    : "border-slate-200 bg-white"
+                    : "border-slate-300 bg-white"
                 }`}
               >
                 {label}
@@ -1393,8 +1380,6 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
           <p className="text-[11px] text-slate-500">Sin selección = todos. Varios = unión.</p>
         </div>
       );
-    case "mes_contable":
-      return <BankingTxMesContableFilterBody />;
     default:
       return null;
   }
@@ -1404,26 +1389,26 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
 function BankingTxSiNoDashBadge({ text }: { text: string }) {
   if (text === "—") {
     return (
-      <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[12px] font-semibold tabular-nums text-slate-500 ring-1 ring-slate-200">
+      <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[12px] font-semibold tabular-nums text-slate-500 ring-1 ring-slate-300 banking-dark:bg-zinc-800 banking-dark:text-zinc-400 banking-dark:ring-zinc-600">
         —
       </span>
     );
   }
   if (text === "Sí") {
     return (
-      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-emerald-100 px-2 py-0.5 text-[12px] font-semibold text-emerald-800 ring-1 ring-emerald-200">
+      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-emerald-100 px-2 py-0.5 text-[12px] font-semibold text-emerald-800 ring-1 ring-emerald-200 banking-dark:bg-emerald-950/55 banking-dark:text-emerald-300 banking-dark:ring-emerald-800/60">
         Sí
       </span>
     );
   }
   if (text === "No") {
     return (
-      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-rose-100 px-2 py-0.5 text-[12px] font-semibold text-rose-800 ring-1 ring-rose-200">
+      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-rose-100 px-2 py-0.5 text-[12px] font-semibold text-rose-800 ring-1 ring-rose-200 banking-dark:bg-rose-950/50 banking-dark:text-rose-300 banking-dark:ring-rose-900/55">
         No
       </span>
     );
   }
-  return <span className="text-[12px] text-slate-500">{text}</span>;
+  return <span className="text-[12px] text-slate-500 banking-dark:text-zinc-400">{text}</span>;
 }
 
 const BankingTxTd = memo(function BankingTxTd({
@@ -1432,7 +1417,6 @@ const BankingTxTd = memo(function BankingTxTd({
   income,
   sharedSettledLabel,
   ccPaidLabel,
-  accountingLabel,
   /** Por defecto el monto va alineado a la derecha (tabla principal); tablas auxiliares TC/compartido usan `center`. */
   montoAlign = "end",
 }: {
@@ -1441,19 +1425,18 @@ const BankingTxTd = memo(function BankingTxTd({
   income: boolean;
   sharedSettledLabel: string;
   ccPaidLabel: string;
-  accountingLabel: string;
   montoAlign?: "end" | "center";
 }) {
   switch (colKey) {
     case "fecha":
       return (
-        <td className="align-middle whitespace-nowrap px-2 py-3 text-center text-[12px] text-slate-700 sm:px-2.5">
+        <td className="align-middle whitespace-nowrap px-2 py-3 text-center text-[12px] text-slate-700 banking-dark:text-zinc-200 sm:px-2.5">
           {row.fecha.slice(0, 10)}
         </td>
       );
     case "descripcion":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-left text-[12px] leading-snug text-slate-600 sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-left text-[12px] leading-snug text-slate-600 banking-dark:text-zinc-300 sm:px-2.5">
           <span className="line-clamp-3 break-words [overflow-wrap:anywhere]">
             {row.description?.trim() || "—"}
           </span>
@@ -1461,13 +1444,15 @@ const BankingTxTd = memo(function BankingTxTd({
       );
     case "producto":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-center text-[12px] text-slate-700 sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-center text-[12px] text-slate-700 banking-dark:text-zinc-200 sm:px-2.5">
           <span className="line-clamp-3 break-words [overflow-wrap:anywhere]">{row.account_name}</span>
         </td>
       );
     case "monto": {
-      /** Colores como actividad de inversiones; tamaño más compacto que la lista principal. */
-      const signClass = income ? "text-teal-600" : "text-rose-600";
+      /** Positivos en verde, cargos/descuentos en rojo (signo viene en el texto). */
+      const signClass = income
+        ? "text-teal-600 banking-dark:text-teal-400"
+        : "text-rose-600 banking-dark:text-rose-400";
       const text = `${income ? "+" : "-"}${formatBankingClpSigned(row.amount)}`;
       const rowJustify = montoAlign === "center" ? "justify-center" : "justify-end";
       return (
@@ -1480,7 +1465,7 @@ const BankingTxTd = memo(function BankingTxTd({
     }
     case "categoria":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-slate-700 sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-slate-700 banking-dark:text-zinc-200 sm:px-2.5">
           <span className="line-clamp-2 break-words font-medium leading-snug [overflow-wrap:anywhere]">
             {row.category_name}
           </span>
@@ -1488,7 +1473,7 @@ const BankingTxTd = memo(function BankingTxTd({
       );
     case "subcategoria":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-slate-700 sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-slate-700 banking-dark:text-zinc-200 sm:px-2.5">
           <span className="line-clamp-3 break-words font-medium leading-snug [overflow-wrap:anywhere]">
             {row.subcategory_name}
           </span>
@@ -1500,8 +1485,8 @@ const BankingTxTd = memo(function BankingTxTd({
           <span
             className={`inline-flex max-w-full justify-center rounded-md px-1.5 py-0.5 text-[12px] font-medium ${
               row.is_shared
-                ? "bg-violet-100 text-violet-900 ring-1 ring-violet-200"
-                : "bg-teal-100 text-teal-900 ring-1 ring-teal-200"
+                ? "bg-violet-100 text-violet-900 ring-1 ring-violet-200 banking-dark:bg-violet-950/55 banking-dark:text-violet-200 banking-dark:ring-violet-800/55"
+                : "bg-teal-100 text-teal-900 ring-1 ring-teal-200 banking-dark:bg-teal-950/50 banking-dark:text-teal-200/95 banking-dark:ring-teal-800/55"
             }`}
           >
             {row.is_shared ? "Compartido" : "Personal"}
@@ -1518,12 +1503,6 @@ const BankingTxTd = memo(function BankingTxTd({
       return (
         <td className="align-middle whitespace-nowrap px-2 py-3 text-center text-[12px] sm:px-2.5">
           <BankingTxSiNoDashBadge text={ccPaidLabel} />
-        </td>
-      );
-    case "mes_contable":
-      return (
-        <td className="align-middle whitespace-nowrap px-2 py-3 text-center text-[12px] text-slate-500 sm:px-2.5">
-          {accountingLabel}
         </td>
       );
   }
@@ -1554,20 +1533,20 @@ function SortableBankingTxColumnPickerRow({
 
   return (
     <li ref={setNodeRef} style={style} className="list-none">
-      <div className="flex items-center gap-2 rounded-lg border border-transparent px-1 py-1.5 transition hover:border-teal-100 hover:bg-teal-50/60">
+      <div className="flex items-center gap-2 rounded-lg border border-transparent px-1 py-1.5 transition hover:border-slate-300 hover:bg-slate-50 banking-dark:hover:border-zinc-700 banking-dark:hover:bg-zinc-900/70">
         <button
           type="button"
           ref={setActivatorNodeRef}
-          className="inline-flex shrink-0 cursor-grab touch-manipulation rounded-md p-1 text-slate-400 hover:bg-slate-200/80 hover:text-slate-800 active:cursor-grabbing"
+          className="inline-flex shrink-0 cursor-grab touch-manipulation rounded-md p-1 text-slate-400 hover:bg-slate-200/80 hover:text-slate-800 active:cursor-grabbing banking-dark:text-zinc-500 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-200"
           aria-label={`Arrastrar ${label}`}
           {...attributes}
           {...listeners}
         >
           <IconGripVertical className="h-4 w-4" />
         </button>
-        <span className="min-w-0 flex-1 text-sm leading-snug text-slate-800">{label}</span>
+        <span className="min-w-0 flex-1 text-sm leading-snug text-slate-800 banking-dark:text-zinc-200">{label}</span>
         {requiredCol ? (
-          <span className="shrink-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500">
+          <span className="shrink-0 rounded-md border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-400">
             Fija
           </span>
         ) : null}
@@ -1583,8 +1562,8 @@ function SortableBankingTxColumnPickerRow({
 }
 
 const txIconBtn =
-  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700";
-const txIconBtnDanger = `${txIconBtn} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600`;
+  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-500 transition hover:border-slate-400 hover:bg-slate-100 hover:text-slate-800 banking-dark:text-zinc-500 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-200";
+const txIconBtnDanger = `${txIconBtn} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 banking-dark:hover:border-rose-900/55 banking-dark:hover:bg-rose-950/45 banking-dark:hover:text-rose-300`;
 
 /** Cuerpo virtualizado de la tabla principal (pocas filas en DOM; scroll en `scrollRef`). */
 function BankingVirtualizedMainTxTableBody({
@@ -1620,7 +1599,7 @@ function BankingVirtualizedMainTxTableBody({
   const padBottom = vItems.length > 0 ? Math.max(0, totalSize - vItems[vItems.length - 1].end) : 0;
 
   return (
-    <tbody className={BANKING_MAIN_TX_TBODY_CLASS}>
+    <tbody>
       {padTop > 0 ? (
         <tr aria-hidden className="pointer-events-none border-0">
           <td colSpan={colCount} className="border-0 p-0" style={{ height: padTop }} />
@@ -1636,7 +1615,6 @@ function BankingVirtualizedMainTxTableBody({
             : row.credit_card_charge_paid
               ? "Sí"
               : "No";
-        const accountingLabel = formatBankingAccountingMonth(row.accounting_month);
         return (
           <tr
             key={row.id}
@@ -1652,7 +1630,6 @@ function BankingVirtualizedMainTxTableBody({
                 income={income}
                 sharedSettledLabel={sharedSettledLabel}
                 ccPaidLabel={ccPaidLabel}
-                accountingLabel={accountingLabel}
               />
             ))}
             <td className="align-middle px-1.5 py-3 sm:px-2">
@@ -1770,16 +1747,25 @@ function BankingCcPendingChargesTable({
       <h3 id={`cc-pending-heading-${accountId}`} className={BANKING_AUX_SECTION_HEADING_CLASS}>
         Cargos pendientes · {accountHeading}
       </h3>
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-100 bg-teal-50/80 px-3 py-2 text-xs leading-snug text-slate-600 shadow-sm">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs leading-snug ${
+          selectedIds.size > 0 ? BANKING_SELECTION_SUMMARY_TICKET_ACTIVE_CLASS : BANKING_SELECTION_SUMMARY_TICKET_IDLE_CLASS
+        }`}
+      >
         <p className="min-w-0 flex-1">
           {selectedIds.size > 0 ? (
             <>
-              <span className="text-slate-400">Suma seleccionada (cuadrar con pago al banco): </span>
-              <strong className="tabular-nums text-teal-700">{formatClpDots(selectedSumClp)}</strong>
-              <span className="text-slate-500"> · {selectedIds.size} movimiento(s)</span>
+              <span className="text-teal-800/90 banking-dark:text-amber-200/80">
+                Suma seleccionada (cuadrar con pago al banco):{" "}
+              </span>
+              <strong className="tabular-nums text-teal-950 banking-dark:text-amber-50">{formatClpDots(selectedSumClp)}</strong>
+              <span className="text-teal-700/88 banking-dark:text-amber-300/85">
+                {" "}
+                · {selectedIds.size} movimiento(s)
+              </span>
             </>
           ) : (
-            <span className="text-slate-400">
+            <span className="text-slate-400 banking-dark:text-zinc-500">
               Marca cargos para ver la suma y alinearla con el monto que transferirás desde la cuenta corriente asociada.
             </span>
           )}
@@ -1833,7 +1819,7 @@ function BankingCcPendingChargesTable({
               <th className={`px-1.5 py-2.5 text-center sm:px-2 ${BANKING_AUX_TX_TH_TEXT_CLASS}`} aria-label="Acciones" />
             </tr>
           </thead>
-          <tbody className={BANKING_AUX_TX_TBODY_CLASS}>
+          <tbody>
             {rows.map((row) => {
               const income = row.amount >= 0;
               const sharedSettledLabel = row.is_shared
@@ -1847,7 +1833,6 @@ function BankingCcPendingChargesTable({
                   : row.credit_card_charge_paid
                     ? "Sí"
                     : "No";
-              const accountingLabel = formatBankingAccountingMonth(row.accounting_month);
               const checked = selectedIds.has(row.id);
               return (
                 <tr key={row.id} className={BANKING_AUX_TX_TR_CLASS}>
@@ -1866,7 +1851,6 @@ function BankingCcPendingChargesTable({
                       income={income}
                       sharedSettledLabel={sharedSettledLabel}
                       ccPaidLabel={ccPaidLabel}
-                      accountingLabel={accountingLabel}
                       montoAlign="center"
                     />
                   ))}
@@ -1979,13 +1963,18 @@ function BankingSharedPendingChargesTable({
         Compartidos pendientes · {accountHeading}
       </h3>
       {selectedInSection > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-100 bg-violet-50/80 px-3 py-2 text-xs leading-snug text-slate-600 shadow-sm">
-          <p className="min-w-0 flex-1">
-            <span className="text-slate-400">Total gasto seleccionado (esta cuenta): </span>
-            <strong className="tabular-nums text-violet-900">{formatClpDots(selectedTotals.totalAbs)}</strong>
-            <span className="text-slate-400"> · Suma de pago por persona (cuota de cada movimiento): </span>
-            <strong className="tabular-nums text-violet-900">{formatClpDots(selectedTotals.sumPerPerson)}</strong>
-            <span className="text-slate-500"> · {selectedInSection} movimiento(s)</span>
+        <div
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs leading-snug ${BANKING_SELECTION_SUMMARY_TICKET_ACTIVE_CLASS}`}
+        >
+          <p className="min-w-0 flex-1 text-teal-950 banking-dark:text-amber-50">
+            <span className="text-teal-800/90 banking-dark:text-amber-200/80">Total gasto seleccionado (esta cuenta): </span>
+            <strong className="tabular-nums text-teal-950 banking-dark:text-amber-50">{formatClpDots(selectedTotals.totalAbs)}</strong>
+            <span className="text-teal-800/88 banking-dark:text-amber-200/78">
+              {" "}
+              · Suma de pago por persona (cuota de cada movimiento):{" "}
+            </span>
+            <strong className="tabular-nums text-teal-950 banking-dark:text-amber-50">{formatClpDots(selectedTotals.sumPerPerson)}</strong>
+            <span className="text-teal-700/88 banking-dark:text-amber-300/85"> · {selectedInSection} movimiento(s)</span>
           </p>
           <button type="button" onClick={onClearSectionSelection} className={bankingToolbarGhostBtnClass}>
             Limpiar selección
@@ -2040,7 +2029,7 @@ function BankingSharedPendingChargesTable({
               <th className={`px-1.5 py-2.5 text-center sm:px-2 ${BANKING_AUX_TX_TH_TEXT_CLASS}`} aria-label="Acciones" />
             </tr>
           </thead>
-          <tbody className={BANKING_AUX_TX_TBODY_CLASS}>
+          <tbody>
             {rows.map((row) => {
               const income = row.amount >= 0;
               const sharedSettledLabel = row.is_shared
@@ -2054,7 +2043,6 @@ function BankingSharedPendingChargesTable({
                   : row.credit_card_charge_paid
                     ? "Sí"
                     : "No";
-              const accountingLabel = formatBankingAccountingMonth(row.accounting_month);
               const checked = selectedIds.has(row.id);
               return (
                 <tr key={row.id} className={BANKING_AUX_TX_TR_CLASS}>
@@ -2073,7 +2061,6 @@ function BankingSharedPendingChargesTable({
                       income={income}
                       sharedSettledLabel={sharedSettledLabel}
                       ccPaidLabel={ccPaidLabel}
-                      accountingLabel={accountingLabel}
                       montoAlign="center"
                     />
                   ))}
@@ -2209,7 +2196,7 @@ function BankingProvisionPendingTable({
               <th className={`px-1.5 py-2.5 text-center sm:px-2 ${BANKING_AUX_TX_TH_TEXT_CLASS}`} aria-label="Acciones" />
             </tr>
           </thead>
-          <tbody className={BANKING_AUX_TX_TBODY_CLASS}>
+          <tbody>
             {rows.map((row) => {
               const income = row.amount >= 0;
               const sharedSettledLabel = row.is_shared ? (row.shared_expense_settled ? "Sí" : "No") : "—";
@@ -2219,7 +2206,6 @@ function BankingProvisionPendingTable({
                   : row.credit_card_charge_paid
                     ? "Sí"
                     : "No";
-              const accountingLabel = formatBankingAccountingMonth(row.accounting_month);
               const checked = selectedIds.has(row.id);
               return (
                 <tr key={row.id} className={BANKING_AUX_TX_TR_CLASS}>
@@ -2238,7 +2224,6 @@ function BankingProvisionPendingTable({
                       income={income}
                       sharedSettledLabel={sharedSettledLabel}
                       ccPaidLabel={ccPaidLabel}
-                      accountingLabel={accountingLabel}
                       montoAlign="center"
                     />
                   ))}
@@ -2285,7 +2270,7 @@ function BankingProvisionPendingTable({
 }
 
 const dateInputClass =
-  "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 [color-scheme:light]";
+  "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
 
 function pickDate(e: React.MouseEvent<HTMLInputElement>) {
   const el = e.currentTarget;
@@ -2333,16 +2318,6 @@ function buildYm(y: number, m: number): string {
   return `${y}-${String(Math.min(12, Math.max(1, m))).padStart(2, "0")}`;
 }
 
-/** Primera fecha del mes contable (ISO) → "Abr 2026" para tabla. */
-function formatBankingAccountingMonth(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const head = iso.slice(0, 10);
-  const mo = Number(head.slice(5, 7));
-  const y = Number(head.slice(0, 4));
-  if (!y || !mo || mo < 1 || mo > 12) return "—";
-  return `${ACCOUNTING_MONTH_ABBR_ES[mo - 1]} ${y}`;
-}
-
 /** Lista de años alrededor del año central (p. ej. selector solo año). */
 function accountingYearRange(centerY: number): number[] {
   const out: number[] = [];
@@ -2368,16 +2343,16 @@ function SiNoField({
 }) {
   return (
     <div className="space-y-1.5">
-      <span className="text-xs text-slate-500">{label}</span>
-      <div className="flex gap-2 rounded-xl border border-slate-200 bg-slate-50/80 p-1">
+      <span className={bankingModalFieldLabelClass}>{label}</span>
+      <div className="flex gap-2 rounded-xl border border-slate-300 bg-slate-50/80 p-1 banking-dark:border-zinc-600 banking-dark:bg-zinc-900/75">
         <button
           type="button"
           aria-pressed={value === true}
           onClick={() => onChange(true)}
           className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
             value === true
-              ? "border border-teal-300 bg-teal-100 text-teal-900 shadow-sm"
-              : "border border-transparent text-slate-600 hover:bg-white hover:text-slate-900"
+              ? "border border-emerald-200 bg-emerald-100 text-emerald-800 shadow-sm ring-1 ring-emerald-200/80 banking-dark:border-emerald-800/55 banking-dark:bg-emerald-950/55 banking-dark:text-emerald-300 banking-dark:ring-emerald-800/60 banking-dark:shadow-none"
+              : "border border-transparent text-slate-600 hover:bg-white hover:text-slate-900 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-100"
           }`}
         >
           {yesLabel}
@@ -2388,8 +2363,8 @@ function SiNoField({
           onClick={() => onChange(false)}
           className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
             value === false
-              ? "border border-rose-200 bg-rose-100 text-rose-900 shadow-sm"
-              : "border border-transparent text-slate-600 hover:bg-white hover:text-slate-900"
+              ? "border border-rose-200 bg-rose-100 text-rose-800 shadow-sm ring-1 ring-rose-200/80 banking-dark:border-rose-900/45 banking-dark:bg-rose-950/50 banking-dark:text-rose-300 banking-dark:ring-rose-900/55 banking-dark:shadow-none"
+              : "border border-transparent text-slate-600 hover:bg-white hover:text-slate-900 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-100"
           }`}
         >
           {noLabel}
@@ -2400,6 +2375,7 @@ function SiNoField({
 }
 
 export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | null) => void }) {
+  const { isDark } = useBankingTheme();
   const [accounts, setAccounts] = useState<BankingAccountRow[]>([]);
   const [bankingDebtTotals, setBankingDebtTotals] = useState<BankingDebtTotalsOut>({
     credit_card_unpaid_clp: 0,
@@ -2470,10 +2446,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const [filterDateTo, setFilterDateTo] = useState("");
   const [filterDescription, setFilterDescription] = useState("");
   const [filterAccountIds, setFilterAccountIds] = useState<number[]>([]);
-  /** Rango por fecha de movimiento en servidor (predeterminado: últimos 60 días). */
-  const [bankingAccountingFullHistory, setBankingAccountingFullHistory] = useState(false);
-  const [bankingTxDateFrom, setBankingTxDateFrom] = useState(() => defaultBankingTxDateRangeIso().from);
-  const [bankingTxDateTo, setBankingTxDateTo] = useState(() => defaultBankingTxDateRangeIso().to);
+  /** Rango por fecha de movimiento en servidor (Desde / hasta; por defecto últimos 2 meses). */
+  const [bankingTxDateFrom, setBankingTxDateFrom] = useState(() => bankingTxRangeForLastTwoMonths().from);
+  const [bankingTxDateTo, setBankingTxDateTo] = useState(() => bankingTxRangeForLastTwoMonths().to);
   const [filterAmountMin, setFilterAmountMin] = useState("");
   const [filterAmountMax, setFilterAmountMax] = useState("");
   const [filterCategoryIds, setFilterCategoryIds] = useState<number[]>([]);
@@ -2838,12 +2813,16 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     return () => cancelAnimationFrame(id);
   }, [subcategoryMenuOpen]);
 
+  const effectiveBankingMovementDateRange = useMemo(
+    () => resolveBankingTxMovementDateRange(bankingTxDateFrom, bankingTxDateTo),
+    [bankingTxDateFrom, bankingTxDateTo],
+  );
+
   bankingViewKeyRef.current = bankingTabCacheKey(
     movementTab,
     filterAccountIds,
-    bankingAccountingFullHistory,
-    bankingTxDateFrom,
-    bankingTxDateTo,
+    effectiveBankingMovementDateRange.from,
+    effectiveBankingMovementDateRange.to,
   );
   const buildBankingTxQueryParams = useCallback(
     (page: number, tabScope: BankingMovementTabScope = movementTab) => {
@@ -2858,18 +2837,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       if (tabScope === "credit_card") params.set("scope", "credit_card");
       if (tabScope === "shared") params.set("scope", "shared");
       if (tabScope === "provisiones") params.set("scope", "provisiones");
-      if (bankingAccountingFullHistory) {
-        params.set("full_history", "true");
-      } else {
-        let df = bankingTxDateFrom;
-        let dt = bankingTxDateTo;
-        if (df > dt) [df, dt] = [dt, df];
-        params.set("date_from", df);
-        params.set("date_to", dt);
-      }
+      params.set("date_from", effectiveBankingMovementDateRange.from);
+      params.set("date_to", effectiveBankingMovementDateRange.to);
       return params;
     },
-    [filterAccountIds, movementTab, bankingAccountingFullHistory, bankingTxDateFrom, bankingTxDateTo],
+    [filterAccountIds, movementTab, effectiveBankingMovementDateRange.from, effectiveBankingMovementDateRange.to],
   );
 
   /** Respuesta cruda de lista (sin setState). */
@@ -3003,9 +2975,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     const requestKey = bankingTabCacheKey(
       movementTab,
       filterAccountIds,
-      bankingAccountingFullHistory,
-      bankingTxDateFrom,
-      bankingTxDateTo,
+      effectiveBankingMovementDateRange.from,
+      effectiveBankingMovementDateRange.to,
     );
     const cached = tabTxCacheRef.current.get(requestKey);
 
@@ -3048,9 +3019,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   }, [
     movementTab,
     filterAccountIds,
-    bankingAccountingFullHistory,
-    bankingTxDateFrom,
-    bankingTxDateTo,
+    effectiveBankingMovementDateRange.from,
+    effectiveBankingMovementDateRange.to,
     reloadBankingDataForScope,
   ]);
 
@@ -3069,9 +3039,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
           const key = bankingTabCacheKey(
             scope,
             filterAccountIds,
-            bankingAccountingFullHistory,
-            bankingTxDateFrom,
-            bankingTxDateTo,
+            effectiveBankingMovementDateRange.from,
+            effectiveBankingMovementDateRange.to,
           );
           if (tabTxCacheRef.current.has(key)) continue;
           try {
@@ -3102,9 +3071,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   }, [
     movementTab,
     filterAccountIds,
-    bankingAccountingFullHistory,
-    bankingTxDateFrom,
-    bankingTxDateTo,
+    effectiveBankingMovementDateRange.from,
+    effectiveBankingMovementDateRange.to,
     loadBankingTransactionsFromNetwork,
     fetchBankingMetaFromNetwork,
     loading,
@@ -3129,9 +3097,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       const pageKey = bankingTabCacheKey(
         scope,
         filterAccountIds,
-        bankingAccountingFullHistory,
-        bankingTxDateFrom,
-        bankingTxDateTo,
+        effectiveBankingMovementDateRange.from,
+        effectiveBankingMovementDateRange.to,
       );
       bankingTxPageFetchAbortRef.current?.abort();
       const ac = new AbortController();
@@ -3160,9 +3127,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       }
     },
     [
-      bankingAccountingFullHistory,
-      bankingTxDateFrom,
-      bankingTxDateTo,
+      effectiveBankingMovementDateRange.from,
+      effectiveBankingMovementDateRange.to,
       bankingTxTotalPages,
       filterAccountIds,
       loadBankingTransactionsFromNetwork,
@@ -3338,6 +3304,24 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     }
     return { totalAbs, sumPerPerson, count };
   }, [sharedPendingAllRows, selectedSharedIds]);
+
+  /** Provisiones pendientes de reversar en todas las cuentas (totales globales de selección). */
+  const provisionPendingAllRows = useMemo(
+    () => provisionPendingGroups.flatMap((g) => g.items),
+    [provisionPendingGroups],
+  );
+
+  /** Suma con signo de los pendientes marcados en la vista Provisiones, sin importar la cuenta. */
+  const provisionSelectionGlobalTotals = useMemo(() => {
+    let sum = 0;
+    let count = 0;
+    for (const row of provisionPendingAllRows) {
+      if (!selectedProvisionReverseIds.has(row.id)) continue;
+      sum += row.amount;
+      count += 1;
+    }
+    return { sum, count };
+  }, [provisionPendingAllRows, selectedProvisionReverseIds]);
 
   const filterAccountsSorted = useMemo(() => {
     return [...accounts].sort((a, b) => a.name.localeCompare(b.name, "es"));
@@ -3516,7 +3500,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   ]);
 
   useEffect(() => {
-    if (filteredBankingTxItems.length === 0) setHeaderFilterOpen(null);
+    if (filteredBankingTxItems.length === 0) {
+      setHeaderFilterOpen(null);
+    }
   }, [filteredBankingTxItems.length]);
 
   const bankingTxFiltersActive = useMemo(() => {
@@ -3620,6 +3606,18 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     setFilterTcPaidValues([]);
     setFilterAccountingMonthYms([]);
     setHeaderFilterOpen(null);
+  }, []);
+
+  const closeMovementModal = useCallback(() => {
+    setModalOpen(false);
+    setEditing(null);
+    setScopeMenuOpen(false);
+    setCategoryMenuOpen(false);
+    setSubcategoryMenuOpen(false);
+    setCategoryPickerSearch("");
+    setSubcategoryPickerSearch("");
+    setAccountingPickMode(null);
+    setProvisionReversalOnSave(false);
   }, []);
 
   function openNew() {
@@ -3810,15 +3808,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       }
       const wasEditing = editing != null;
       const pageAfterSave = wasEditing ? bankingTxPage : 1;
-      setModalOpen(false);
-      setEditing(null);
-      setScopeMenuOpen(false);
-      setCategoryMenuOpen(false);
-      setSubcategoryMenuOpen(false);
-      setCategoryPickerSearch("");
-      setSubcategoryPickerSearch("");
-      setAccountingPickMode(null);
-      setProvisionReversalOnSave(false);
+      closeMovementModal();
       await reloadBankingFull(pageAfterSave);
     } catch (e) {
       onToast(e instanceof Error ? e.message : "No se pudo guardar");
@@ -3997,11 +3987,20 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   }
 
   return (
-    <div className="banking-theme min-h-full bg-gradient-to-br from-slate-50 via-cyan-50/90 to-indigo-50/70 text-slate-800">
+    <div
+      className={`banking-theme min-h-full ${
+        isDark
+          ? "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(251,191,36,0.055),transparent_52%),linear-gradient(to_bottom,#0d0d0d,#070707)] text-zinc-300"
+          : "bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100/80 text-slate-800"
+      }`}
+    >
     <div className="mx-auto w-full max-w-[min(100%,1560px)] space-y-6 px-4 pb-28 pt-4 md:px-10 md:pt-6">
+      <div className="flex justify-end">
+        <BankingThemeToggle />
+      </div>
       {accounts.length > 0 ? (
         <section aria-labelledby="banking-account-balances-heading">
-          <h2 id="banking-account-balances-heading" className="mb-3 text-lg font-semibold text-slate-800">
+          <h2 id="banking-account-balances-heading" className="mb-3 text-lg font-semibold text-slate-800 banking-dark:text-zinc-100">
             Saldos cuentas
           </h2>
           <DndContext sensors={columnDndSensors} collisionDetection={closestCenter} onDragEnd={handleBalanceCardDragEnd}>
@@ -4037,17 +4036,13 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       ) : null}
 
       <section className={BANKING_MOVEMENTS_SECTION_CLASS} aria-label="Movimientos">
-        <div className={BANKING_MOVEMENTS_TABLIST_CLASS} role="tablist" aria-label="Tipo de vista">
+        <div className={BANKING_MOVEMENTS_TAB_BAR_CLASS} role="tablist" aria-label="Tipo de vista">
           <button
             type="button"
             role="tab"
             aria-selected={movementTab === "all"}
             onClick={() => setMovementTab("all")}
-            className={`rounded-t-xl px-5 py-2.5 text-sm font-medium transition ${
-              movementTab === "all"
-                ? "border border-b-0 border-teal-200 bg-white text-teal-900 shadow-sm"
-                : "rounded-xl border border-transparent text-slate-600 hover:bg-white/70 hover:text-teal-800"
-            }`}
+            className={movementTab === "all" ? BANKING_MOVEMENTS_TAB_BTN_ACTIVE : BANKING_MOVEMENTS_TAB_BTN_IDLE}
           >
             Movimientos bancarios
           </button>
@@ -4056,11 +4051,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             role="tab"
             aria-selected={movementTab === "credit_card"}
             onClick={() => setMovementTab("credit_card")}
-            className={`rounded-t-xl px-5 py-2.5 text-sm font-medium transition ${
-              movementTab === "credit_card"
-                ? "border border-b-0 border-teal-200 bg-white text-teal-900 shadow-sm"
-                : "rounded-xl border border-transparent text-slate-600 hover:bg-white/70 hover:text-teal-800"
-            }`}
+            className={
+              movementTab === "credit_card" ? BANKING_MOVEMENTS_TAB_BTN_ACTIVE : BANKING_MOVEMENTS_TAB_BTN_IDLE
+            }
           >
             Tarjeta de crédito
           </button>
@@ -4069,11 +4062,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             role="tab"
             aria-selected={movementTab === "shared"}
             onClick={() => setMovementTab("shared")}
-            className={`rounded-t-xl px-5 py-2.5 text-sm font-medium transition ${
-              movementTab === "shared"
-                ? "border border-b-0 border-teal-200 bg-white text-teal-900 shadow-sm"
-                : "rounded-xl border border-transparent text-slate-600 hover:bg-white/70 hover:text-teal-800"
-            }`}
+            className={movementTab === "shared" ? BANKING_MOVEMENTS_TAB_BTN_ACTIVE : BANKING_MOVEMENTS_TAB_BTN_IDLE}
           >
             Pago compartido
           </button>
@@ -4082,20 +4071,18 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             role="tab"
             aria-selected={movementTab === "provisiones"}
             onClick={() => setMovementTab("provisiones")}
-            className={`rounded-t-xl px-5 py-2.5 text-sm font-medium transition ${
-              movementTab === "provisiones"
-                ? "border border-b-0 border-teal-200 bg-white text-teal-900 shadow-sm"
-                : "rounded-xl border border-transparent text-slate-600 hover:bg-white/70 hover:text-teal-800"
-            }`}
+            className={
+              movementTab === "provisiones" ? BANKING_MOVEMENTS_TAB_BTN_ACTIVE : BANKING_MOVEMENTS_TAB_BTN_IDLE
+            }
           >
             Provisiones
           </button>
         </div>
 
-        <div className="space-y-5 p-4 md:p-6">
+        <div className="space-y-5 bg-white p-4 md:p-6 banking-dark:bg-zinc-950 banking-dark:text-zinc-300">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">
+          <h2 className="text-lg font-semibold text-slate-800 banking-dark:text-zinc-100">
             {movementTab === "credit_card"
               ? "Tarjeta de crédito"
               : movementTab === "shared"
@@ -4104,15 +4091,15 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   ? "Provisiones"
                   : "Movimientos bancarios"}
           </h2>
-          <p className="mt-1 text-sm text-slate-600">
-            {movementTab === "credit_card"
-              ? "Cargos y pagos de TC; arriba, cargos pendientes por tarjeta para marcarlos pagados al liquidar."
-              : movementTab === "shared"
-                ? "Solo movimientos compartidos; arriba, pendientes de liquidar. Puedes marcar varios a la vez con la casilla y «Marcar como pagados»."
-                : movementTab === "provisiones"
-                  ? "Solo categoría Provisiones; arriba, pendientes de registrar la reversa contable. La tabla lista todas las provisiones del período."
-                  : "Ingresos y egresos por cuenta: el signo del monto define el tipo (positivo / negativo)."}
-          </p>
+          {movementTab !== "all" ? (
+            <p className="mt-1 text-sm text-slate-600 banking-dark:text-zinc-400">
+              {movementTab === "credit_card"
+                ? "Cargos y pagos de TC; arriba, cargos pendientes por tarjeta para marcarlos pagados al liquidar."
+                : movementTab === "shared"
+                  ? "Solo movimientos compartidos; arriba, pendientes de liquidar. Puedes marcar varios a la vez con la casilla y «Marcar como pagados»."
+                  : "Solo categoría Provisiones; arriba, pendientes de registrar la reversa contable. La tabla lista todas las provisiones del período."}
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div ref={columnPickerWrapRef} className="relative">
@@ -4122,9 +4109,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               aria-haspopup="dialog"
               aria-controls="banking-tx-column-picker"
               onClick={() => setColumnPickerOpen((o) => !o)}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50/80"
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800"
             >
-              <IconColumns className="h-4 w-4 text-slate-300" aria-hidden />
+              <IconColumns className="h-4 w-4 text-slate-300 banking-dark:text-zinc-500" aria-hidden />
               Columnas
             </button>
             {columnPickerOpen && (
@@ -4132,12 +4119,12 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 id="banking-tx-column-picker"
                 role="dialog"
                 aria-label="Columnas de la tabla"
-                className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(calc(100vw-2rem),21rem)] rounded-xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-300/40 ring-1 ring-slate-100"
+                className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(calc(100vw-2rem),21rem)] rounded-xl border border-slate-300 bg-white p-3 shadow-xl shadow-slate-300/40 ring-1 ring-slate-300 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:shadow-black/40 banking-dark:ring-zinc-700"
               >
-                <p className="mb-1 text-[12px] font-medium uppercase tracking-wide text-slate-400">
+                <p className="mb-1 text-[12px] font-medium uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">
                   Orden y visibilidad
                 </p>
-                <p className="mb-2 text-[12px] leading-snug text-slate-500">
+                <p className="mb-2 text-[12px] leading-snug text-slate-500 banking-dark:text-zinc-400">
                   Arrastra ⋮⋮ para ordenar. Fecha y Monto no se pueden ocultar.
                 </p>
                 <DndContext
@@ -4165,7 +4152,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 <button
                   type="button"
                   onClick={resetBankingTxColumns}
-                  className="mt-3 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-900"
+                  className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 banking-dark:border-zinc-600 banking-dark:text-zinc-400 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-100"
                 >
                   Restablecer orden y columnas
                 </button>
@@ -4174,7 +4161,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
           </div>
           <Link
             to="/banking/settings"
-            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:border-teal-300 hover:bg-teal-50"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800"
           >
             Cuentas
           </Link>
@@ -4182,7 +4169,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             type="button"
             disabled={!hasVisibleAccount}
             onClick={openNew}
-            className="rounded-xl border border-teal-400/80 bg-gradient-to-r from-teal-400 to-emerald-400 px-5 py-2 text-sm font-semibold text-white shadow-[0_6px_24px_-6px_rgba(20,184,166,0.45)] hover:from-teal-500 hover:to-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-xl border border-slate-800 bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 banking-dark:border-amber-600/45 banking-dark:bg-amber-600 banking-dark:text-zinc-950 banking-dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)] banking-dark:hover:border-amber-500/55 banking-dark:hover:bg-amber-500"
           >
             Nuevo movimiento
           </button>
@@ -4190,18 +4177,24 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       </div>
 
       {accounts.length === 0 && !loading && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900/90">
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900/90 banking-dark:border-amber-900/45 banking-dark:bg-amber-950/35 banking-dark:text-amber-100/90">
           Primero crea al menos un producto en{" "}
-          <Link to="/banking/settings" className="font-medium text-teal-700 underline decoration-teal-300 hover:text-teal-800">
+          <Link
+            to="/banking/settings"
+            className="font-medium text-teal-700 underline decoration-teal-300 hover:text-teal-800 banking-dark:text-amber-300/95 banking-dark:decoration-amber-900 banking-dark:hover:text-amber-200"
+          >
             Cuentas
           </Link>
           .
         </p>
       )}
       {accounts.length > 0 && !hasVisibleAccount && !loading && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900/90">
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900/90 banking-dark:border-amber-900/45 banking-dark:bg-amber-950/35 banking-dark:text-amber-100/90">
           Ningún producto está visible para movimientos. Activa al menos uno en{" "}
-          <Link to="/banking/settings" className="font-medium text-teal-700 underline decoration-teal-300 hover:text-teal-800">
+          <Link
+            to="/banking/settings"
+            className="font-medium text-teal-700 underline decoration-teal-300 hover:text-teal-800 banking-dark:text-amber-300/95 banking-dark:decoration-amber-900 banking-dark:hover:text-amber-200"
+          >
             Cuentas
           </Link>
           .
@@ -4228,18 +4221,20 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       ) : null}
 
       {movementTab === "shared" && !loading && sharedSelectionGlobalTotals.count > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-300/80 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-4 py-3 text-sm shadow-sm ring-1 ring-violet-100">
-          <p className="min-w-0 flex-1 leading-snug text-slate-700">
-            <span className="font-semibold text-violet-950">Selección global (todas las cuentas):</span>{" "}
-            <span className="text-slate-600">total gasto </span>
-            <strong className="tabular-nums text-violet-900">
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm ${BANKING_SELECTION_SUMMARY_TICKET_ACTIVE_CLASS}`}
+        >
+          <p className="min-w-0 flex-1 leading-snug text-teal-950 banking-dark:text-amber-50">
+            <span className="font-semibold text-teal-900 banking-dark:text-amber-100">Selección global (todas las cuentas):</span>{" "}
+            <span className="text-teal-800/88 banking-dark:text-amber-200/78">total gasto </span>
+            <strong className="tabular-nums text-teal-950 banking-dark:text-amber-50">
               {formatClpDots(sharedSelectionGlobalTotals.totalAbs)}
             </strong>
-            <span className="text-slate-600"> · suma cuotas por persona </span>
-            <strong className="tabular-nums text-violet-900">
+            <span className="text-teal-800/88 banking-dark:text-amber-200/78"> · suma cuotas por persona </span>
+            <strong className="tabular-nums text-teal-950 banking-dark:text-amber-50">
               {formatClpDots(sharedSelectionGlobalTotals.sumPerPerson)}
             </strong>
-            <span className="text-slate-500"> · {sharedSelectionGlobalTotals.count} movimiento(s)</span>
+            <span className="text-teal-700/85 banking-dark:text-amber-300/82"> · {sharedSelectionGlobalTotals.count} movimiento(s)</span>
           </p>
           <button
             type="button"
@@ -4276,6 +4271,28 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         </div>
       ) : null}
 
+      {movementTab === "provisiones" && !loading && provisionSelectionGlobalTotals.count > 0 ? (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm ${BANKING_SELECTION_SUMMARY_TICKET_ACTIVE_CLASS}`}
+        >
+          <p className="min-w-0 flex-1 leading-snug text-teal-950 banking-dark:text-amber-50">
+            <span className="font-semibold text-teal-900 banking-dark:text-amber-100">Selección global (todas las cuentas):</span>{" "}
+            <span className="text-teal-800/88 banking-dark:text-amber-200/78">suma de movimientos </span>
+            <strong className="tabular-nums text-teal-950 banking-dark:text-amber-50">
+              {formatBankingClpSigned(provisionSelectionGlobalTotals.sum)}
+            </strong>
+            <span className="text-teal-700/85 banking-dark:text-amber-300/82"> · {provisionSelectionGlobalTotals.count} movimiento(s)</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => setSelectedProvisionReverseIds(new Set())}
+            className={bankingToolbarGhostBtnClass}
+          >
+            Limpiar toda la selección
+          </button>
+        </div>
+      ) : null}
+
       {movementTab === "provisiones" && !loading && provisionPendingGroups.length > 0 ? (
         <div className="space-y-1">
           {provisionPendingGroups.map((g) => (
@@ -4302,94 +4319,74 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
       <div className={BANKING_MAIN_TX_CARD_CLASS}>
         {loading ? (
-          <p className="p-6 text-sm text-slate-400">Cargando…</p>
+          <p className="p-6 text-sm text-slate-400 banking-dark:text-zinc-500">Cargando…</p>
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-teal-100/90 bg-gradient-to-r from-teal-50/90 to-cyan-50/70 px-3 py-2.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Fecha movimiento</span>
-              <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500/30"
-                  checked={bankingAccountingFullHistory}
-                  onChange={(e) => {
-                    const on = e.target.checked;
-                    setBankingAccountingFullHistory(on);
-                    if (!on) {
-                      const d = defaultBankingTxDateRangeIso();
-                      setBankingTxDateFrom(d.from);
-                      setBankingTxDateTo(d.to);
-                    }
-                  }}
-                />
-                Todo el historial
-              </label>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-slate-500">Desde</span>
-                <input
-                  type="date"
-                  value={bankingTxDateFrom}
-                  disabled={bankingAccountingFullHistory}
-                  onChange={(e) => {
-                    setBankingAccountingFullHistory(false);
-                    setBankingTxDateFrom(e.target.value);
-                  }}
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-45 [color-scheme:light]"
-                />
-                <span className="text-xs text-slate-500">hasta</span>
-                <input
-                  type="date"
-                  value={bankingTxDateTo}
-                  disabled={bankingAccountingFullHistory}
-                  onChange={(e) => {
-                    setBankingAccountingFullHistory(false);
-                    setBankingTxDateTo(e.target.value);
-                  }}
-                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-45 [color-scheme:light]"
-                />
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-t-xl border-b border-slate-300 bg-white px-3 py-2.5 banking-dark:border-zinc-700 banking-dark:bg-zinc-950">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 banking-dark:text-zinc-500">
+                Fecha movimiento
+              </span>
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-slate-500 banking-dark:text-zinc-500">Desde</span>
+                  <input
+                    id="banking-tx-date-from"
+                    type="date"
+                    value={bankingTxDateFrom}
+                    onChange={(e) => setBankingTxDateFrom(e.target.value)}
+                    onClick={pickDate}
+                    className={bankingToolbarDateInputClass}
+                    aria-label="Fecha desde (movimiento)"
+                  />
+                  <span className="text-xs text-slate-500 banking-dark:text-zinc-500">hasta</span>
+                  <input
+                    id="banking-tx-date-to"
+                    type="date"
+                    value={bankingTxDateTo}
+                    onChange={(e) => setBankingTxDateTo(e.target.value)}
+                    onClick={pickDate}
+                    className={bankingToolbarDateInputClass}
+                    aria-label="Fecha hasta (movimiento)"
+                  />
+                </div>
+                {tabRefreshing ? <span className="text-[11px] text-slate-500 banking-dark:text-zinc-500">Actualizando…</span> : null}
               </div>
-              <p className="w-full min-w-0 text-[11px] leading-snug text-slate-500 sm:w-auto sm:pl-1">
-                {bankingAccountingFullHistory
-                  ? "Sin filtro de fechas en servidor. Sigue habiendo 50 movimientos por página."
-                  : "Por defecto: últimos 60 días por fecha del movimiento. Amplía las fechas o usa «Todo el historial»."}
-                {tabRefreshing ? <span className="ml-1 text-teal-600">· Actualizando…</span> : null}
-              </p>
             </div>
             {items.length === 0 ? (
-              <p className="p-6 text-sm text-slate-400">
-                No hay movimientos en este período. Amplía el rango de fechas o activa «Todo el historial».
+              <p className="p-6 text-sm text-slate-400 banking-dark:text-zinc-500">
+                No hay movimientos en este período. Amplía el rango Desde / hasta.
               </p>
             ) : (
           <BankingTxFilterUICtx.Provider value={bankingTxFilterUICtxValue}>
             <div className={BANKING_MAIN_TX_TOOLBAR_CLASS}>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-400 banking-dark:text-zinc-500">
                 {bankingTxTotalPages > 1 ? (
                   <>
                     Página{" "}
-                    <strong className="tabular-nums text-slate-800">{bankingTxPage}</strong>/
-                    <strong className="tabular-nums text-slate-800">{bankingTxTotalPages}</strong>
+                    <strong className="tabular-nums text-slate-800 banking-dark:text-zinc-200">{bankingTxPage}</strong>/
+                    <strong className="tabular-nums text-slate-800 banking-dark:text-zinc-200">{bankingTxTotalPages}</strong>
                     {" · "}
                   </>
                 ) : null}
-                <strong className="tabular-nums text-slate-800">{bankingTxTotal}</strong> movimientos
+                <strong className="tabular-nums text-slate-800 banking-dark:text-zinc-200">{bankingTxTotal}</strong> movimientos
                 {filteredBankingTxItems.length !== items.length && items.length > 0 ? (
                   <>
                     {" · "}
-                    <strong className="tabular-nums text-teal-700">{filteredBankingTxItems.length}</strong>
+                    <strong className="tabular-nums text-slate-700 banking-dark:text-zinc-300">{filteredBankingTxItems.length}</strong>
                     {" / "}
-                    <strong className="tabular-nums text-slate-800">{items.length}</strong>
-                    <span className="text-slate-500"> en esta página</span>
+                    <strong className="tabular-nums text-slate-800 banking-dark:text-zinc-200">{items.length}</strong>
+                    <span className="text-slate-500 banking-dark:text-zinc-500"> en esta página</span>
                   </>
                 ) : null}
               </p>
               {tabRefreshing ? (
                 <span
-                  className="inline-flex items-center gap-2 text-xs font-medium text-teal-700"
+                  className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 banking-dark:text-zinc-400"
                   role="status"
                   aria-live="polite"
                 >
                   <span
-                    className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-teal-500"
+                    className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-slate-400 banking-dark:bg-amber-900/70"
                     aria-hidden
                   />
                   Actualizando datos…
@@ -4407,12 +4404,14 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             </div>
             {filteredBankingTxItems.length === 0 ? (
               <div className="px-6 py-14 text-center">
-                <p className="text-sm font-medium text-slate-800">Ningún movimiento coincide con los filtros</p>
-                <p className="mt-1 text-xs text-slate-400">Ajusta los filtros en los encabezados o pulsa «Limpiar filtros».</p>
+                <p className="text-sm font-medium text-slate-800 banking-dark:text-zinc-200">Ningún movimiento coincide con los filtros</p>
+                <p className="mt-1 text-xs text-slate-400 banking-dark:text-zinc-500">
+                  Ajusta los filtros en los encabezados de la tabla o pulsa «Limpiar filtros».
+                </p>
                 <button
                   type="button"
                   onClick={clearBankingTxFilters}
-                  className="mt-4 rounded-lg border border-teal-200 bg-teal-50 px-4 py-2 text-sm font-medium text-teal-900 shadow-sm transition hover:bg-teal-100"
+                  className="mt-4 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-800"
                 >
                   Limpiar filtros
                 </button>
@@ -4421,7 +4420,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               <>
                 <div
                   ref={bankingTxScrollRef}
-                  className="banking-table-scroll max-h-[min(65vh,560px)] overflow-auto border-t border-teal-100"
+                  className="banking-table-scroll max-h-[min(65vh,560px)] overflow-auto border-t border-slate-300 banking-dark:border-zinc-800"
                 >
                   <table
                     className="w-full table-fixed border-collapse text-[12px]"
@@ -4439,7 +4438,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                           <BankingTxColumnHeader key={colKey} colKey={colKey} />
                         ))}
                         <th
-                          className="px-1.5 py-3 text-center text-[12px] font-semibold uppercase tracking-wide text-teal-900/75 sm:px-2"
+                          className="px-1.5 py-3 text-center text-[12px] font-semibold uppercase tracking-wide text-slate-600 banking-dark:text-zinc-300 sm:px-2"
                           aria-label="Acciones"
                         />
                       </tr>
@@ -4454,10 +4453,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   </table>
                 </div>
                 <div className={BANKING_MAIN_TX_FOOTER_CLASS}>
-                  <p className="text-[12px] leading-snug text-slate-400">
-                    Hasta <strong className="text-slate-800">{BANKING_TX_PAGE_SIZE}</strong> movimientos por página.
+                  <p className="text-[12px] leading-snug text-slate-400 banking-dark:text-zinc-500">
+                    Hasta <strong className="text-slate-800 banking-dark:text-zinc-200">{BANKING_TX_PAGE_SIZE}</strong> movimientos por página.
                     {filterAccountIds.length > 0 ? (
-                      <span className="text-slate-500">
+                      <span className="text-slate-500 banking-dark:text-zinc-500">
                         {" "}
                         {filterAccountIds.length === 1
                           ? "Cuenta acotada en servidor."
@@ -4474,9 +4473,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     >
                       Anterior
                     </button>
-                    <span className="text-xs tabular-nums text-slate-600">
-                      Página <strong className="text-slate-800">{bankingTxPage}</strong> /{" "}
-                      <strong className="text-slate-800">{bankingTxTotalPages}</strong>
+                    <span className="text-xs tabular-nums text-slate-600 banking-dark:text-zinc-400">
+                      Página <strong className="text-slate-800 banking-dark:text-zinc-200">{bankingTxPage}</strong> /{" "}
+                      <strong className="text-slate-800 banking-dark:text-zinc-200">{bankingTxTotalPages}</strong>
                     </span>
                     <button
                       type="button"
@@ -4496,7 +4495,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     ref={filterPopoverPanelRef}
                     role="dialog"
                     aria-label={`Filtro: ${BANKING_TX_COLUMN_LABELS[headerFilterOpen]}`}
-                    className="rounded-xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-900/10 ring-1 ring-slate-100"
+                    className="banking-theme rounded-xl border border-slate-300 bg-white p-3 shadow-xl shadow-slate-900/10 ring-1 ring-slate-300 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:shadow-black/40 banking-dark:ring-zinc-700"
                     style={{
                       position: "fixed",
                       top: headerFilterPopoverPos.top,
@@ -4523,19 +4522,23 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
       {modalOpen && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[2px] banking-dark:bg-black/65 banking-dark:backdrop-blur-[3px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="banking-tx-modal-title"
+          onClick={(e) => {
+            if (e.target !== e.currentTarget || saving) return;
+            closeMovementModal();
+          }}
         >
-          <div className="tx-scroll max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-2xl shadow-teal-900/10">
-            <h3 id="banking-tx-modal-title" className="text-base font-semibold text-slate-900">
+          <div className="banking-theme tx-scroll max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-300 bg-white p-6 shadow-2xl shadow-teal-900/10 banking-dark:border-zinc-600 banking-dark:bg-zinc-950 banking-dark:shadow-black/50">
+            <h3 id="banking-tx-modal-title" className="text-base font-semibold text-slate-900 banking-dark:text-zinc-100">
               {editing ? "Editar movimiento" : "Nuevo movimiento"}
             </h3>
 
             <div className="mt-5 space-y-4">
               <label className="block">
-                <span className="text-xs text-slate-500">Fecha de la transacción</span>
+                <span className={bankingModalFieldLabelClass}>Fecha de la transacción</span>
                 <input
                   type="date"
                   value={fecha}
@@ -4550,7 +4553,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               </label>
 
               <label className="block">
-                <span className="text-xs text-slate-500">Producto o cuenta</span>
+                <span className={bankingModalFieldLabelClass}>Producto o cuenta</span>
                 <select
                   value={accountId === "" ? "" : String(accountId)}
                   onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
@@ -4565,7 +4568,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               </label>
 
               <label className="block">
-                <span className="text-xs text-slate-500">Descripción</span>
+                <span className={bankingModalFieldLabelClass}>Descripción</span>
                 <input
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -4576,7 +4579,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               </label>
 
               <label className="block">
-                <span className="text-xs text-slate-500">Monto (positivo = ingreso, negativo = egreso)</span>
+                <span className={bankingModalFieldLabelClass}>Monto (positivo = ingreso, negativo = egreso)</span>
                 <input
                   inputMode="decimal"
                   value={amount}
@@ -4588,7 +4591,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               </label>
 
               <div ref={categoryMenuRef} className="space-y-1.5">
-                <span id="banking-tx-category-label" className="text-xs text-slate-500">
+                <span id="banking-tx-category-label" className={bankingModalFieldLabelClass}>
                   Categoría
                 </span>
                 <button
@@ -4610,7 +4613,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   className={bankingModalCategoryTriggerClass}
                 >
                   <span
-                    className={`min-w-0 flex-1 truncate font-semibold ${selectedCategory ? "text-slate-800" : "text-slate-500"}`}
+                    className={`min-w-0 flex-1 truncate font-semibold ${selectedCategory ? "text-slate-800 banking-dark:text-zinc-50" : "text-slate-500 banking-dark:text-zinc-400"}`}
                   >
                     {selectedCategory?.name ?? "Selecciona categoría"}
                   </span>
@@ -4618,7 +4621,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden
-                    className={`h-5 w-5 shrink-0 text-slate-500 transition ${categoryMenuOpen ? "rotate-180" : ""}`}
+                    className={`h-5 w-5 shrink-0 text-slate-500 transition banking-dark:text-amber-200/75 ${categoryMenuOpen ? "rotate-180" : ""}`}
                   >
                     <path
                       fillRule="evenodd"
@@ -4631,7 +4634,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
               {categoryId !== "" && (
                 <div ref={subcategoryMenuRef} className="space-y-1.5">
-                  <span id="banking-tx-subcategory-label" className="text-xs text-slate-500">
+                  <span id="banking-tx-subcategory-label" className={bankingModalFieldLabelClass}>
                     Subcategoría
                   </span>
                   <button
@@ -4653,7 +4656,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     className={bankingModalCategoryTriggerClass}
                   >
                     <span
-                      className={`min-w-0 flex-1 truncate font-semibold ${selectedSubcategoryRow ? "text-slate-800" : "text-slate-500"}`}
+                      className={`min-w-0 flex-1 truncate font-semibold ${selectedSubcategoryRow ? "text-slate-800 banking-dark:text-zinc-50" : "text-slate-500 banking-dark:text-zinc-400"}`}
                     >
                       {selectedSubcategoryRow?.name ?? "Selecciona subcategoría"}
                     </span>
@@ -4661,7 +4664,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       viewBox="0 0 20 20"
                       fill="currentColor"
                       aria-hidden
-                      className={`h-5 w-5 shrink-0 text-slate-500 transition ${subcategoryMenuOpen ? "rotate-180" : ""}`}
+                      className={`h-5 w-5 shrink-0 text-slate-500 transition banking-dark:text-amber-200/75 ${subcategoryMenuOpen ? "rotate-180" : ""}`}
                     >
                       <path
                         fillRule="evenodd"
@@ -4675,7 +4678,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
               {isOwnAccountsTransfer && !editing && (
                 <label className="block">
-                  <span className="text-xs text-slate-500">¿A qué producto va la transferencia?</span>
+                  <span className={bankingModalFieldLabelClass}>¿A qué producto va la transferencia?</span>
                   <select
                     value={transferDestinationAccountId === "" ? "" : String(transferDestinationAccountId)}
                     onChange={(e) =>
@@ -4691,12 +4694,12 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       </option>
                     ))}
                   </select>
-                  <p className="mt-1.5 text-[12px] leading-snug text-slate-500">
+                  <p className={`mt-1.5 ${bankingModalHelperTextClass}`}>
                     No puede ser la cuenta de este movimiento ni una tarjeta de crédito. Se creará un segundo
                     movimiento en la cuenta destino con el monto de signo contrario.
                   </p>
                   {transferDestinationOptions.length === 0 && (
-                    <p className="mt-1 text-[12px] text-amber-800/90">
+                    <p className="mt-1 text-[12px] text-amber-800/90 banking-dark:text-amber-200/90">
                       No hay otra cuenta disponible. Crea otra cuenta (no tarjeta) en Cuentas.
                     </p>
                   )}
@@ -4704,7 +4707,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               )}
 
               <div ref={scopeMenuRef} className="relative space-y-1.5">
-                <span id="banking-tx-scope-label" className="text-xs text-slate-500">
+                <span id="banking-tx-scope-label" className={bankingModalFieldLabelClass}>
                   Tipo de movimiento
                 </span>
                 <button
@@ -4714,17 +4717,23 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   aria-haspopup="listbox"
                   aria-labelledby="banking-tx-scope-label"
                   onClick={() => setScopeMenuOpen((o) => !o)}
-                  className={`flex w-full items-center justify-between gap-3 rounded-xl border px-3 py-3 text-left text-sm font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-teal-300/50 ${
+                  className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium shadow-sm ring-1 transition focus:outline-none focus:ring-2 ${
                     isShared
-                      ? "border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 text-violet-900 ring-1 ring-violet-100"
-                      : "border-teal-200 bg-gradient-to-br from-teal-50 to-cyan-50 text-teal-900 ring-1 ring-teal-100"
+                      ? "border-violet-200 bg-violet-100 text-violet-900 ring-violet-200 focus:ring-violet-400/45 banking-dark:border-violet-800/55 banking-dark:bg-violet-950/55 banking-dark:text-violet-200 banking-dark:ring-violet-800/55 banking-dark:focus:ring-violet-600/35"
+                      : "border-teal-200 bg-teal-100 text-teal-900 ring-teal-200 focus:ring-teal-400/45 banking-dark:border-teal-800/55 banking-dark:bg-teal-950/50 banking-dark:text-teal-200/95 banking-dark:ring-teal-800/55 banking-dark:focus:ring-teal-600/35"
                   }`}
                 >
                   <span>
                     <span className="block text-[13px] font-semibold">
                       {isShared ? "Compartido" : "Personal"}
                     </span>
-                    <span className="mt-0.5 block text-[12px] font-normal opacity-85">
+                    <span
+                      className={`mt-0.5 block text-[12px] font-normal ${
+                        isShared
+                          ? "text-violet-800/90 banking-dark:text-violet-400/90"
+                          : "text-teal-800/90 banking-dark:text-teal-400/90"
+                      }`}
+                    >
                       {isShared
                         ? "Divide el monto entre varias personas"
                         : "Solo aplica a tus finanzas"}
@@ -4734,7 +4743,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden
-                    className={`h-5 w-5 shrink-0 opacity-70 transition ${scopeMenuOpen ? "rotate-180" : ""}`}
+                    className={`h-5 w-5 shrink-0 opacity-75 transition ${
+                      isShared
+                        ? "text-violet-700 banking-dark:text-violet-300/90"
+                        : "text-teal-700 banking-dark:text-teal-300/85"
+                    } ${scopeMenuOpen ? "rotate-180" : ""}`}
                   >
                     <path
                       fillRule="evenodd"
@@ -4745,21 +4758,21 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 </button>
 
                 {isShared && (
-                  <div className="space-y-4 border-t border-slate-200 pt-4">
-                    <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50/80">
+                  <div className="space-y-4 border-t border-slate-300 pt-4 banking-dark:border-zinc-700">
+                    <div className="overflow-hidden rounded-xl border border-slate-300 bg-slate-50/80 banking-dark:border-zinc-600 banking-dark:bg-zinc-900/80">
                       <table className="w-full border-collapse text-sm">
                         <thead>
-                          <tr className="border-b border-slate-200 bg-white">
-                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          <tr className="border-b border-slate-300 bg-white banking-dark:border-zinc-700 banking-dark:bg-zinc-900">
+                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">
                               Personas
                             </th>
-                            <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">
                               Monto P/P
                             </th>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr className="align-middle">
+                          <tr className="align-middle banking-dark:bg-zinc-950">
                             <td className="px-3 py-2">
                               <input
                                 type="number"
@@ -4767,10 +4780,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                                 min={1}
                                 value={splitParticipants}
                                 onChange={(e) => setSplitParticipants(e.target.value)}
-                                className="w-[4.25rem] rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-center font-mono text-sm text-slate-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 [color-scheme:light]"
+                                className="w-[4.25rem] rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-center font-mono text-sm text-slate-800 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-600/55 banking-dark:focus:ring-amber-500/15"
                               />
                             </td>
-                            <td className="px-3 py-2 text-right font-mono text-slate-800">
+                            <td className="px-3 py-2 text-right font-mono text-slate-800 banking-dark:text-zinc-200">
                               {amountPerPersonLabel}
                             </td>
                           </tr>
@@ -4804,19 +4817,19 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               )}
 
               <div ref={accountingMonthWrapRef} className="block">
-                <span id="banking-tx-accounting-month-label" className="text-xs text-slate-500">
+                <span id="banking-tx-accounting-month-label" className={bankingModalFieldLabelClass}>
                   Mes contable
                 </span>
                 <div
                   ref={accountingMonthTriggerRef}
                   role="group"
                   aria-labelledby="banking-tx-accounting-month-label"
-                  className="mt-1.5 flex min-h-[42px] items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none shadow-sm transition hover:border-slate-300 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-400/20 [color-scheme:light]"
+                  className="mt-1.5 flex min-h-[42px] items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none shadow-sm transition hover:border-slate-300 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-400/20 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-500 banking-dark:focus-within:border-amber-600/55 banking-dark:focus-within:ring-amber-500/15"
                 >
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                     <button
                       type="button"
-                      className="rounded-md px-2 py-1 text-left text-slate-800 transition hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60"
+                      className="rounded-md px-2 py-1 text-left text-slate-800 transition hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-100 banking-dark:focus-visible:ring-amber-500/35"
                       aria-label={`Mes: ${ACCOUNTING_MONTH_ABBR_ES[accountingYmParts.m - 1]}`}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -4827,7 +4840,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     </button>
                     <button
                       type="button"
-                      className="rounded-md px-2 py-1 tabular-nums text-slate-800 transition hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60"
+                      className="rounded-md px-2 py-1 tabular-nums text-slate-800 transition hover:bg-teal-50 hover:text-teal-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-300/60 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-100 banking-dark:focus-visible:ring-amber-500/35"
                       aria-label={`Año: ${accountingYmParts.y}`}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -4839,7 +4852,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   </div>
                   <button
                     type="button"
-                    className="shrink-0 rounded-md p-1 text-slate-500 outline-none transition hover:bg-teal-50 hover:text-teal-700 focus-visible:ring-2 focus-visible:ring-teal-300/60"
+                    className="shrink-0 rounded-md p-1 text-slate-500 outline-none transition hover:bg-teal-50 hover:text-teal-700 focus-visible:ring-2 focus-visible:ring-teal-300/60 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200/90 banking-dark:focus-visible:ring-amber-500/35"
                     aria-label="Elegir mes"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -4849,7 +4862,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     <IconCalendar className="h-5 w-5" />
                   </button>
                 </div>
-                <span className="mt-1 block text-[12px] text-slate-500">
+                <span className={`mt-1 block ${bankingModalHelperTextClass}`}>
                   Por defecto coincide con el mes de la fecha de la transacción (útil para filtros y reportes). Pulsa el
                   mes o el ícono para los meses; pulsa el año para elegir año.
                 </span>
@@ -4859,18 +4872,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  setModalOpen(false);
-                  setEditing(null);
-                  setScopeMenuOpen(false);
-                  setCategoryMenuOpen(false);
-                  setSubcategoryMenuOpen(false);
-                  setCategoryPickerSearch("");
-                  setSubcategoryPickerSearch("");
-                  setAccountingPickMode(null);
-                  setProvisionReversalOnSave(false);
-                }}
-                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50"
+                disabled={saving}
+                onClick={() => closeMovementModal()}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-800 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-700"
               >
                 Cancelar
               </button>
@@ -4887,7 +4891,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     (transferDestinationAccountId === "" || transferDestinationOptions.length === 0))
                 }
                 onClick={() => void saveModal()}
-                className="rounded-xl border border-teal-400/80 bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:from-teal-600 hover:to-emerald-600 disabled:opacity-40"
+                className="rounded-xl border border-teal-400/80 bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:from-teal-600 hover:to-emerald-600 disabled:opacity-40 banking-dark:border-amber-600/45 banking-dark:bg-gradient-to-r banking-dark:from-amber-600 banking-dark:to-amber-500 banking-dark:text-zinc-950 banking-dark:hover:from-amber-500 banking-dark:hover:to-amber-400 banking-dark:hover:border-amber-500/50"
               >
                 {saving ? "Guardando…" : editing ? "Guardar cambios" : "Registrar"}
               </button>
@@ -4909,25 +4913,27 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: scopePanelBox.width,
               zIndex: 9999,
             }}
-            className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 ring-1 ring-slate-100"
+            className="banking-theme overflow-hidden rounded-xl border border-slate-300 bg-white shadow-2xl shadow-slate-900/10 ring-1 ring-slate-300 banking-dark:border-amber-900/45 banking-dark:bg-zinc-900 banking-dark:shadow-black/45 banking-dark:ring-amber-950/35"
           >
             <div className="grid gap-2 p-2 sm:grid-cols-2">
               <button
                 type="button"
                 role="option"
                 aria-selected={!isShared}
-                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-teal-300/60 ${
+                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-teal-400/50 banking-dark:focus:ring-teal-600/35 ${
                   !isShared
-                    ? "border-teal-300 bg-teal-50 ring-2 ring-teal-200"
-                    : "border-slate-200 bg-white hover:border-teal-200 hover:bg-teal-50/50"
+                    ? "border-teal-300 bg-teal-100 ring-2 ring-teal-300 banking-dark:border-teal-800/55 banking-dark:bg-teal-950/50 banking-dark:ring-teal-700/50"
+                    : "border-slate-300 bg-white hover:border-teal-200 hover:bg-teal-50/50 banking-dark:border-zinc-600 banking-dark:bg-zinc-950 banking-dark:hover:border-teal-800/45 banking-dark:hover:bg-teal-950/20"
                 }`}
                 onClick={() => {
                   setIsShared(false);
                   setScopeMenuOpen(false);
                 }}
               >
-                <span className="block text-sm font-semibold text-teal-900">Personal</span>
-                <span className="mt-1 block text-[12px] leading-snug text-teal-700/85">
+                <span className="block text-sm font-semibold text-teal-900 banking-dark:text-teal-200/95">
+                  Personal
+                </span>
+                <span className="mt-1 block text-[12px] leading-snug text-teal-800/85 banking-dark:text-teal-400/85">
                   Movimiento individual
                 </span>
               </button>
@@ -4935,18 +4941,20 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 type="button"
                 role="option"
                 aria-selected={isShared}
-                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-300/60 ${
+                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-400/50 banking-dark:focus:ring-violet-600/30 ${
                   isShared
-                    ? "border-violet-300 bg-violet-50 ring-2 ring-violet-200"
-                    : "border-slate-200 bg-white hover:border-violet-200 hover:bg-violet-50/50"
+                    ? "border-violet-300 bg-violet-100 ring-2 ring-violet-300 banking-dark:border-violet-800/55 banking-dark:bg-violet-950/55 banking-dark:ring-violet-800/55"
+                    : "border-slate-300 bg-white hover:border-violet-200 hover:bg-violet-50/50 banking-dark:border-zinc-600 banking-dark:bg-zinc-950 banking-dark:hover:border-violet-800/45 banking-dark:hover:bg-violet-950/25"
                 }`}
                 onClick={() => {
                   setIsShared(true);
                   setScopeMenuOpen(false);
                 }}
               >
-                <span className="block text-sm font-semibold text-violet-900">Compartido</span>
-                <span className="mt-1 block text-[12px] leading-snug text-violet-700/85">
+                <span className="block text-sm font-semibold text-violet-900 banking-dark:text-violet-200">
+                  Compartido
+                </span>
+                <span className="mt-1 block text-[12px] leading-snug text-violet-800/85 banking-dark:text-violet-400/85">
                   Reparto entre personas
                 </span>
               </button>
@@ -4969,9 +4977,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: categoryPanelBox.width,
               zIndex: 10000,
             }}
-            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-100"
+            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-slate-300 bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-300 banking-dark:border-amber-900/45 banking-dark:bg-zinc-900 banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-amber-950/35"
           >
-            <div className="shrink-0 border-b border-slate-100 bg-white px-2 pb-2 pt-2">
+            <div className="shrink-0 border-b border-slate-300 bg-white px-2 pb-2 pt-2 banking-dark:border-amber-900/35 banking-dark:bg-zinc-800">
               <input
                 ref={categorySearchInputRef}
                 type="search"
@@ -4987,11 +4995,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             </div>
             <div className={bankingPickerListScrollClass}>
               {categoryOptionsFiltered.length === 0 ? (
-                <p className="px-3 py-6 text-center text-sm text-slate-500">
+                <p className="px-3 py-6 text-center text-sm text-slate-500 banking-dark:text-zinc-400">
                   Sin coincidencias. Prueba con otras letras o borra el filtro.
                 </p>
               ) : (
-                <div className="flex flex-col gap-0.5 px-1.5 pb-1.5 pt-0.5">
+                <div className="flex flex-col gap-0.5 px-1.5 pb-1.5 pt-0.5 banking-dark:bg-zinc-900/98">
                   {categoryOptionsFiltered.map((c) => {
                     const sel = c.id === categoryId;
                     return (
@@ -5001,7 +5009,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                         role="option"
                         aria-selected={sel}
                         className={`rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
-                          sel ? "bg-teal-50 text-teal-900 ring-1 ring-teal-200/80" : "text-slate-800 hover:bg-slate-50"
+                          sel
+                            ? "bg-teal-50 text-teal-900 ring-1 ring-teal-200/80 banking-dark:bg-amber-600/35 banking-dark:text-zinc-50 banking-dark:ring-amber-400/45"
+                            : "text-slate-800 hover:bg-slate-50 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-50"
                         }`}
                         onClick={() => {
                           setCategoryId(c.id);
@@ -5033,9 +5043,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: subcategoryPanelBox.width,
               zIndex: 10002,
             }}
-            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-100"
+            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-slate-300 bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-300 banking-dark:border-amber-900/45 banking-dark:bg-zinc-900 banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-amber-950/35"
           >
-            <div className="shrink-0 border-b border-slate-100 bg-white px-2 pb-2 pt-2">
+            <div className="shrink-0 border-b border-slate-300 bg-white px-2 pb-2 pt-2 banking-dark:border-amber-900/35 banking-dark:bg-zinc-800">
               <input
                 ref={subcategorySearchInputRef}
                 type="search"
@@ -5051,11 +5061,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             </div>
             <div className={bankingPickerListScrollClass}>
               {subOptionsFiltered.length === 0 ? (
-                <p className="px-3 py-6 text-center text-sm text-slate-500">
+                <p className="px-3 py-6 text-center text-sm text-slate-500 banking-dark:text-zinc-400">
                   Sin coincidencias. Prueba con otras letras o borra el filtro.
                 </p>
               ) : (
-                <div className="flex flex-col gap-0.5 px-1.5 pb-1.5 pt-0.5">
+                <div className="flex flex-col gap-0.5 px-1.5 pb-1.5 pt-0.5 banking-dark:bg-zinc-900/98">
                   {subOptionsFiltered.map((s) => {
                     const sel = s.id === subcategoryId;
                     return (
@@ -5065,7 +5075,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                         role="option"
                         aria-selected={sel}
                         className={`rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
-                          sel ? "bg-teal-50 text-teal-900 ring-1 ring-teal-200/80" : "text-slate-800 hover:bg-slate-50"
+                          sel
+                            ? "bg-teal-50 text-teal-900 ring-1 ring-teal-200/80 banking-dark:bg-amber-600/35 banking-dark:text-zinc-50 banking-dark:ring-amber-400/45"
+                            : "text-slate-800 hover:bg-slate-50 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-50"
                         }`}
                         onClick={() => {
                           setSubcategoryId(s.id);
@@ -5098,10 +5110,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: accountingMonthPanelBox.width,
               zIndex: 10001,
             }}
-            className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/10 ring-1 ring-slate-100"
+            className="banking-theme overflow-hidden rounded-xl border border-slate-300 bg-white shadow-2xl shadow-slate-900/10 ring-1 ring-slate-300 banking-dark:border-amber-900/45 banking-dark:bg-zinc-900 banking-dark:ring-amber-950/35 banking-dark:shadow-black/45"
           >
             {accountingPickMode === "month" ? (
-              <div className="grid grid-cols-3 gap-1 p-2">
+              <div className="grid grid-cols-3 gap-1 p-2 banking-dark:bg-zinc-950">
                 {ACCOUNTING_MONTH_ABBR_ES.map((abbr, idx) => {
                   const mi = idx + 1;
                   const sel = accountingYmParts.m === mi;
@@ -5111,8 +5123,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       type="button"
                       className={`rounded-lg px-2 py-2 text-sm font-medium transition ${
                         sel
-                          ? "bg-teal-100 text-teal-900 ring-2 ring-teal-300"
-                          : "text-slate-800 hover:bg-slate-50"
+                          ? "bg-teal-100 text-teal-900 ring-2 ring-teal-300 banking-dark:bg-amber-600/35 banking-dark:text-zinc-50 banking-dark:ring-amber-400/45"
+                          : "text-slate-800 hover:bg-slate-50 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-800"
                       }`}
                       onClick={() => {
                         setAccountingMonthYm(buildYm(accountingYmParts.y, mi));
@@ -5125,7 +5137,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 })}
               </div>
             ) : (
-              <div className="tx-scroll max-h-56 overflow-y-auto p-2">
+              <div className="tx-scroll max-h-56 overflow-y-auto p-2 banking-dark:bg-zinc-950">
                 <div className="grid grid-cols-4 gap-1">
                   {accountingYearRange(accountingYmParts.y).map((yy) => {
                     const sel = yy === accountingYmParts.y;
@@ -5135,8 +5147,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                         type="button"
                         className={`rounded-lg px-2 py-2 text-sm tabular-nums transition ${
                           sel
-                            ? "bg-teal-100 text-teal-900 ring-2 ring-teal-300"
-                            : "text-slate-800 hover:bg-slate-50"
+                            ? "bg-teal-100 text-teal-900 ring-2 ring-teal-300 banking-dark:bg-amber-600/35 banking-dark:text-zinc-50 banking-dark:ring-amber-400/45"
+                            : "text-slate-800 hover:bg-slate-50 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-800"
                         }`}
                         onClick={() => {
                           setAccountingMonthYm(buildYm(yy, accountingYmParts.m));

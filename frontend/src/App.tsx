@@ -9,6 +9,7 @@ import { ActivitySection } from "./ActivitySection";
 import { ManualSnapshotModal } from "./ManualModals";
 import { FintualConnectModal } from "./FintualConnectModal";
 import { NoServicesPage } from "./NoServicesPage";
+import { BankingBodyClassSync, BankingThemeProvider } from "./BankingThemeContext";
 import { runSync, SyncOverlay, type TickerUiState } from "./SyncOverlay";
 import { TransactionModal } from "./TransactionModal";
 import {
@@ -359,6 +360,8 @@ export default function App() {
       <main className="pt-14 pl-16">
         {showMain ? (
           <Suspense fallback={<RoutePageFallback />}>
+            <BankingThemeProvider>
+              <BankingBodyClassSync />
             <Routes>
               <Route
                 path="/profile"
@@ -461,6 +464,7 @@ export default function App() {
                 }
               />
             </Routes>
+            </BankingThemeProvider>
           </Suspense>
         ) : initError ? (
           <div className="flex min-h-[50vh] flex-col items-center justify-center gap-5 px-6 text-center">

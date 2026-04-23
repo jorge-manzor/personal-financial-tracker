@@ -16,6 +16,7 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { apiFetch, fetchJson, patchJson, postJson } from "./api";
+import { BankingThemeToggle, useBankingTheme } from "./BankingThemeContext";
 import type {
   BankingAccountRow,
   BankingBankRow,
@@ -135,7 +136,7 @@ function CategoryDragPreview({ cat, expanded }: { cat: BankingCategoryRow; expan
         <span className="shrink-0 text-xs text-slate-500">({cat.subcategories.length})</span>
       </div>
       {expanded ? (
-        <div className="border-t border-slate-200 px-4 py-2.5 text-[11px] leading-relaxed text-slate-500">
+        <div className="border-t border-slate-300 px-4 py-2.5 text-[11px] leading-relaxed text-slate-500">
           {cat.subcategories.length} subcategorías · arrastra el asa ⋮⋮ para orden (también en movimientos)
         </div>
       ) : null}
@@ -291,17 +292,17 @@ function CategoryDragHandleButton({
 }
 
 const btnGreenBanking =
-  "rounded-xl border border-teal-400/80 bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:from-teal-600 hover:to-emerald-600 disabled:opacity-50";
+  "rounded-xl border border-teal-400/80 bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:from-teal-600 hover:to-emerald-600 disabled:opacity-50 banking-dark:border-amber-600/45 banking-dark:bg-gradient-to-r banking-dark:from-amber-600 banking-dark:to-amber-500 banking-dark:text-zinc-950 banking-dark:hover:from-amber-500 banking-dark:hover:to-amber-400 banking-dark:hover:border-amber-500/50";
 
 const iconBtn =
-  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 disabled:opacity-40";
-const iconBtnDanger = `${iconBtn} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600`;
+  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 disabled:opacity-40 banking-dark:text-zinc-500 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200/90";
+const iconBtnDanger = `${iconBtn} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 banking-dark:hover:border-rose-900 banking-dark:hover:bg-rose-950/40 banking-dark:hover:text-rose-300`;
 
 const selectFieldClass =
-  "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light]";
+  "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
 
 const bankingSettingsCardClass =
-  "rounded-xl border border-slate-200 bg-white p-5 shadow-sm";
+  "rounded-xl border border-slate-300 bg-white p-5 shadow-sm banking-dark:border-zinc-700 banking-dark:bg-zinc-950 banking-dark:shadow-none";
 
 const PRODUCT_TYPE_OPTIONS: { value: BankingProductType; label: string }[] = [
   { value: "cuenta_corriente", label: "Cuenta Corriente" },
@@ -322,6 +323,7 @@ function bankingSubcategoryAllowsRename(cat: BankingCategoryRow, sub: BankingSub
 }
 
 export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null) => void }) {
+  const { isDark } = useBankingTheme();
   const [accounts, setAccounts] = useState<BankingAccountRow[]>([]);
   const [banks, setBanks] = useState<BankingBankRow[]>([]);
   const [categories, setCategories] = useState<BankingCategoryRow[]>([]);
@@ -792,24 +794,33 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
   }
 
   return (
-    <div className="banking-theme min-h-full bg-gradient-to-br from-slate-50 via-cyan-50/90 to-indigo-50/70 text-slate-800">
+    <div
+      className={`banking-theme min-h-full ${
+        isDark
+          ? "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(251,191,36,0.055),transparent_52%),linear-gradient(to_bottom,#0d0d0d,#070707)] text-zinc-300"
+          : "bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100/80 text-slate-800"
+      }`}
+    >
     <div className="mx-auto max-w-[880px] space-y-10 p-4 pb-28 md:p-6">
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900">Configuración bancaria</h2>
-        <p className="mt-1 text-sm text-slate-500">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+        <h2 className="text-lg font-semibold text-slate-900 banking-dark:text-zinc-100">Configuración bancaria</h2>
+        <p className="mt-1 text-sm text-slate-500 banking-dark:text-zinc-500">
           Productos (cuentas) y categorías del catálogo del servidor. Activa las categorías y subcategorías que quieras
           usar en movimientos manuales; personaliza el color y el orden con el asa (⋮⋮). Al final verás categorías de
           uso interno (siempre activas, sin interruptor).
         </p>
+        </div>
+        <BankingThemeToggle />
       </div>
 
       <section className="space-y-4" aria-labelledby="banking-accounts-heading">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h3 id="banking-accounts-heading" className="text-base font-semibold text-slate-900">
+            <h3 id="banking-accounts-heading" className="text-base font-semibold text-slate-900 banking-dark:text-zinc-100">
               Productos
             </h3>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-slate-500 banking-dark:text-zinc-500">
               Activa la visibilidad en «Nuevo movimiento» y, en cuentas líquidas, si suman en el «Saldo real» del
               resumen en Movimientos (excluye respaldos o cuentas transitorias). El saldo se gestiona en el backend.
             </p>
@@ -969,7 +980,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                   type="color"
                   value={newCategoryForm.color}
                   onChange={(e) => setNewCategoryForm({ ...newCategoryForm, color: e.target.value })}
-                  className="h-10 w-14 cursor-pointer rounded-lg border border-slate-200 bg-white p-1 shadow-sm"
+                  className="h-10 w-14 cursor-pointer rounded-lg border border-slate-300 bg-white p-1 shadow-sm"
                   title="Color de la categoría"
                 />
               </label>
@@ -986,7 +997,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                   type="button"
                   disabled={busyKey !== null}
                   onClick={() => setNewCategoryForm(null)}
-                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50"
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50"
                 >
                   Cancelar
                 </button>
@@ -1013,7 +1024,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                     <SortableCategoryWrapper key={cat.id} id={cat.id} disabled={busyKey !== null}>
                       {(handle) => (
                         <details
-                          className="group overflow-hidden rounded-xl border border-slate-200/70 bg-white/70"
+                          className="group overflow-hidden rounded-xl border border-slate-300/80 bg-white/70"
                           style={softCategorySurface(cat.color)}
                           open={expandedCategoryIds.has(cat.id)}
                           onToggle={(e) => {
@@ -1026,7 +1037,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                             });
                           }}
                         >
-                          <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-slate-200/70 px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
+                          <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-slate-300/80 px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
                             <CategoryDragHandleButton
                               setActivatorNodeRef={handle.setActivatorNodeRef}
                               attributes={handle.attributes}
@@ -1051,7 +1062,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                       <>
                         <input
                           type="text"
-                          className="min-w-[10rem] flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm font-medium text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25"
+                          className="min-w-[10rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25"
                           value={categoryFullEdit.name}
                           onChange={(e) =>
                             setCategoryFullEdit({ ...categoryFullEdit, name: e.target.value })
@@ -1085,7 +1096,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           onChange={(e) =>
                             setCategoryFullEdit({ ...categoryFullEdit, color: e.target.value })
                           }
-                          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-200 bg-white p-0.5 shadow-sm"
+                          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm"
                           title="Color"
                           onClick={(e) => e.stopPropagation()}
                         />
@@ -1109,7 +1120,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                             e.stopPropagation();
                             setCategoryFullEdit(null);
                           }}
-                          className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50"
+                          className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50"
                         >
                           Cancelar
                         </button>
@@ -1161,7 +1172,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           type="color"
                           value={categoryEdit.color}
                           onChange={(e) => setCategoryEdit({ ...categoryEdit, color: e.target.value })}
-                          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-200 bg-white p-0.5 shadow-sm"
+                          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm"
                           title="Color"
                           onClick={(e) => e.stopPropagation()}
                         />
@@ -1185,7 +1196,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                             e.stopPropagation();
                             setCategoryEdit(null);
                           }}
-                          className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50"
+                          className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50"
                         >
                           Cancelar
                         </button>
@@ -1273,8 +1284,8 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                 <div
                                   className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2 py-2 text-xs ${
                                     parentEnabled
-                                      ? "border-slate-200 bg-slate-50/90 text-slate-700"
-                                      : "cursor-not-allowed border-slate-100 bg-slate-100/80 text-slate-500"
+                                      ? "border-slate-300 bg-slate-50/90 text-slate-700"
+                                      : "cursor-not-allowed border-slate-300 bg-slate-100/80 text-slate-500"
                                   }`}
                                   aria-disabled={!parentEnabled}
                                 >
@@ -1338,7 +1349,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                         <button
                                           type="button"
                                           disabled={busyKey !== null}
-                                          className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50"
+                                          className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             setSubNameEdit(null);
@@ -1379,11 +1390,11 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           );
                         })}
                       </SortableContext>
-                      <li className="mt-2 flex list-none flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                      <li className="mt-2 flex list-none flex-wrap items-center gap-2 border-t border-slate-300 pt-3">
                         <input
                           type="text"
                           placeholder="Nueva subcategoría…"
-                          className="min-w-[12rem] flex-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
+                          className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
                           value={newSubDraft[cat.id] ?? ""}
                           onChange={(e) =>
                             setNewSubDraft((d) => ({ ...d, [cat.id]: e.target.value }))
@@ -1433,7 +1444,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                       });
                     }}
                   >
-                    <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-slate-200/70 px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-slate-300/80 px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
                       <span className="inline-flex h-8 w-8 shrink-0" aria-hidden />
                       <span
                         className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition-transform duration-200 group-open:rotate-180"
@@ -1452,7 +1463,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                               <span className="font-normal text-slate-500">({cat.subcategories.length})</span>
                             </p>
                             <span
-                              className="shrink-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-slate-500"
+                              className="shrink-0 rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-slate-500"
                               title="No se puede desactivar; la app usa estas categorías internamente."
                             >
                               Siempre activa
@@ -1461,7 +1472,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                               type="color"
                               value={categoryEdit.color}
                               onChange={(e) => setCategoryEdit({ ...categoryEdit, color: e.target.value })}
-                              className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-200 bg-white p-0.5 shadow-sm"
+                              className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm"
                               title="Color"
                               onClick={(e) => e.stopPropagation()}
                             />
@@ -1485,7 +1496,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                 e.stopPropagation();
                                 setCategoryEdit(null);
                               }}
-                              className="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50"
+                              className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50"
                             >
                               Cancelar
                             </button>
@@ -1501,7 +1512,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                             </p>
                             <div className="ml-auto flex h-8 shrink-0 items-center gap-2">
                               <span
-                                className="shrink-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-slate-500"
+                                className="shrink-0 rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-slate-500"
                                 title="No se puede desactivar; la app usa estas categorías internamente."
                               >
                                 Siempre activa
@@ -1538,7 +1549,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                             return (
                               <SortableSubcategoryWrapper key={s.id} subId={s.id} disabled={dragDisabled}>
                                 {(handle) => (
-                                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs text-slate-600 shadow-sm">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs text-slate-600 shadow-sm">
                                     <div className="flex min-w-0 flex-1 items-center gap-2">
                                       <CategoryDragHandleButton
                                         setActivatorNodeRef={handle.setActivatorNodeRef}
@@ -1603,7 +1614,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
           aria-modal="true"
           aria-labelledby="banking-product-modal-title"
         >
-          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6 shadow-2xl shadow-teal-900/10">
+          <div className="w-full max-w-lg rounded-xl border border-slate-300 bg-white p-6 shadow-2xl shadow-teal-900/10">
             <h3 id="banking-product-modal-title" className="text-base font-semibold text-slate-900">
               {editingAccount ? "Editar producto" : "Nuevo producto"}
             </h3>
@@ -1678,7 +1689,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                   ) : null}
                 </label>
               ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-3 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50/90 px-3 py-3 shadow-sm">
                 <div className="min-w-0">
                   <span className="text-xs font-medium text-slate-800">Activa</span>
                   <p className="mt-1 text-[11px] leading-snug text-slate-500">
@@ -1695,7 +1706,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                 />
               </div>
               {productType !== "tarjeta_credito" ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/90 px-3 py-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50/90 px-3 py-3 shadow-sm">
                   <div className="min-w-0">
                     <span className="text-xs font-medium text-slate-800">En total</span>
                     <p className="mt-1 text-[11px] leading-snug text-slate-500">
@@ -1729,7 +1740,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                   setAccountModalOpen(false);
                   setEditingAccount(null);
                 }}
-                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50"
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50"
               >
                 Cancelar
               </button>

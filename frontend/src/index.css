@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Modo oscuro solo bajo `.banking-dark` (rutas Banking) */
+@custom-variant banking-dark (.banking-dark &);
+
 @theme {
   --color-bg: #0d1117;
   --color-card: #161b22;
@@ -61,11 +64,11 @@ body {
  * Scroll horizontal tablas — no reutilizar fuera de rutas /banking/*.
  */
 .banking-theme {
-  /* Barra horizontal tablas: menta pastel sobre track claro */
-  --bk-scrollbar-thumb: rgb(45 212 191 / 0.42);
-  --bk-scrollbar-thumb-hover: rgb(20 184 166 / 0.55);
-  --bk-scrollbar-track: rgb(241 245 249 / 0.95);
-  --bk-scrollbar-track-edge: rgb(203 213 225 / 0.35);
+  /* Scroll horizontal tablas: tonos neutros (extracto / lista simple) */
+  --bk-scrollbar-thumb: rgb(148 163 184 / 0.55);
+  --bk-scrollbar-thumb-hover: rgb(100 116 139 / 0.65);
+  --bk-scrollbar-track: rgb(248 250 252 / 0.98);
+  --bk-scrollbar-track-edge: rgb(203 213 225 / 0.85);
 }
 
 .banking-theme .banking-table-scroll {
@@ -92,22 +95,47 @@ body {
   background: var(--bk-scrollbar-thumb-hover);
 }
 
-/* Scroll vertical dentro de Banking (modales, listas): coherente con fondo claro */
+/* Modo oscuro Banking (`body.banking-dark` + `.banking-theme` en la vista) */
+.banking-dark .banking-theme {
+  --bk-scrollbar-thumb: rgb(82 82 91 / 0.5);
+  --bk-scrollbar-thumb-hover: rgb(113 113 122 / 0.6);
+  --bk-scrollbar-track: rgb(9 9 11 / 0.95);
+  --bk-scrollbar-track-edge: rgb(63 63 70 / 0.45);
+}
+
+/* Scroll vertical dentro de Banking (modales, listas): neutro sobre fondo claro */
 .banking-theme.tx-scroll,
 .banking-theme .tx-scroll {
-  scrollbar-color: rgb(45 212 191 / 0.38) rgb(241 245 249 / 0.95);
+  scrollbar-color: rgb(148 163 184 / 0.55) rgb(248 250 252 / 0.98);
 }
 .banking-theme.tx-scroll::-webkit-scrollbar-track,
 .banking-theme .tx-scroll::-webkit-scrollbar-track {
-  background: rgb(241 245 249 / 0.95);
+  background: rgb(248 250 252 / 0.98);
 }
 .banking-theme.tx-scroll::-webkit-scrollbar-thumb,
 .banking-theme .tx-scroll::-webkit-scrollbar-thumb {
-  background: rgb(45 212 191 / 0.38);
+  background: rgb(148 163 184 / 0.55);
 }
 .banking-theme.tx-scroll::-webkit-scrollbar-thumb:hover,
 .banking-theme .tx-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgb(20 184 166 / 0.48);
+  background: rgb(100 116 139 / 0.65);
+}
+
+.banking-dark .banking-theme.tx-scroll,
+.banking-dark .banking-theme .tx-scroll {
+  scrollbar-color: rgb(82 82 91 / 0.55) rgb(24 24 27 / 0.98);
+}
+.banking-dark .banking-theme.tx-scroll::-webkit-scrollbar-track,
+.banking-dark .banking-theme .tx-scroll::-webkit-scrollbar-track {
+  background: rgb(24 24 27 / 0.98);
+}
+.banking-dark .banking-theme.tx-scroll::-webkit-scrollbar-thumb,
+.banking-dark .banking-theme .tx-scroll::-webkit-scrollbar-thumb {
+  background: rgb(82 82 91 / 0.5);
+}
+.banking-dark .banking-theme.tx-scroll::-webkit-scrollbar-thumb:hover,
+.banking-dark .banking-theme .tx-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(113 113 122 / 0.6);
 }
 
 /* Misma fila que el panel de sectores: oculta la barra pero mantiene el scroll */
