@@ -3307,6 +3307,26 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     [bankingCcPendingVisibleColumns],
   );
 
+  /** Pendientes compartidos en todas las cuentas (para totales globales de selección). */
+  const sharedPendingAllRows = useMemo(
+    () => sharedUnsettledGroups.flatMap((g) => g.items),
+    [sharedUnsettledGroups],
+  );
+
+  /** Suma de todos los pendientes marcados en la vista compartido, sin importar la cuenta. */
+  const sharedSelectionGlobalTotals = useMemo(() => {
+    let totalAbs = 0;
+    let sumPerPerson = 0;
+    let count = 0;
+    for (const row of sharedPendingAllRows) {
+      if (!selectedSharedIds.has(row.id)) continue;
+      totalAbs += Math.abs(row.amount);
+      sumPerPerson += sharedPendingPerPersonClp(row);
+      count += 1;
+    }
+    return { totalAbs, sumPerPerson, count };
+  }, [sharedPendingAllRows, selectedSharedIds]);
+
   const filterAccountsSorted = useMemo(() => {
     return [...accounts].sort((a, b) => a.name.localeCompare(b.name, "es"));
   }, [accounts]);
@@ -4192,6 +4212,30 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               removeRow={removeRow}
             />
           ))}
+        </div>
+      ) : null}
+
+      {movementTab === "shared" && !loading && sharedSelectionGlobalTotals.count > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-300/80 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-4 py-3 text-sm shadow-sm ring-1 ring-violet-100">
+          <p className="min-w-0 flex-1 leading-snug text-slate-700">
+            <span className="font-semibold text-violet-950">Selección global (todas las cuentas):</span>{" "}
+            <span className="text-slate-600">total gasto </span>
+            <strong className="tabular-nums text-violet-900">
+              {formatClpDots(sharedSelectionGlobalTotals.totalAbs)}
+            </strong>
+            <span className="text-slate-600"> · suma cuotas por persona </span>
+            <strong className="tabular-nums text-violet-900">
+              {formatClpDots(sharedSelectionGlobalTotals.sumPerPerson)}
+            </strong>
+            <span className="text-slate-500"> · {sharedSelectionGlobalTotals.count} movimiento(s)</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => setSelectedSharedIds(new Set())}
+            className={bankingToolbarGhostBtnClass}
+          >
+            Limpiar toda la selección
+          </button>
         </div>
       ) : null}
 
