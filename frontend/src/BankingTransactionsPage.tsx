@@ -1912,6 +1912,16 @@ function BankingCcPendingChargesTable({
   );
 }
 
+/** Cuota por persona en un movimiento compartido (usa `amount_per_person` del backend si existe). */
+function sharedPendingPerPersonClp(row: BankingTransactionRow): number {
+  const ap = row.amount_per_person;
+  if (ap != null && !Number.isNaN(Number(ap))) {
+    return Math.abs(Number(ap));
+  }
+  const n = row.split_participants != null && row.split_participants >= 1 ? row.split_participants : 1;
+  return Math.abs(row.amount) / n;
+}
+
 /** Pendientes compartidos: mismas columnas auxiliares que TC + selección y liquidación grupal. */
 function BankingSharedPendingChargesTable({
   accountId,
@@ -1926,6 +1936,7 @@ function BankingSharedPendingChargesTable({
   onToggleSelectAll,
   onBulkSettle,
   onMarkSettled,
+  onClearSectionSelection,
   openEdit,
   removeRow,
 }: {
@@ -1941,6 +1952,7 @@ function BankingSharedPendingChargesTable({
   onToggleSelectAll: () => void;
   onBulkSettle: () => void | Promise<void>;
   onMarkSettled: (row: BankingTransactionRow) => void | Promise<void>;
+  onClearSectionSelection: () => void;
   openEdit: (row: BankingTransactionRow) => void;
   removeRow: (row: BankingTransactionRow) => void;
 }) {
@@ -1950,11 +1962,36 @@ function BankingSharedPendingChargesTable({
 
   const selectedInSection = useMemo(() => rowIds.filter((id) => selectedIds.has(id)).length, [rowIds, selectedIds]);
 
+  const selectedTotals = useMemo(() => {
+    let totalAbs = 0;
+    let sumPerPerson = 0;
+    for (const row of rows) {
+      if (!selectedIds.has(row.id)) continue;
+      totalAbs += Math.abs(row.amount);
+      sumPerPerson += sharedPendingPerPersonClp(row);
+    }
+    return { totalAbs, sumPerPerson };
+  }, [rows, selectedIds]);
+
   return (
     <section className="mb-6 space-y-2" aria-labelledby={`shared-pending-heading-${accountId}`}>
       <h3 id={`shared-pending-heading-${accountId}`} className={BANKING_AUX_SECTION_HEADING_CLASS}>
         Compartidos pendientes · {accountHeading}
       </h3>
+      {selectedInSection > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-100 bg-violet-50/80 px-3 py-2 text-xs leading-snug text-slate-600 shadow-sm">
+          <p className="min-w-0 flex-1">
+            <span className="text-slate-400">Total gasto seleccionado (esta cuenta): </span>
+            <strong className="tabular-nums text-violet-900">{formatClpDots(selectedTotals.totalAbs)}</strong>
+            <span className="text-slate-400"> · Suma de pago por persona (cuota de cada movimiento): </span>
+            <strong className="tabular-nums text-violet-900">{formatClpDots(selectedTotals.sumPerPerson)}</strong>
+            <span className="text-slate-500"> · {selectedInSection} movimiento(s)</span>
+          </p>
+          <button type="button" onClick={onClearSectionSelection} className={bankingToolbarGhostBtnClass}>
+            Limpiar selección
+          </button>
+        </div>
+      ) : null}
       {someSelected ? (
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -3897,6 +3934,15 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     }
   }
 
+  const clearSharedSelectionForRows = useCallback((sectionRows: BankingTransactionRow[]) => {
+    const drop = new Set(sectionRows.map((r) => r.id));
+    setSelectedSharedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of drop) next.delete(id);
+      return next;
+    });
+  }, []);
+
   async function handleBulkProvisionReverse() {
     if (selectedProvisionReverseIds.size === 0) return;
     try {
@@ -4166,6 +4212,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               onToggleSelectAll={() => toggleSharedSelectAll(g.items)}
               onBulkSettle={handleBulkSharedSettled}
               onMarkSettled={handleMarkSharedSettled}
+              onClearSectionSelection={() => clearSharedSelectionForRows(g.items)}
               openEdit={openEdit}
               removeRow={removeRow}
             />
