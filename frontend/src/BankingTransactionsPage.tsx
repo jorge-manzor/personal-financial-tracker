@@ -2430,6 +2430,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const [provisionReversalOnSave, setProvisionReversalOnSave] = useState(false);
   const [bankingTxPage, setBankingTxPage] = useState(1);
   const [movementTab, setMovementTab] = useState<BankingMovementTabScope>("all");
+  /** Para resetear filtros de TC al entrar en Provisiones desde otra pestaña (las filas suelen tener `credit_card_charge_paid` null). */
+  const movementTabPrevRef = useRef<BankingMovementTabScope | null>(null);
   const [ccUnpaidGroups, setCcUnpaidGroups] = useState<BankingCreditCardUnpaidGroup[]>([]);
   const [sharedUnsettledGroups, setSharedUnsettledGroups] = useState<BankingSharedUnsettledGroup[]>([]);
   const [provisionPendingGroups, setProvisionPendingGroups] = useState<BankingCreditCardUnpaidGroup[]>([]);
@@ -2887,35 +2889,34 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   /** Meta global + grupos según pestaña (compartidos, provisiones pendientes de reversa, etc.). */
   const fetchBankingMetaFromNetwork = useCallback(async (tabScope: BankingMovementTabScope, signal?: AbortSignal) => {
     const init = signal ? { signal } : undefined;
-    const [acc, cats, debt, ccUg] = await Promise.all([
+    /** Evita encadenar awaits: el endpoint de provisiones puede ser pesado; en paralelo llega antes a la UI. */
+    const sharedExtra =
+      tabScope === "shared"
+        ? fetchJson<{ groups: BankingSharedUnsettledGroup[] }>("/banking/shared/unsettled-grouped", init)
+        : Promise.resolve({ groups: [] as BankingSharedUnsettledGroup[] });
+    const provisionExtra =
+      tabScope === "provisiones"
+        ? fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>(
+            "/banking/provisions/pending-reversal-grouped",
+            init,
+          )
+        : Promise.resolve({ groups: [] as BankingCreditCardUnpaidGroup[] });
+
+    const [acc, cats, debt, ccUg, ug, pg] = await Promise.all([
       fetchJson<BankingAccountRow[]>("/banking/accounts", init),
       fetchJson<BankingCategoryRow[]>("/banking/categories", init),
       fetchJson<BankingDebtTotalsOut>("/banking/debt-totals", init),
       fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>("/banking/credit-card/unpaid-grouped", init),
+      sharedExtra,
+      provisionExtra,
     ]);
-    let sharedGroups: BankingSharedUnsettledGroup[] = [];
-    if (tabScope === "shared") {
-      const ug = await fetchJson<{ groups: BankingSharedUnsettledGroup[] }>(
-        "/banking/shared/unsettled-grouped",
-        init,
-      );
-      sharedGroups = ug.groups;
-    }
-    let provisionPending: BankingCreditCardUnpaidGroup[] = [];
-    if (tabScope === "provisiones") {
-      const pg = await fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>(
-        "/banking/provisions/pending-reversal-grouped",
-        init,
-      );
-      provisionPending = pg.groups;
-    }
     return {
       acc,
       cats,
       debt,
       ccGroups: ccUg.groups,
-      sharedGroups,
-      provisionPendingGroups: provisionPending,
+      sharedGroups: ug.groups,
+      provisionPendingGroups: pg.groups,
     };
   }, []);
 
@@ -2989,6 +2990,14 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   }, [movementTab]);
 
   useEffect(() => {
+    const prev = movementTabPrevRef.current;
+    movementTabPrevRef.current = movementTab;
+    if (movementTab === "provisiones" && prev !== null && prev !== "provisiones") {
+      setFilterTcPaidValues([]);
+    }
+  }, [movementTab]);
+
+  useEffect(() => {
     let cancelled = false;
     const ac = new AbortController();
     const requestKey = bankingTabCacheKey(
@@ -3023,6 +3032,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       };
     }
 
+    setItems([]);
+    setBankingTxTotal(0);
+    setBankingTxPage(1);
     setLoading(true);
     void reloadBankingDataForScope(1, movementTab, requestKey, ac.signal)
       .catch(onReloadError)

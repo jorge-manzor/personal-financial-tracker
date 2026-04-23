@@ -1305,35 +1305,13 @@ def _provision_expected_reversal_description(orig: BankingTransaction) -> str:
     return ("Reversa - " + orig_desc) if orig_desc else "Reversa -"
 
 
-def provision_movement_has_automatic_reversal(db: Session, user_id: int, orig: BankingTransaction) -> bool:
-    """True si ya existe una reversa generada por la app para este movimiento original."""
-    expected_desc = _provision_expected_reversal_description(orig)
-    cand = (
-        db.query(BankingTransaction)
-        .filter(
-            BankingTransaction.user_id == user_id,
-            BankingTransaction.account_id == orig.account_id,
-            BankingTransaction.category_id == orig.category_id,
-            BankingTransaction.subcategory_id == orig.subcategory_id,
-        )
-        .all()
-    )
-    orig_amt = float(orig.amount)
-    for r in cand:
-        if abs(float(r.amount) + orig_amt) > 1e-6:
-            continue
-        if not _is_provision_reversal_movement(db, user_id, r):
-            continue
-        rd = (r.description or "").strip()
-        if rd == expected_desc:
-            return True
-    return False
-
-
 def banking_provisions_pending_reversal_groups_payload(db: Session, user_id: int) -> list[dict[str, Any]]:
     """
     Movimientos de categoría Provisiones que no son reversas automáticas y sin reversa pareja registrada,
     agrupados por cuenta (orden por nombre de cuenta).
+
+    Implementación en O(n): una pasada para indexar reversas por (cuenta, categoría, sub, monto) + descripción,
+    sin N consultas por movimiento (importante en producción con historial largo).
     """
     prov_cat = or_(
         BankingCategory.template_cat_id == TEMPLATE_CAT_PROVISIONES,
@@ -1354,13 +1332,47 @@ def banking_provisions_pending_reversal_groups_payload(db: Session, user_id: int
         )
         .all()
     )
+    tpl_rows = (
+        db.query(BankingCategory.id, BankingCategory.template_cat_id)
+        .filter(BankingCategory.user_id == user_id)
+        .all()
+    )
+    tpl_by_cat: dict[int, int | None] = {int(cid): (int(tid) if tid is not None else None) for cid, tid in tpl_rows}
+
+    def is_provision_reversal_row(tx: BankingTransaction) -> bool:
+        desc = (tx.description or "").strip()
+        if not desc.startswith("Reversa -"):
+            return False
+        tid = tpl_by_cat.get(int(tx.category_id))
+        return tid is not None and int(tid) == TEMPLATE_CAT_PROVISIONES
+
+    # Clave: cuenta + categoría + sub + monto (de la fila reversa); valores: descripciones exactas de reversas
+    rev_desc_by_key: dict[tuple[int, int, int, float], set[str]] = {}
+    for tx in txs:
+        if not is_provision_reversal_row(tx):
+            continue
+        key = (
+            int(tx.account_id),
+            int(tx.category_id),
+            int(tx.subcategory_id),
+            round(float(tx.amount), 4),
+        )
+        rev_desc_by_key.setdefault(key, set()).add((tx.description or "").strip())
+
     pending: list[BankingTransaction] = []
     for tx in txs:
-        if _is_provision_reversal_movement(db, user_id, tx):
+        if is_provision_reversal_row(tx):
             continue
         if abs(float(tx.amount)) < 1e-12:
             continue
-        if provision_movement_has_automatic_reversal(db, user_id, tx):
+        expected = _provision_expected_reversal_description(tx)
+        lookup_key = (
+            int(tx.account_id),
+            int(tx.category_id),
+            int(tx.subcategory_id),
+            round(-float(tx.amount), 4),
+        )
+        if expected in rev_desc_by_key.get(lookup_key, set()):
             continue
         pending.append(tx)
 
