@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from auth import BankingUser
@@ -67,6 +67,99 @@ from schemas import (
     BankingTransactionOut,
     BankingTransactionPatch,
 )
+
+"""Días hacia atrás desde hoy cuando no hay rango explícito ni historial completo."""
+BANKING_TX_DEFAULT_LOOKBACK_DAYS = 60
+
+
+def _first_day_next_month(d: date) -> date:
+    if d.month == 12:
+        return date(d.year + 1, 1, 1)
+    return date(d.year, d.month + 1, 1)
+
+
+def _parse_month_yyyy_mm(s: str) -> date:
+    try:
+        s = (s or "").strip()
+        parts = s.split("-")
+        if len(parts) < 2:
+            raise ValueError
+        y, m = int(parts[0]), int(parts[1])
+        if not (1 <= m <= 12):
+            raise ValueError
+        return date(y, m, 1)
+    except (ValueError, IndexError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Mes contable: use formato YYYY-MM.") from e
+
+
+def _accounting_month_span_expr(start: date, end_inc: date):
+    """Unión de filas con accounting_month en el rango y, si es null, fecha dentro del mismo span calendario."""
+    if start > end_inc:
+        start, end_inc = end_inc, start
+    end_excl = _first_day_next_month(end_inc)
+    acct_ok = and_(
+        BankingTransaction.accounting_month.isnot(None),
+        BankingTransaction.accounting_month >= start,
+        BankingTransaction.accounting_month <= end_inc,
+    )
+    fecha_fallback = and_(
+        BankingTransaction.accounting_month.is_(None),
+        BankingTransaction.fecha >= start,
+        BankingTransaction.fecha < end_excl,
+    )
+    return or_(acct_ok, fecha_fallback)
+
+
+def _parse_iso_date_yyyy_mm_dd(s: str) -> date:
+    try:
+        s = (s or "").strip()
+        parts = s.split("-")
+        if len(parts) < 3:
+            raise ValueError
+        y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
+        return date(y, m, d)
+    except (ValueError, IndexError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="date_from / date_to: use formato YYYY-MM-DD.",
+        ) from e
+
+
+def _banking_transactions_scope_expr(
+    *,
+    full_history: bool,
+    accounting_month_from: str | None,
+    accounting_month_to: str | None,
+    date_from: str | None,
+    date_to: str | None,
+):
+    """Predeterminado: últimos N días por `fecha` del movimiento. Tiene prioridad mes contable explícito, luego rango fecha."""
+    if full_history:
+        return None
+    if accounting_month_from and accounting_month_to:
+        start = _parse_month_yyyy_mm(accounting_month_from)
+        end_inc = _parse_month_yyyy_mm(accounting_month_to)
+        return _accounting_month_span_expr(start, end_inc)
+    if accounting_month_from or accounting_month_to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Envíe accounting_month_from y accounting_month_to juntos.",
+        )
+    if date_from and date_to:
+        df = _parse_iso_date_yyyy_mm_dd(date_from)
+        dt = _parse_iso_date_yyyy_mm_dd(date_to)
+        if df > dt:
+            df, dt = dt, df
+        return and_(BankingTransaction.fecha >= df, BankingTransaction.fecha <= dt)
+    if date_from or date_to:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Envíe date_from y date_to juntos (YYYY-MM-DD).",
+        )
+    today = date.today()
+    cutoff = today - timedelta(days=BANKING_TX_DEFAULT_LOOKBACK_DAYS)
+    return and_(BankingTransaction.fecha >= cutoff, BankingTransaction.fecha <= today)
+
 
 router = APIRouter()
 
@@ -486,6 +579,14 @@ def banking_list_transactions(
     account_id: int | None = Query(None),
     account_ids: Annotated[list[int] | None, Query()] = None,
     scope: str | None = Query(None, description="credit_card | shared (compartidos). Vacío = todos."),
+    full_history: bool = Query(
+        False,
+        description="Si true, no acota por fechas. Si false, rango explícito o predeterminado (últimos 60 días por fecha del movimiento).",
+    ),
+    date_from: str | None = Query(None, description="YYYY-MM-DD inicio inclusive (fecha del movimiento); junto con date_to."),
+    date_to: str | None = Query(None, description="YYYY-MM-DD fin inclusive."),
+    accounting_month_from: str | None = Query(None, description="Opcional avanzado: YYYY-MM (prioridad sobre date_from/date_to si ambos pares existen)."),
+    accounting_month_to: str | None = Query(None, description="Opcional avanzado: YYYY-MM."),
     db: Session = Depends(get_db),
 ) -> BankingTransactionListOut:
     ensure_default_categories(db, user.id)
@@ -512,6 +613,16 @@ def banking_list_transactions(
         cq = banking_apply_credit_card_transaction_scope(db, user.id, cq)
     elif shared_scope:
         cq = banking_apply_shared_transaction_scope(db, user.id, cq)
+    scope_expr = _banking_transactions_scope_expr(
+        full_history=full_history,
+        accounting_month_from=accounting_month_from,
+        accounting_month_to=accounting_month_to,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    if scope_expr is not None:
+        q = q.filter(scope_expr)
+        cq = cq.filter(scope_expr)
     n = cq.scalar() or 0
     rows = (
         q.order_by(

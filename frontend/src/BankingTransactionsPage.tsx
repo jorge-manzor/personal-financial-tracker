@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   createContext,
   useCallback,
@@ -47,7 +48,20 @@ const BANKING_TEMPLATE_SUB_ENTRE_CUENTAS_PROPIAS = 1901;
 const BANKING_TEMPLATE_CAT_PROVISIONES = 21;
 
 /** Movimientos por página (coincide con GET /banking/transactions `page_size`). */
-const BANKING_TX_PAGE_SIZE = 200;
+const BANKING_TX_PAGE_SIZE = 50;
+
+/** Alto estimado por fila en la tabla principal (virtualizada); debe ser ≥ alto real medio para evitar saltos. */
+const BANKING_TX_VIRTUAL_ROW_ESTIMATE_PX = 52;
+
+/** Alineado con el backend: desde hoy − 60 días hasta hoy (`YYYY-MM-DD`, fecha del movimiento). */
+function defaultBankingTxDateRangeIso(): { from: string; to: string } {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(from.getDate() - 60);
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { from: iso(from), to: iso(to) };
+}
 
 const BANKING_BALANCE_CARD_ORDER_STORAGE_KEY = "banking_balance_card_order_v1";
 
@@ -478,9 +492,9 @@ const bankingAuxActionBtnClass =
 const bankingAuxBulkBtnClass =
   "rounded-xl border border-teal-200 bg-gradient-to-b from-teal-50 to-emerald-50 px-3.5 py-2 text-sm font-semibold text-teal-900 shadow-sm ring-1 ring-teal-100 transition hover:from-teal-100 hover:to-emerald-50 disabled:cursor-not-allowed disabled:opacity-40";
 
-/** Tabla principal — tarjeta blanca + menta muy suave (modo claro). */
+/** Tabla principal — sin backdrop-blur (mejor scroll en GPUs modestas). */
 const BANKING_MAIN_TX_CARD_CLASS =
-  "banking-table-scroll overflow-x-auto rounded-2xl border border-teal-100 bg-white/95 pb-2 shadow-[0_8px_40px_-12px_rgba(45,212,191,0.18),inset_0_1px_0_0_rgba(255,255,255,0.9)] backdrop-blur-sm";
+  "rounded-2xl border border-teal-100 bg-white pb-2 shadow-sm ring-1 ring-teal-100/40";
 const BANKING_MAIN_TX_TOOLBAR_CLASS =
   "sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 border-b border-teal-100/90 bg-gradient-to-r from-teal-50/95 to-cyan-50/80 px-3 py-2.5";
 const BANKING_MAIN_TX_THEAD_CLASS =
@@ -1339,6 +1353,8 @@ function BankingTxTd({
   sharedSettledLabel,
   ccPaidLabel,
   accountingLabel,
+  /** Por defecto el monto va alineado a la derecha (tabla principal); tablas auxiliares TC/compartido usan `center`. */
+  montoAlign = "end",
 }: {
   colKey: BankingTxColumnKey;
   row: BankingTransactionRow;
@@ -1346,6 +1362,7 @@ function BankingTxTd({
   sharedSettledLabel: string;
   ccPaidLabel: string;
   accountingLabel: string;
+  montoAlign?: "end" | "center";
 }) {
   switch (colKey) {
     case "fecha":
@@ -1372,9 +1389,10 @@ function BankingTxTd({
       /** Colores como actividad de inversiones; tamaño más compacto que la lista principal. */
       const signClass = income ? "text-teal-600" : "text-rose-600";
       const text = `${income ? "+" : "-"}${formatBankingClpSigned(row.amount)}`;
+      const rowJustify = montoAlign === "center" ? "justify-center" : "justify-end";
       return (
-        <td className="align-middle whitespace-nowrap px-2 py-3 sm:px-2.5">
-          <div className="flex w-full justify-end">
+        <td className={`align-middle whitespace-nowrap px-2 py-3 sm:px-2.5 ${montoAlign === "center" ? "text-center" : ""}`}>
+          <div className={`flex w-full ${rowJustify}`}>
             <span className={`text-[12px] font-semibold tabular-nums ${signClass}`}>{text}</span>
           </div>
         </td>
@@ -1487,6 +1505,107 @@ function SortableBankingTxColumnPickerRow({
 const txIconBtn =
   "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700";
 const txIconBtnDanger = `${txIconBtn} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600`;
+
+/** Cuerpo virtualizado de la tabla principal (pocas filas en DOM; scroll en `scrollRef`). */
+function BankingVirtualizedMainTxTableBody({
+  scrollRef,
+  rows,
+  orderedVisibleBankingTxColumns,
+  openEdit,
+  removeRow,
+}: {
+  scrollRef: React.RefObject<HTMLDivElement | null>;
+  rows: BankingTransactionRow[];
+  orderedVisibleBankingTxColumns: BankingTxColumnKey[];
+  openEdit: (row: BankingTransactionRow) => void;
+  removeRow: (row: BankingTransactionRow) => void;
+}) {
+  const colCount = orderedVisibleBankingTxColumns.length + 1;
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => BANKING_TX_VIRTUAL_ROW_ESTIMATE_PX,
+    overscan: 12,
+  });
+  const vItems = virtualizer.getVirtualItems();
+  const totalSize = virtualizer.getTotalSize();
+  const padTop = vItems.length > 0 ? vItems[0].start : 0;
+  const padBottom = vItems.length > 0 ? Math.max(0, totalSize - vItems[vItems.length - 1].end) : 0;
+
+  return (
+    <tbody className={BANKING_MAIN_TX_TBODY_CLASS}>
+      {padTop > 0 ? (
+        <tr aria-hidden className="pointer-events-none border-0">
+          <td colSpan={colCount} className="border-0 p-0" style={{ height: padTop }} />
+        </tr>
+      ) : null}
+      {vItems.map((vi) => {
+        const row = rows[vi.index];
+        const income = row.amount >= 0;
+        const sharedSettledLabel = row.is_shared ? (row.shared_expense_settled ? "Sí" : "No") : "—";
+        const ccPaidLabel =
+          row.credit_card_charge_paid === null || row.credit_card_charge_paid === undefined
+            ? "—"
+            : row.credit_card_charge_paid
+              ? "Sí"
+              : "No";
+        const accountingLabel = formatBankingAccountingMonth(row.accounting_month);
+        return (
+          <tr
+            key={row.id}
+            className={BANKING_MAIN_TX_TR_CLASS}
+            style={{ height: vi.size }}
+            data-index={vi.index}
+          >
+            {orderedVisibleBankingTxColumns.map((colKey) => (
+              <BankingTxTd
+                key={colKey}
+                colKey={colKey}
+                row={row}
+                income={income}
+                sharedSettledLabel={sharedSettledLabel}
+                ccPaidLabel={ccPaidLabel}
+                accountingLabel={accountingLabel}
+              />
+            ))}
+            <td className="align-middle px-1.5 py-3 sm:px-2">
+              <div className="flex items-center justify-center gap-0.5">
+                <button
+                  type="button"
+                  disabled={row.peer_transaction_id != null || row.is_provision_reversal === true}
+                  title={
+                    row.peer_transaction_id != null
+                      ? "Las transferencias entre cuentas propias no se pueden editar aquí"
+                      : row.is_provision_reversal === true
+                        ? "Las reversas de provisión solo se pueden eliminar"
+                        : "Editar movimiento"
+                  }
+                  onClick={() => openEdit(row)}
+                  className={`${txIconBtn} disabled:pointer-events-none disabled:opacity-30`}
+                >
+                  <IconPencil />
+                </button>
+                <button
+                  type="button"
+                  title="Eliminar movimiento"
+                  onClick={() => void removeRow(row)}
+                  className={txIconBtnDanger}
+                >
+                  <IconTrash />
+                </button>
+              </div>
+            </td>
+          </tr>
+        );
+      })}
+      {padBottom > 0 ? (
+        <tr aria-hidden className="pointer-events-none border-0">
+          <td colSpan={colCount} className="border-0 p-0" style={{ height: padBottom }} />
+        </tr>
+      ) : null}
+    </tbody>
+  );
+}
 
 /** Monto en CLP que aporta un cargo TC a la deuda (egreso negativo → valor positivo). */
 function tcChargeDebtMagnitudeClp(row: BankingTransactionRow): number {
@@ -1661,6 +1780,7 @@ function BankingCcPendingChargesTable({
                       sharedSettledLabel={sharedSettledLabel}
                       ccPaidLabel={ccPaidLabel}
                       accountingLabel={accountingLabel}
+                      montoAlign="center"
                     />
                   ))}
                   <td className="align-middle px-1.5 py-3 text-center sm:px-2">
@@ -1830,6 +1950,7 @@ function BankingSharedPendingChargesTable({
                       sharedSettledLabel={sharedSettledLabel}
                       ccPaidLabel={ccPaidLabel}
                       accountingLabel={accountingLabel}
+                      montoAlign="center"
                     />
                   ))}
                   <td className="align-middle px-1.5 py-3 text-center sm:px-2">
@@ -2033,6 +2154,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   );
   const [columnPickerOpen, setColumnPickerOpen] = useState(false);
   const columnPickerWrapRef = useRef<HTMLDivElement>(null);
+  /** Contenedor con scroll de la tabla principal (virtualizada). */
+  const bankingTxScrollRef = useRef<HTMLDivElement>(null);
 
   const columnDndSensors = useSensors(
     useSensor(PointerSensor, {
@@ -2044,6 +2167,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const [filterDateTo, setFilterDateTo] = useState("");
   const [filterDescription, setFilterDescription] = useState("");
   const [filterAccountIds, setFilterAccountIds] = useState<number[]>([]);
+  /** Rango por fecha de movimiento en servidor (predeterminado: últimos 60 días). */
+  const [bankingAccountingFullHistory, setBankingAccountingFullHistory] = useState(false);
+  const [bankingTxDateFrom, setBankingTxDateFrom] = useState(() => defaultBankingTxDateRangeIso().from);
+  const [bankingTxDateTo, setBankingTxDateTo] = useState(() => defaultBankingTxDateRangeIso().to);
   const [filterAmountMin, setFilterAmountMin] = useState("");
   const [filterAmountMax, setFilterAmountMax] = useState("");
   const [filterCategoryIds, setFilterCategoryIds] = useState<number[]>([]);
@@ -2344,7 +2471,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     };
   }, [categoryMenuOpen]);
 
-  const reloadBankingTransactions = useCallback(async (page: number) => {
+  const buildBankingTxQueryParams = useCallback((page: number) => {
     const params = new URLSearchParams();
     params.set("page", String(page));
     params.set("page_size", String(BANKING_TX_PAGE_SIZE));
@@ -2355,20 +2482,43 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     }
     if (movementTab === "credit_card") params.set("scope", "credit_card");
     if (movementTab === "shared") params.set("scope", "shared");
+    if (bankingAccountingFullHistory) {
+      params.set("full_history", "true");
+    } else {
+      let df = bankingTxDateFrom;
+      let dt = bankingTxDateTo;
+      if (df > dt) [df, dt] = [dt, df];
+      params.set("date_from", df);
+      params.set("date_to", dt);
+    }
+    return params;
+  }, [filterAccountIds, movementTab, bankingAccountingFullHistory, bankingTxDateFrom, bankingTxDateTo]);
 
-    const [acc, cats, txList, debt, ccUg] = await Promise.all([
-      fetchJson<BankingAccountRow[]>("/banking/accounts"),
-      fetchJson<BankingCategoryRow[]>("/banking/categories"),
-      fetchJson<{
+  /** Solo lista paginada (navegación rápida entre páginas). */
+  const fetchBankingTransactionsPage = useCallback(
+    async (page: number) => {
+      const params = buildBankingTxQueryParams(page);
+      const txList = await fetchJson<{
         items: BankingTransactionRow[];
         total: number;
         page: number;
         page_size: number;
-      }>(`/banking/transactions?${params.toString()}`),
+      }>(`/banking/transactions?${params.toString()}`);
+      setItems(txList.items);
+      setBankingTxTotal(txList.total);
+      setBankingTxPage(txList.page);
+    },
+    [buildBankingTxQueryParams],
+  );
+
+  /** Cuentas, categorías, resúmenes de deuda y pendientes TC/compartido. */
+  const fetchBankingMeta = useCallback(async () => {
+    const [acc, cats, debt, ccUg] = await Promise.all([
+      fetchJson<BankingAccountRow[]>("/banking/accounts"),
+      fetchJson<BankingCategoryRow[]>("/banking/categories"),
       fetchJson<BankingDebtTotalsOut>("/banking/debt-totals"),
       fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>("/banking/credit-card/unpaid-grouped"),
     ]);
-    const groups = ccUg.groups;
     let sharedGroups: BankingSharedUnsettledGroup[] = [];
     if (movementTab === "shared") {
       const ug = await fetchJson<{ groups: BankingSharedUnsettledGroup[] }>("/banking/shared/unsettled-grouped");
@@ -2377,12 +2527,16 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     setAccounts(acc);
     setBankingDebtTotals(debt);
     setCategories([...cats].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id));
-    setItems(txList.items);
-    setBankingTxTotal(txList.total);
-    setBankingTxPage(txList.page);
-    setCcUnpaidGroups(groups);
+    setCcUnpaidGroups(ccUg.groups);
     setSharedUnsettledGroups(sharedGroups);
-  }, [filterAccountIds, movementTab]);
+  }, [movementTab]);
+
+  const reloadBankingFull = useCallback(
+    async (page: number) => {
+      await Promise.all([fetchBankingTransactionsPage(page), fetchBankingMeta()]);
+    },
+    [fetchBankingTransactionsPage, fetchBankingMeta],
+  );
 
   useEffect(() => {
     if (movementTab !== "shared") setSelectedSharedIds(new Set());
@@ -2391,7 +2545,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void reloadBankingTransactions(1)
+    void reloadBankingFull(1)
       .catch(console.error)
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -2399,7 +2553,13 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     return () => {
       cancelled = true;
     };
-  }, [reloadBankingTransactions]);
+  }, [reloadBankingFull]);
+
+  /** Tras cargar o cambiar de página, el scroll de la tabla vuelve arriba. */
+  useEffect(() => {
+    if (loading) return;
+    bankingTxScrollRef.current?.scrollTo(0, 0);
+  }, [loading, bankingTxPage]);
 
   const bankingTxTotalPages = useMemo(
     () => Math.max(1, Math.ceil(bankingTxTotal / BANKING_TX_PAGE_SIZE)),
@@ -2411,14 +2571,14 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       if (nextPage < 1 || nextPage > bankingTxTotalPages) return;
       setLoading(true);
       try {
-        await reloadBankingTransactions(nextPage);
+        await fetchBankingTransactionsPage(nextPage);
       } catch (e) {
         console.error(e);
       } finally {
         setLoading(false);
       }
     },
-    [reloadBankingTransactions, bankingTxTotalPages],
+    [fetchBankingTransactionsPage, bankingTxTotalPages],
   );
 
   const toggleBankingTxColumn = useCallback((key: BankingTxColumnKey) => {
@@ -3026,7 +3186,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       setCategoryMenuOpen(false);
       setAccountingPickMode(null);
       setProvisionReversalOnSave(false);
-      await reloadBankingTransactions(pageAfterSave);
+      await reloadBankingFull(pageAfterSave);
     } catch (e) {
       onToast(e instanceof Error ? e.message : "No se pudo guardar");
     } finally {
@@ -3046,7 +3206,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         return;
       }
       onToast("Movimiento eliminado");
-      await reloadBankingTransactions(bankingTxPage);
+      await reloadBankingFull(bankingTxPage);
     } catch {
       onToast("No se pudo eliminar");
     }
@@ -3059,7 +3219,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         credit_card_charge_paid: true,
       });
       onToast("Cargo marcado como pagado; se registró el egreso en la cuenta corriente asociada.");
-      await reloadBankingTransactions(bankingTxPage);
+      await reloadBankingFull(bankingTxPage);
     } catch (e) {
       onToast(e instanceof Error ? e.message : "No se pudo marcar como pagado");
     } finally {
@@ -3099,7 +3259,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         next.delete(row.id);
         return next;
       });
-      await reloadBankingTransactions(bankingTxPage);
+      await reloadBankingFull(bankingTxPage);
     } catch (e) {
       onToast(e instanceof Error ? e.message : "No se pudo marcar como liquidado");
     } finally {
@@ -3116,7 +3276,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       });
       onToast(`${out.updated} movimiento(s) marcado(s) como liquidado(s).`);
       setSelectedSharedIds(new Set());
-      await reloadBankingTransactions(bankingTxPage);
+      await reloadBankingFull(bankingTxPage);
     } catch (e) {
       onToast(e instanceof Error ? e.message : "No se pudo liquidar la selección");
     } finally {
@@ -3365,9 +3525,62 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       <div className={BANKING_MAIN_TX_CARD_CLASS}>
         {loading ? (
           <p className="p-6 text-sm text-slate-400">Cargando…</p>
-        ) : items.length === 0 ? (
-          <p className="p-6 text-sm text-slate-400">No hay movimientos todavía.</p>
         ) : (
+          <>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-teal-100/90 bg-gradient-to-r from-teal-50/90 to-cyan-50/70 px-3 py-2.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Fecha movimiento</span>
+              <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500/30"
+                  checked={bankingAccountingFullHistory}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    setBankingAccountingFullHistory(on);
+                    if (!on) {
+                      const d = defaultBankingTxDateRangeIso();
+                      setBankingTxDateFrom(d.from);
+                      setBankingTxDateTo(d.to);
+                    }
+                  }}
+                />
+                Todo el historial
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500">Desde</span>
+                <input
+                  type="date"
+                  value={bankingTxDateFrom}
+                  disabled={bankingAccountingFullHistory}
+                  onChange={(e) => {
+                    setBankingAccountingFullHistory(false);
+                    setBankingTxDateFrom(e.target.value);
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-45 [color-scheme:light]"
+                />
+                <span className="text-xs text-slate-500">hasta</span>
+                <input
+                  type="date"
+                  value={bankingTxDateTo}
+                  disabled={bankingAccountingFullHistory}
+                  onChange={(e) => {
+                    setBankingAccountingFullHistory(false);
+                    setBankingTxDateTo(e.target.value);
+                  }}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-45 [color-scheme:light]"
+                />
+              </div>
+              <p className="w-full min-w-0 text-[11px] leading-snug text-slate-500 sm:w-auto sm:pl-1">
+                {bankingAccountingFullHistory
+                  ? "Sin filtro de fechas en servidor. Sigue habiendo 50 movimientos por página."
+                  : "Por defecto: últimos 60 días por fecha del movimiento. Amplía las fechas o usa «Todo el historial»."}
+              </p>
+            </div>
+            {items.length === 0 ? (
+              <p className="p-6 text-sm text-slate-400">
+                No hay movimientos en este período. Amplía el rango de fechas o activa «Todo el historial».
+              </p>
+            ) : (
           <BankingTxFilterUICtx.Provider value={bankingTxFilterUICtxValue}>
             <div className={BANKING_MAIN_TX_TOOLBAR_CLASS}>
               <p className="text-xs text-slate-400">
@@ -3414,84 +3627,40 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               </div>
             ) : (
               <>
-                <table
-                  className="w-full table-fixed border-collapse text-[12px]"
-                  style={{ minWidth: bankingTableMinWidthPx }}
+                <div
+                  ref={bankingTxScrollRef}
+                  className="banking-table-scroll max-h-[min(65vh,560px)] overflow-auto border-t border-teal-100"
                 >
-                  <colgroup>
-                    {orderedVisibleBankingTxColumns.map((colKey) => (
-                      <col key={colKey} style={{ width: BANKING_TX_COL_WIDTH[colKey] }} />
-                    ))}
-                    <col style={{ width: "5rem" }} />
-                  </colgroup>
-                  <thead className={BANKING_MAIN_TX_THEAD_CLASS}>
-                    <tr>
+                  <table
+                    className="w-full table-fixed border-collapse text-[12px]"
+                    style={{ minWidth: bankingTableMinWidthPx }}
+                  >
+                    <colgroup>
                       {orderedVisibleBankingTxColumns.map((colKey) => (
-                        <BankingTxColumnHeader key={colKey} colKey={colKey} />
+                        <col key={colKey} style={{ width: BANKING_TX_COL_WIDTH[colKey] }} />
                       ))}
-                      <th className="px-1.5 py-3 text-center text-[12px] font-semibold uppercase tracking-wide text-teal-900/75 sm:px-2" aria-label="Acciones" />
-                    </tr>
-                  </thead>
-                  <tbody className={BANKING_MAIN_TX_TBODY_CLASS}>
-                    {filteredBankingTxItems.map((row) => {
-                    const income = row.amount >= 0;
-                    const sharedSettledLabel = row.is_shared
-                      ? row.shared_expense_settled
-                        ? "Sí"
-                        : "No"
-                      : "—";
-                    const ccPaidLabel =
-                      row.credit_card_charge_paid === null || row.credit_card_charge_paid === undefined
-                        ? "—"
-                        : row.credit_card_charge_paid
-                          ? "Sí"
-                          : "No";
-                    const accountingLabel = formatBankingAccountingMonth(row.accounting_month);
-                    return (
-                      <tr key={row.id} className={BANKING_MAIN_TX_TR_CLASS}>
+                      <col style={{ width: "5rem" }} />
+                    </colgroup>
+                    <thead className={`${BANKING_MAIN_TX_THEAD_CLASS} sticky top-0 z-10`}>
+                      <tr>
                         {orderedVisibleBankingTxColumns.map((colKey) => (
-                          <BankingTxTd
-                            key={colKey}
-                            colKey={colKey}
-                            row={row}
-                            income={income}
-                            sharedSettledLabel={sharedSettledLabel}
-                            ccPaidLabel={ccPaidLabel}
-                            accountingLabel={accountingLabel}
-                          />
+                          <BankingTxColumnHeader key={colKey} colKey={colKey} />
                         ))}
-                        <td className="align-middle px-1.5 py-3 sm:px-2">
-                          <div className="flex items-center justify-center gap-0.5">
-                            <button
-                              type="button"
-                              disabled={row.peer_transaction_id != null || row.is_provision_reversal === true}
-                              title={
-                                row.peer_transaction_id != null
-                                  ? "Las transferencias entre cuentas propias no se pueden editar aquí"
-                                  : row.is_provision_reversal === true
-                                    ? "Las reversas de provisión solo se pueden eliminar"
-                                    : "Editar movimiento"
-                              }
-                              onClick={() => openEdit(row)}
-                              className={`${txIconBtn} disabled:pointer-events-none disabled:opacity-30`}
-                            >
-                              <IconPencil />
-                            </button>
-                            <button
-                              type="button"
-                              title="Eliminar movimiento"
-                              onClick={() => void removeRow(row)}
-                              className={txIconBtnDanger}
-                            >
-                              <IconTrash />
-                            </button>
-                          </div>
-                        </td>
+                        <th
+                          className="px-1.5 py-3 text-center text-[12px] font-semibold uppercase tracking-wide text-teal-900/75 sm:px-2"
+                          aria-label="Acciones"
+                        />
                       </tr>
-                    );
-                  })}
-                  </tbody>
-                </table>
+                    </thead>
+                    <BankingVirtualizedMainTxTableBody
+                      scrollRef={bankingTxScrollRef}
+                      rows={filteredBankingTxItems}
+                      orderedVisibleBankingTxColumns={orderedVisibleBankingTxColumns}
+                      openEdit={openEdit}
+                      removeRow={removeRow}
+                    />
+                  </table>
+                </div>
                 <div className={BANKING_MAIN_TX_FOOTER_CLASS}>
                   <p className="text-[12px] leading-snug text-slate-400">
                     Hasta <strong className="text-slate-800">{BANKING_TX_PAGE_SIZE}</strong> movimientos por página.
@@ -3552,6 +3721,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 )
               : null}
           </BankingTxFilterUICtx.Provider>
+            )}
+          </>
         )}
       </div>
 
