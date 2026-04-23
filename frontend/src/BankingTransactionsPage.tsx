@@ -19,6 +19,7 @@ import type { CSSProperties, Dispatch, SetStateAction } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   createContext,
+  memo,
   useCallback,
   useContext,
   useEffect,
@@ -558,13 +559,13 @@ const BANKING_MAIN_TX_THEAD_CLASS =
   "border-b border-teal-100 bg-gradient-to-r from-teal-50 via-emerald-50/90 to-teal-50";
 const BANKING_MAIN_TX_TBODY_CLASS = "divide-y divide-slate-100";
 const BANKING_MAIN_TX_TR_CLASS =
-  "odd:bg-white even:bg-slate-50/90 text-slate-800 transition-colors hover:bg-teal-50/70";
+  "odd:bg-white even:bg-slate-50/90 text-slate-800 hover:bg-teal-50/70";
 const BANKING_MAIN_TX_FOOTER_CLASS =
   "flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/95 px-3 py-2.5";
 
 /** Pendientes TC / compartidos — violeta pastel sobre claro. */
 const BANKING_AUX_TX_CARD_CLASS =
-  "banking-table-scroll overflow-x-auto rounded-2xl border border-violet-100 bg-white/95 pb-2 shadow-[0_8px_40px_-12px_rgba(139,92,246,0.12)] backdrop-blur-sm";
+  "banking-table-scroll overflow-x-auto rounded-2xl border border-violet-100 bg-white pb-2 shadow-[0_8px_40px_-12px_rgba(139,92,246,0.12)]";
 const BANKING_AUX_TX_THEAD_CLASS =
   "border-b border-violet-100 bg-gradient-to-r from-violet-50 via-fuchsia-50/70 to-violet-50";
 const BANKING_AUX_TX_TBODY_CLASS = "divide-y divide-slate-100";
@@ -574,9 +575,9 @@ const BANKING_AUX_TX_TH_TEXT_CLASS =
   "text-[12px] font-semibold uppercase tracking-wide text-violet-900/75";
 const BANKING_AUX_SECTION_HEADING_CLASS = "text-sm font-semibold text-slate-700";
 
-/** Contenedor pestañas «Movimientos». */
+/** Contenedor pestañas «Movimientos». Sin backdrop-blur: el blur forza recomposición en cada frame al hacer scroll (muy pesado en GPU integradas / Windows). */
 const BANKING_MOVEMENTS_SECTION_CLASS =
-  "overflow-hidden rounded-2xl border border-teal-100 bg-white/90 shadow-[0_12px_48px_-16px_rgba(20,184,166,0.15)] backdrop-blur-sm";
+  "overflow-hidden rounded-2xl border border-teal-100 bg-white shadow-[0_12px_48px_-16px_rgba(20,184,166,0.14)]";
 const BANKING_MOVEMENTS_TABLIST_CLASS =
   "flex flex-wrap gap-2 border-b border-teal-100 bg-gradient-to-r from-teal-50/90 to-cyan-50/70 px-2 pt-3";
 
@@ -1403,7 +1404,7 @@ function BankingTxSiNoDashBadge({ text }: { text: string }) {
   return <span className="text-[12px] text-slate-500">{text}</span>;
 }
 
-function BankingTxTd({
+const BankingTxTd = memo(function BankingTxTd({
   colKey,
   row,
   income,
@@ -1504,7 +1505,7 @@ function BankingTxTd({
         </td>
       );
   }
-}
+});
 
 function SortableBankingTxColumnPickerRow({
   columnKey,
@@ -1582,7 +1583,14 @@ function BankingVirtualizedMainTxTableBody({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => BANKING_TX_VIRTUAL_ROW_ESTIMATE_PX,
-    overscan: 12,
+    /** Menos filas extra en DOM = menos trabajo en GPUs modestas. */
+    overscan: 8,
+    getItemKey: (index) => rows[index]?.id ?? index,
+    /**
+     * Por defecto el virtualizer usa `flushSync` en actualizaciones síncronas al hacer scroll;
+     * en Windows / GPU integrada eso bloquea el hilo principal cada frame y se nota como scroll entrecortado.
+     */
+    useFlushSync: false,
   });
   const vItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
