@@ -1288,6 +1288,119 @@ def banking_bulk_set_shared_expense_settled(db: Session, user_id: int, transacti
     return n
 
 
+def banking_apply_provision_transaction_scope(_db: Session, _user_id: int, q):
+    """Solo movimientos cuya categoría es plantilla Provisiones (21) o nombre «Provisiones»."""
+    prov_cat = or_(
+        BankingCategory.template_cat_id == TEMPLATE_CAT_PROVISIONES,
+        func.lower(func.trim(BankingCategory.name)) == "provisiones",
+    )
+    return q.join(BankingCategory, BankingCategory.id == BankingTransaction.category_id).filter(
+        BankingCategory.user_id == _user_id,
+        prov_cat,
+    )
+
+
+def _provision_expected_reversal_description(orig: BankingTransaction) -> str:
+    orig_desc = (orig.description or "").strip()
+    return ("Reversa - " + orig_desc) if orig_desc else "Reversa -"
+
+
+def provision_movement_has_automatic_reversal(db: Session, user_id: int, orig: BankingTransaction) -> bool:
+    """True si ya existe una reversa generada por la app para este movimiento original."""
+    expected_desc = _provision_expected_reversal_description(orig)
+    cand = (
+        db.query(BankingTransaction)
+        .filter(
+            BankingTransaction.user_id == user_id,
+            BankingTransaction.account_id == orig.account_id,
+            BankingTransaction.category_id == orig.category_id,
+            BankingTransaction.subcategory_id == orig.subcategory_id,
+        )
+        .all()
+    )
+    orig_amt = float(orig.amount)
+    for r in cand:
+        if abs(float(r.amount) + orig_amt) > 1e-6:
+            continue
+        if not _is_provision_reversal_movement(db, user_id, r):
+            continue
+        rd = (r.description or "").strip()
+        if rd == expected_desc:
+            return True
+    return False
+
+
+def banking_provisions_pending_reversal_groups_payload(db: Session, user_id: int) -> list[dict[str, Any]]:
+    """
+    Movimientos de categoría Provisiones que no son reversas automáticas y sin reversa pareja registrada,
+    agrupados por cuenta (orden por nombre de cuenta).
+    """
+    prov_cat = or_(
+        BankingCategory.template_cat_id == TEMPLATE_CAT_PROVISIONES,
+        func.lower(func.trim(BankingCategory.name)) == "provisiones",
+    )
+    txs = (
+        db.query(BankingTransaction)
+        .join(BankingCategory, BankingCategory.id == BankingTransaction.category_id)
+        .filter(
+            BankingTransaction.user_id == user_id,
+            BankingCategory.user_id == user_id,
+            prov_cat,
+        )
+        .order_by(
+            BankingTransaction.fecha.desc(),
+            BankingTransaction.created_at.desc(),
+            BankingTransaction.id.desc(),
+        )
+        .all()
+    )
+    pending: list[BankingTransaction] = []
+    for tx in txs:
+        if _is_provision_reversal_movement(db, user_id, tx):
+            continue
+        if abs(float(tx.amount)) < 1e-12:
+            continue
+        if provision_movement_has_automatic_reversal(db, user_id, tx):
+            continue
+        pending.append(tx)
+
+    by_acc: dict[int, list[BankingTransaction]] = {}
+    for tx in pending:
+        aid = int(tx.account_id)
+        by_acc.setdefault(aid, []).append(tx)
+    names: dict[int, str] = {}
+    for aid in by_acc:
+        acc = get_account_for_user(db, user_id, aid)
+        names[aid] = acc.name.strip() if acc else ""
+    out: list[dict[str, Any]] = []
+    for aid in sorted(by_acc.keys(), key=lambda i: (names.get(i, "").lower(), i)):
+        out.append(
+            {
+                "account_id": aid,
+                "account_name": names.get(aid, ""),
+                "items": [transaction_to_out(db, t) for t in by_acc[aid]],
+            }
+        )
+    return out
+
+
+def banking_bulk_reverse_provision(db: Session, user_id: int, transaction_ids: list[int]) -> int:
+    """Ejecuta reverse_provision por cada id único; cuenta éxitos (omitidos si HTTPException)."""
+    seen: set[int] = set()
+    n = 0
+    for raw in transaction_ids:
+        tid = int(raw)
+        if tid in seen:
+            continue
+        seen.add(tid)
+        try:
+            reverse_provision_transaction_row(db, user_id, tid)
+            n += 1
+        except HTTPException:
+            continue
+    return n
+
+
 def banking_apply_credit_card_transaction_scope(db: Session, user_id: int, q):
     """
     Limita la consulta a movimientos en cuenta tarjeta de crédito o egresos categoría «Pago Tarjeta de Credito».

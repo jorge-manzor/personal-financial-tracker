@@ -558,3 +558,11 @@ class BankingBulkSharedSettledBody(BaseModel):
 
 class BankingBulkSharedSettledOut(BaseModel):
     updated: int
+
+
+class BankingBulkReverseProvisionBody(BaseModel):
+    transaction_ids: list[int] = Field(..., min_length=1)
+
+
+class BankingBulkReverseProvisionOut(BaseModel):
+    created: int

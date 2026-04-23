@@ -55,6 +55,21 @@ const BANKING_TX_PAGE_SIZE = 50;
 /** Alto estimado por fila en la tabla principal (virtualizada); debe ser ≥ alto real medio para evitar saltos. */
 const BANKING_TX_VIRTUAL_ROW_ESTIMATE_PX = 52;
 
+function normalizeBankingPickerSearch(raw: string): string {
+  const s = raw.trim().toLowerCase();
+  try {
+    return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  } catch {
+    return s;
+  }
+}
+
+/** Búsqueda tipo contains; vacío muestra todas. Compara sin distinguir mayúsculas ni tildes (p. ej. cafe → Café). */
+function bankingPickerSearchMatches(haystack: string, needle: string): boolean {
+  if (!needle.trim()) return true;
+  return normalizeBankingPickerSearch(haystack).includes(normalizeBankingPickerSearch(needle));
+}
+
 /** Alineado con el backend: desde hoy − 60 días hasta hoy (`YYYY-MM-DD`, fecha del movimiento). */
 function defaultBankingTxDateRangeIso(): { from: string; to: string } {
   const to = new Date();
@@ -66,7 +81,7 @@ function defaultBankingTxDateRangeIso(): { from: string; to: string } {
 }
 
 /** Vista de movimientos (tabs); alinea con query `scope`. */
-type BankingMovementTabScope = "all" | "credit_card" | "shared";
+type BankingMovementTabScope = "all" | "credit_card" | "shared" | "provisiones";
 
 /** Cache SWR: misma semántica que los params de lista en servidor. */
 function bankingTabCacheKey(
@@ -90,6 +105,7 @@ type BankingTabTxCacheEntry = {
   total: number;
   page: number;
   sharedUnsettledGroups: BankingSharedUnsettledGroup[];
+  provisionPendingGroups: BankingCreditCardUnpaidGroup[];
 };
 
 /** Evita crecimiento indefinido del Map al combinar filtros/pestañas/fechas. */
@@ -541,6 +557,12 @@ const bankingModalControlClass =
   "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light]";
 const bankingModalCategoryTriggerClass =
   "flex w-full items-center justify-between gap-2 overflow-hidden rounded-xl border border-slate-200 bg-white py-2 pl-3 pr-3 text-left text-sm outline-none shadow-sm transition hover:border-teal-200 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 disabled:cursor-not-allowed disabled:opacity-40 [color-scheme:light]";
+/** Campo buscar en desplegables categoría / subcategoría (modal movimiento). */
+const bankingPickerSearchInputClass =
+  "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light]";
+/** Lista del panel (el padre debe llevar `.banking-theme` para scrollbar claro en portales). */
+const bankingPickerListScrollClass =
+  "tx-scroll max-h-[min(55vh,22rem)] min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-py-1 [-webkit-overflow-scrolling:touch]";
 const bankingToolbarGhostBtnClass =
   "rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:border-teal-200 hover:bg-teal-50/90";
 const bankingToolbarGhostBtnMdClass =
@@ -2060,6 +2082,171 @@ function BankingSharedPendingChargesTable({
   );
 }
 
+/** Provisiones sin reversa automática registrada: selección + reversa unitaria y masiva. */
+function BankingProvisionPendingTable({
+  accountId,
+  accountHeading,
+  rows,
+  orderedVisibleBankingTxColumns,
+  tableMinWidthPx,
+  bulkReversing,
+  reversingId,
+  selectedIds,
+  onToggleRow,
+  onToggleSelectAll,
+  onBulkReverse,
+  onReverseOne,
+  openEdit,
+  removeRow,
+}: {
+  accountId: number;
+  accountHeading: string;
+  rows: BankingTransactionRow[];
+  orderedVisibleBankingTxColumns: BankingTxColumnKey[];
+  tableMinWidthPx: number;
+  bulkReversing: boolean;
+  reversingId: number | null;
+  selectedIds: Set<number>;
+  onToggleRow: (id: number) => void;
+  onToggleSelectAll: () => void;
+  onBulkReverse: () => void | Promise<void>;
+  onReverseOne: (row: BankingTransactionRow) => void | Promise<void>;
+  openEdit: (row: BankingTransactionRow) => void;
+  removeRow: (row: BankingTransactionRow) => void;
+}) {
+  const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const allSelected = rowIds.length > 0 && rowIds.every((id) => selectedIds.has(id));
+  const someSelected = rowIds.some((id) => selectedIds.has(id));
+  const selectedInSection = useMemo(() => rowIds.filter((id) => selectedIds.has(id)).length, [rowIds, selectedIds]);
+
+  return (
+    <section className="mb-6 space-y-2" aria-labelledby={`provision-pending-heading-${accountId}`}>
+      <h3 id={`provision-pending-heading-${accountId}`} className={BANKING_AUX_SECTION_HEADING_CLASS}>
+        Provisiones pendientes de reversar · {accountHeading}
+      </h3>
+      {someSelected ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={bulkReversing || selectedInSection === 0}
+            onClick={() => void onBulkReverse()}
+            className={bankingAuxBulkBtnClass}
+          >
+            {bulkReversing ? "Creando reversas…" : `Crear reversas (${selectedInSection})`}
+          </button>
+        </div>
+      ) : null}
+      <div className={BANKING_AUX_TX_CARD_CLASS}>
+        <table className="w-full table-fixed border-collapse text-[12px]" style={{ minWidth: tableMinWidthPx }}>
+          <colgroup>
+            <col style={{ width: "2.75rem" }} />
+            {orderedVisibleBankingTxColumns.map((colKey) => (
+              <col key={colKey} style={{ width: BANKING_TX_COL_WIDTH[colKey] }} />
+            ))}
+            <col style={{ width: "6rem" }} />
+            <col style={{ width: "5rem" }} />
+          </colgroup>
+          <thead className={BANKING_AUX_TX_THEAD_CLASS}>
+            <tr>
+              <th scope="col" className="px-1 py-2.5 text-center sm:px-1.5">
+                <BankingAuxRoundCheckbox
+                  checked={allSelected}
+                  indeterminate={someSelected && !allSelected}
+                  onChange={onToggleSelectAll}
+                  title={allSelected ? "Desmarcar todos" : "Seleccionar todos"}
+                  aria-label="Seleccionar todas las provisiones pendientes en esta cuenta"
+                />
+              </th>
+              {orderedVisibleBankingTxColumns.map((colKey) => (
+                <th
+                  key={colKey}
+                  scope="col"
+                  className={`px-2 py-2.5 text-center sm:px-2.5 ${BANKING_AUX_TX_TH_TEXT_CLASS}`}
+                >
+                  {BANKING_TX_COLUMN_LABELS[colKey]}
+                </th>
+              ))}
+              <th scope="col" className={`px-1.5 py-2.5 text-center sm:px-2 ${BANKING_AUX_TX_TH_TEXT_CLASS}`}>
+                Reversa
+              </th>
+              <th className={`px-1.5 py-2.5 text-center sm:px-2 ${BANKING_AUX_TX_TH_TEXT_CLASS}`} aria-label="Acciones" />
+            </tr>
+          </thead>
+          <tbody className={BANKING_AUX_TX_TBODY_CLASS}>
+            {rows.map((row) => {
+              const income = row.amount >= 0;
+              const sharedSettledLabel = row.is_shared ? (row.shared_expense_settled ? "Sí" : "No") : "—";
+              const ccPaidLabel =
+                row.credit_card_charge_paid === null || row.credit_card_charge_paid === undefined
+                  ? "—"
+                  : row.credit_card_charge_paid
+                    ? "Sí"
+                    : "No";
+              const accountingLabel = formatBankingAccountingMonth(row.accounting_month);
+              const checked = selectedIds.has(row.id);
+              return (
+                <tr key={row.id} className={BANKING_AUX_TX_TR_CLASS}>
+                  <td className="align-middle px-1 py-3 text-center sm:px-1.5">
+                    <BankingAuxRoundCheckbox
+                      checked={checked}
+                      onChange={() => onToggleRow(row.id)}
+                      aria-label={`Seleccionar provisión ${row.description ?? row.id}`}
+                    />
+                  </td>
+                  {orderedVisibleBankingTxColumns.map((colKey) => (
+                    <BankingTxTd
+                      key={colKey}
+                      colKey={colKey}
+                      row={row}
+                      income={income}
+                      sharedSettledLabel={sharedSettledLabel}
+                      ccPaidLabel={ccPaidLabel}
+                      accountingLabel={accountingLabel}
+                      montoAlign="center"
+                    />
+                  ))}
+                  <td className="align-middle px-1.5 py-3 text-center sm:px-2">
+                    <button
+                      type="button"
+                      disabled={reversingId === row.id}
+                      onClick={() => void onReverseOne(row)}
+                      className={bankingAuxActionBtnClass}
+                    >
+                      {reversingId === row.id ? "…" : "Reversar"}
+                    </button>
+                  </td>
+                  <td className="align-middle px-1.5 py-3 sm:px-2">
+                    <div className="flex items-center justify-center gap-0.5">
+                      <button
+                        type="button"
+                        disabled={row.peer_transaction_id != null || row.is_provision_reversal === true}
+                        title={
+                          row.peer_transaction_id != null
+                            ? "Las transferencias entre cuentas propias no se pueden editar aquí"
+                            : row.is_provision_reversal === true
+                              ? "Las reversas de provisión solo se pueden eliminar"
+                              : "Editar movimiento"
+                        }
+                        onClick={() => openEdit(row)}
+                        className={`${txIconBtnAux} disabled:pointer-events-none disabled:opacity-30`}
+                      >
+                        <IconPencil />
+                      </button>
+                      <button type="button" title="Eliminar movimiento" onClick={() => void removeRow(row)} className={txIconBtnAuxDanger}>
+                        <IconTrash />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 const dateInputClass =
   "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 [color-scheme:light]";
 
@@ -2205,9 +2392,13 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   /** Solo edición de categoría Provisiones: al guardar con Sí se crea la reversa tras actualizar. */
   const [provisionReversalOnSave, setProvisionReversalOnSave] = useState(false);
   const [bankingTxPage, setBankingTxPage] = useState(1);
-  const [movementTab, setMovementTab] = useState<"all" | "credit_card" | "shared">("all");
+  const [movementTab, setMovementTab] = useState<BankingMovementTabScope>("all");
   const [ccUnpaidGroups, setCcUnpaidGroups] = useState<BankingCreditCardUnpaidGroup[]>([]);
   const [sharedUnsettledGroups, setSharedUnsettledGroups] = useState<BankingSharedUnsettledGroup[]>([]);
+  const [provisionPendingGroups, setProvisionPendingGroups] = useState<BankingCreditCardUnpaidGroup[]>([]);
+  const [selectedProvisionReverseIds, setSelectedProvisionReverseIds] = useState<Set<number>>(() => new Set());
+  const [reversingProvisionId, setReversingProvisionId] = useState<number | null>(null);
+  const [bulkReversingProvision, setBulkReversingProvision] = useState(false);
   const [markingPaidId, setMarkingPaidId] = useState<number | null>(null);
   const [markingSharedSettledId, setMarkingSharedSettledId] = useState<number | null>(null);
   const [bulkSettlingShared, setBulkSettlingShared] = useState(false);
@@ -2449,6 +2640,18 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const [categoryPanelBox, setCategoryPanelBox] = useState<{ top: number; left: number; width: number } | null>(
     null,
   );
+  const [categoryPickerSearch, setCategoryPickerSearch] = useState("");
+  const categorySearchInputRef = useRef<HTMLInputElement>(null);
+
+  const [subcategoryMenuOpen, setSubcategoryMenuOpen] = useState(false);
+  const subcategoryMenuRef = useRef<HTMLDivElement>(null);
+  const subcategoryTriggerRef = useRef<HTMLButtonElement>(null);
+  const subcategoryPanelRef = useRef<HTMLDivElement>(null);
+  const [subcategoryPanelBox, setSubcategoryPanelBox] = useState<{ top: number; left: number; width: number } | null>(
+    null,
+  );
+  const [subcategoryPickerSearch, setSubcategoryPickerSearch] = useState("");
+  const subcategorySearchInputRef = useRef<HTMLInputElement>(null);
 
   const [accountingPickMode, setAccountingPickMode] = useState<null | "month" | "year">(null);
   const accountingMonthWrapRef = useRef<HTMLDivElement>(null);
@@ -2544,6 +2747,58 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     };
   }, [categoryMenuOpen]);
 
+  const updateSubcategoryPanelBox = useCallback(() => {
+    const el = subcategoryTriggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setSubcategoryPanelBox({ top: r.bottom + 8, left: r.left, width: r.width });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!subcategoryMenuOpen) {
+      setSubcategoryPanelBox(null);
+      return;
+    }
+    updateSubcategoryPanelBox();
+    window.addEventListener("scroll", updateSubcategoryPanelBox, true);
+    window.addEventListener("resize", updateSubcategoryPanelBox);
+    return () => {
+      window.removeEventListener("scroll", updateSubcategoryPanelBox, true);
+      window.removeEventListener("resize", updateSubcategoryPanelBox);
+    };
+  }, [subcategoryMenuOpen, updateSubcategoryPanelBox]);
+
+  useEffect(() => {
+    if (!subcategoryMenuOpen) return;
+    function handleDown(e: MouseEvent) {
+      const t = e.target as Node;
+      if (subcategoryMenuRef.current?.contains(t)) return;
+      if (subcategoryPanelRef.current?.contains(t)) return;
+      setSubcategoryMenuOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setSubcategoryMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleDown);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleDown);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [subcategoryMenuOpen]);
+
+  useEffect(() => {
+    if (!categoryMenuOpen) return;
+    const id = requestAnimationFrame(() => categorySearchInputRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [categoryMenuOpen]);
+
+  useEffect(() => {
+    if (!subcategoryMenuOpen) return;
+    const id = requestAnimationFrame(() => subcategorySearchInputRef.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [subcategoryMenuOpen]);
+
   bankingViewKeyRef.current = bankingTabCacheKey(
     movementTab,
     filterAccountIds,
@@ -2563,6 +2818,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       }
       if (tabScope === "credit_card") params.set("scope", "credit_card");
       if (tabScope === "shared") params.set("scope", "shared");
+      if (tabScope === "provisiones") params.set("scope", "provisiones");
       if (bankingAccountingFullHistory) {
         params.set("full_history", "true");
       } else {
@@ -2591,7 +2847,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     [buildBankingTxQueryParams],
   );
 
-  /** Meta global + grupos compartidos solo si `tabScope === "shared"`. */
+  /** Meta global + grupos según pestaña (compartidos, provisiones pendientes de reversa, etc.). */
   const fetchBankingMetaFromNetwork = useCallback(async (tabScope: BankingMovementTabScope, signal?: AbortSignal) => {
     const init = signal ? { signal } : undefined;
     const [acc, cats, debt, ccUg] = await Promise.all([
@@ -2608,12 +2864,21 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       );
       sharedGroups = ug.groups;
     }
+    let provisionPending: BankingCreditCardUnpaidGroup[] = [];
+    if (tabScope === "provisiones") {
+      const pg = await fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>(
+        "/banking/provisions/pending-reversal-grouped",
+        init,
+      );
+      provisionPending = pg.groups;
+    }
     return {
       acc,
       cats,
       debt,
       ccGroups: ccUg.groups,
       sharedGroups,
+      provisionPendingGroups: provisionPending,
     };
   }, []);
 
@@ -2651,11 +2916,13 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       setBankingTxTotal(txList.total);
       setBankingTxPage(txList.page);
       setSharedUnsettledGroups(meta.sharedGroups);
+      setProvisionPendingGroups(meta.provisionPendingGroups);
       bankingTabCachePut(tabTxCacheRef.current, expectedViewKey, {
         items: txList.items,
         total: txList.total,
         page: txList.page,
         sharedUnsettledGroups: meta.sharedGroups,
+        provisionPendingGroups: meta.provisionPendingGroups,
       });
     },
     [applyBankingMetaGlobal, fetchBankingMetaFromNetwork, loadBankingTransactionsFromNetwork],
@@ -2681,6 +2948,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   }, [movementTab]);
 
   useEffect(() => {
+    if (movementTab !== "provisiones") setSelectedProvisionReverseIds(new Set());
+  }, [movementTab]);
+
+  useEffect(() => {
     let cancelled = false;
     const ac = new AbortController();
     const requestKey = bankingTabCacheKey(
@@ -2701,6 +2972,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       setBankingTxTotal(cached.total);
       setBankingTxPage(cached.page);
       setSharedUnsettledGroups(cached.sharedUnsettledGroups);
+      setProvisionPendingGroups(cached.provisionPendingGroups ?? []);
       setLoading(false);
       setTabRefreshing(true);
       void reloadBankingDataForScope(1, movementTab, requestKey, ac.signal)
@@ -2740,7 +3012,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     const ac = new AbortController();
     const idleId = scheduleIdlePrefetch(() => {
       if (ac.signal.aborted) return;
-      const scopes: BankingMovementTabScope[] = ["all", "credit_card", "shared"];
+      const scopes: BankingMovementTabScope[] = ["all", "credit_card", "shared", "provisiones"];
       void (async () => {
         for (const scope of scopes) {
           if (ac.signal.aborted) return;
@@ -2765,6 +3037,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               total: txList.total,
               page: txList.page,
               sharedUnsettledGroups: meta.sharedGroups,
+              provisionPendingGroups: meta.provisionPendingGroups,
             });
           } catch (e) {
             if (!isAbortError(e)) console.error(e);
@@ -2827,6 +3100,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
           total: txList.total,
           page: txList.page,
           sharedUnsettledGroups: prev?.sharedUnsettledGroups ?? [],
+          provisionPendingGroups: prev?.provisionPendingGroups ?? [],
         });
       } catch (e) {
         if (!isAbortError(e)) console.error(e);
@@ -2937,6 +3211,16 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     if (subcategoryId === "" || subOptions.length === 0) return undefined;
     return subOptions.find((s) => s.id === subcategoryId);
   }, [subOptions, subcategoryId]);
+
+  const categoryOptionsFiltered = useMemo(
+    () => categoryOptions.filter((c) => bankingPickerSearchMatches(c.name, categoryPickerSearch)),
+    [categoryOptions, categoryPickerSearch],
+  );
+
+  const subOptionsFiltered = useMemo(
+    () => subOptions.filter((s) => bankingPickerSearchMatches(s.name, subcategoryPickerSearch)),
+    [subOptions, subcategoryPickerSearch],
+  );
 
   const isOwnAccountsTransfer = useMemo(() => {
     const c = selectedCategory;
@@ -3292,6 +3576,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     setTransferDestinationAccountId("");
     setScopeMenuOpen(false);
     setCategoryMenuOpen(false);
+    setSubcategoryMenuOpen(false);
+    setCategoryPickerSearch("");
+    setSubcategoryPickerSearch("");
     setAccountingPickMode(null);
     setProvisionReversalOnSave(false);
     setModalOpen(true);
@@ -3313,6 +3600,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     setTransferDestinationAccountId("");
     setScopeMenuOpen(false);
     setCategoryMenuOpen(false);
+    setSubcategoryMenuOpen(false);
+    setCategoryPickerSearch("");
+    setSubcategoryPickerSearch("");
     setAccountingPickMode(null);
     setProvisionReversalOnSave(false);
     setModalOpen(true);
@@ -3324,6 +3614,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       setProvisionReversalOnSave(false);
     }
   }, [modalOpen, editing, isEditingProvision]);
+
+  useEffect(() => {
+    setSubcategoryPickerSearch("");
+    setSubcategoryMenuOpen(false);
+  }, [categoryId]);
 
   useEffect(() => {
     if (!modalOpen || categoryId === "") return;
@@ -3450,6 +3745,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       setEditing(null);
       setScopeMenuOpen(false);
       setCategoryMenuOpen(false);
+      setSubcategoryMenuOpen(false);
+      setCategoryPickerSearch("");
+      setSubcategoryPickerSearch("");
       setAccountingPickMode(null);
       setProvisionReversalOnSave(false);
       await reloadBankingFull(pageAfterSave);
@@ -3550,6 +3848,76 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     }
   }
 
+  function toggleProvisionReverseRow(id: number) {
+    setSelectedProvisionReverseIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleProvisionReverseSelectAll(rows: BankingTransactionRow[]) {
+    const ids = rows.map((r) => r.id);
+    setSelectedProvisionReverseIds((prev) => {
+      const allSelected = ids.length > 0 && ids.every((i) => prev.has(i));
+      const next = new Set(prev);
+      if (allSelected) for (const i of ids) next.delete(i);
+      else for (const i of ids) next.add(i);
+      return next;
+    });
+  }
+
+  async function handleReverseProvisionOne(row: BankingTransactionRow) {
+    try {
+      setReversingProvisionId(row.id);
+      const r = await apiFetch(`/banking/transactions/${row.id}/reverse-provision`, { method: "POST" });
+      if (!r.ok) {
+        let msg = "No se pudo crear la reversa";
+        try {
+          const j = (await r.json()) as { detail?: unknown };
+          if (typeof j.detail === "string") msg = j.detail;
+        } catch {
+          /* ignore */
+        }
+        onToast(msg);
+        return;
+      }
+      onToast("Reversa de provisión registrada ✅");
+      setSelectedProvisionReverseIds((prev) => {
+        const next = new Set(prev);
+        next.delete(row.id);
+        return next;
+      });
+      await reloadBankingFull(bankingTxPage);
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : "No se pudo crear la reversa");
+    } finally {
+      setReversingProvisionId(null);
+    }
+  }
+
+  async function handleBulkProvisionReverse() {
+    if (selectedProvisionReverseIds.size === 0) return;
+    try {
+      setBulkReversingProvision(true);
+      const out = await postJson<{ created: number }>("/banking/transactions/bulk-reverse-provision", {
+        transaction_ids: [...selectedProvisionReverseIds],
+      });
+      onToast(
+        out.created > 0
+          ? `${out.created} reversa(s) de provisión registrada(s) ✅`
+          : "No se registró ninguna reversa (revisa que los movimientos sigan siendo válidos).",
+      );
+      setSelectedProvisionReverseIds(new Set());
+      await reloadBankingFull(bankingTxPage);
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : "No se pudieron crear las reversas");
+    } finally {
+      setBulkReversingProvision(false);
+    }
+  }
+
   return (
     <div className="banking-theme min-h-full bg-gradient-to-br from-slate-50 via-cyan-50/90 to-indigo-50/70 text-slate-800">
     <div className="mx-auto w-full max-w-[min(100%,1560px)] space-y-6 px-4 pb-28 pt-4 md:px-10 md:pt-6">
@@ -3631,6 +3999,19 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
           >
             Pago compartido
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={movementTab === "provisiones"}
+            onClick={() => setMovementTab("provisiones")}
+            className={`rounded-t-xl px-5 py-2.5 text-sm font-medium transition ${
+              movementTab === "provisiones"
+                ? "border border-b-0 border-teal-200 bg-white text-teal-900 shadow-sm"
+                : "rounded-xl border border-transparent text-slate-600 hover:bg-white/70 hover:text-teal-800"
+            }`}
+          >
+            Provisiones
+          </button>
         </div>
 
         <div className="space-y-5 p-4 md:p-6">
@@ -3641,14 +4022,18 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               ? "Tarjeta de crédito"
               : movementTab === "shared"
                 ? "Pago compartido"
-                : "Movimientos bancarios"}
+                : movementTab === "provisiones"
+                  ? "Provisiones"
+                  : "Movimientos bancarios"}
           </h2>
           <p className="mt-1 text-sm text-slate-600">
             {movementTab === "credit_card"
               ? "Cargos y pagos de TC; arriba, cargos pendientes por tarjeta para marcarlos pagados al liquidar."
               : movementTab === "shared"
                 ? "Solo movimientos compartidos; arriba, pendientes de liquidar. Puedes marcar varios a la vez con la casilla y «Marcar como pagados»."
-                : "Ingresos y egresos por cuenta: el signo del monto define el tipo (positivo / negativo)."}
+                : movementTab === "provisiones"
+                  ? "Solo categoría Provisiones; arriba, pendientes de registrar la reversa contable. La tabla lista todas las provisiones del período."
+                  : "Ingresos y egresos por cuenta: el signo del monto define el tipo (positivo / negativo)."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -3781,6 +4166,30 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               onToggleSelectAll={() => toggleSharedSelectAll(g.items)}
               onBulkSettle={handleBulkSharedSettled}
               onMarkSettled={handleMarkSharedSettled}
+              openEdit={openEdit}
+              removeRow={removeRow}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {movementTab === "provisiones" && !loading && provisionPendingGroups.length > 0 ? (
+        <div className="space-y-1">
+          {provisionPendingGroups.map((g) => (
+            <BankingProvisionPendingTable
+              key={g.account_id}
+              accountId={g.account_id}
+              accountHeading={g.account_name}
+              rows={g.items}
+              orderedVisibleBankingTxColumns={bankingCcPendingVisibleColumns}
+              tableMinWidthPx={pendingCcTableMinWidthPx}
+              bulkReversing={bulkReversingProvision}
+              reversingId={reversingProvisionId}
+              selectedIds={selectedProvisionReverseIds}
+              onToggleRow={toggleProvisionReverseRow}
+              onToggleSelectAll={() => toggleProvisionReverseSelectAll(g.items)}
+              onBulkReverse={handleBulkProvisionReverse}
+              onReverseOne={handleReverseProvisionOne}
               openEdit={openEdit}
               removeRow={removeRow}
             />
@@ -4086,7 +4495,15 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   aria-haspopup="listbox"
                   aria-labelledby="banking-tx-category-label"
                   disabled={categoryOptions.length === 0}
-                  onClick={() => categoryOptions.length > 0 && setCategoryMenuOpen((o) => !o)}
+                  onClick={() => {
+                    if (categoryOptions.length === 0) return;
+                    setSubcategoryMenuOpen(false);
+                    setCategoryMenuOpen((open) => {
+                      const next = !open;
+                      if (next) setCategoryPickerSearch("");
+                      return next;
+                    });
+                  }}
                   className={bankingModalCategoryTriggerClass}
                 >
                   <span
@@ -4110,21 +4527,47 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               </div>
 
               {categoryId !== "" && (
-                <label className="block">
-                  <span className="text-xs text-slate-500">Subcategoría</span>
-                  <select
-                    value={subcategoryId === "" ? "" : String(subcategoryId)}
-                    onChange={(e) => setSubcategoryId(e.target.value ? Number(e.target.value) : "")}
-                    className={bankingModalControlClass}
+                <div ref={subcategoryMenuRef} className="space-y-1.5">
+                  <span id="banking-tx-subcategory-label" className="text-xs text-slate-500">
+                    Subcategoría
+                  </span>
+                  <button
+                    ref={subcategoryTriggerRef}
+                    type="button"
+                    aria-expanded={subcategoryMenuOpen}
+                    aria-haspopup="listbox"
+                    aria-labelledby="banking-tx-subcategory-label"
                     disabled={subOptions.length === 0}
+                    onClick={() => {
+                      if (subOptions.length === 0) return;
+                      setCategoryMenuOpen(false);
+                      setSubcategoryMenuOpen((open) => {
+                        const next = !open;
+                        if (next) setSubcategoryPickerSearch("");
+                        return next;
+                      });
+                    }}
+                    className={bankingModalCategoryTriggerClass}
                   >
-                    {subOptions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    <span
+                      className={`min-w-0 flex-1 truncate font-semibold ${selectedSubcategoryRow ? "text-slate-800" : "text-slate-500"}`}
+                    >
+                      {selectedSubcategoryRow?.name ?? "Selecciona subcategoría"}
+                    </span>
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden
+                      className={`h-5 w-5 shrink-0 text-slate-500 transition ${subcategoryMenuOpen ? "rotate-180" : ""}`}
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.24 4.496a.75.75 0 01-1.08 0l-4.24-4.497a.75.75 0 01.02-1.06z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                </div>
               )}
 
               {isOwnAccountsTransfer && !editing && (
@@ -4318,6 +4761,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   setEditing(null);
                   setScopeMenuOpen(false);
                   setCategoryMenuOpen(false);
+                  setSubcategoryMenuOpen(false);
+                  setCategoryPickerSearch("");
+                  setSubcategoryPickerSearch("");
                   setAccountingPickMode(null);
                   setProvisionReversalOnSave(false);
                 }}
@@ -4420,28 +4866,116 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: categoryPanelBox.width,
               zIndex: 10000,
             }}
-            className="tx-scroll max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-2xl shadow-slate-900/10 ring-1 ring-slate-100"
+            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-100"
           >
-            {categoryOptions.map((c) => {
-              const sel = c.id === categoryId;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  role="option"
-                  aria-selected={sel}
-                  className={`flex w-full border-b border-slate-100 py-2.5 pl-3 pr-3 text-left text-sm font-semibold transition last:border-b-0 ${
-                    sel ? "bg-teal-50 text-teal-900" : "text-slate-800 hover:bg-slate-50"
-                  }`}
-                  onClick={() => {
-                    setCategoryId(c.id);
-                    setCategoryMenuOpen(false);
-                  }}
-                >
-                  <span className="min-w-0 flex-1 truncate">{c.name}</span>
-                </button>
-              );
-            })}
+            <div className="shrink-0 border-b border-slate-100 bg-white px-2 pb-2 pt-2">
+              <input
+                ref={categorySearchInputRef}
+                type="search"
+                autoComplete="off"
+                enterKeyHint="search"
+                value={categoryPickerSearch}
+                onChange={(e) => setCategoryPickerSearch(e.target.value)}
+                placeholder="Buscar categoría…"
+                aria-label="Filtrar categorías por texto"
+                className={bankingPickerSearchInputClass}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+            </div>
+            <div className={bankingPickerListScrollClass}>
+              {categoryOptionsFiltered.length === 0 ? (
+                <p className="px-3 py-6 text-center text-sm text-slate-500">
+                  Sin coincidencias. Prueba con otras letras o borra el filtro.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-0.5 px-1.5 pb-1.5 pt-0.5">
+                  {categoryOptionsFiltered.map((c) => {
+                    const sel = c.id === categoryId;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        role="option"
+                        aria-selected={sel}
+                        className={`rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
+                          sel ? "bg-teal-50 text-teal-900 ring-1 ring-teal-200/80" : "text-slate-800 hover:bg-slate-50"
+                        }`}
+                        onClick={() => {
+                          setCategoryId(c.id);
+                          setCategoryMenuOpen(false);
+                        }}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {subcategoryMenuOpen &&
+        subcategoryPanelBox !== null &&
+        createPortal(
+          <div
+            ref={subcategoryPanelRef}
+            role="listbox"
+            aria-labelledby="banking-tx-subcategory-label"
+            style={{
+              position: "fixed",
+              top: subcategoryPanelBox.top,
+              left: subcategoryPanelBox.left,
+              width: subcategoryPanelBox.width,
+              zIndex: 10002,
+            }}
+            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-100"
+          >
+            <div className="shrink-0 border-b border-slate-100 bg-white px-2 pb-2 pt-2">
+              <input
+                ref={subcategorySearchInputRef}
+                type="search"
+                autoComplete="off"
+                enterKeyHint="search"
+                value={subcategoryPickerSearch}
+                onChange={(e) => setSubcategoryPickerSearch(e.target.value)}
+                placeholder="Buscar subcategoría…"
+                aria-label="Filtrar subcategorías por texto"
+                className={bankingPickerSearchInputClass}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
+            </div>
+            <div className={bankingPickerListScrollClass}>
+              {subOptionsFiltered.length === 0 ? (
+                <p className="px-3 py-6 text-center text-sm text-slate-500">
+                  Sin coincidencias. Prueba con otras letras o borra el filtro.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-0.5 px-1.5 pb-1.5 pt-0.5">
+                  {subOptionsFiltered.map((s) => {
+                    const sel = s.id === subcategoryId;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        role="option"
+                        aria-selected={sel}
+                        className={`rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
+                          sel ? "bg-teal-50 text-teal-900 ring-1 ring-teal-200/80" : "text-slate-800 hover:bg-slate-50"
+                        }`}
+                        onClick={() => {
+                          setSubcategoryId(s.id);
+                          setSubcategoryMenuOpen(false);
+                        }}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{s.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>,
           document.body,
         )}

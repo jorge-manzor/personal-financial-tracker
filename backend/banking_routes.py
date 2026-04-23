@@ -14,9 +14,12 @@ from banking_service import (
     BANKING_PRODUCT_TYPES,
     banking_account_to_out,
     banking_apply_credit_card_transaction_scope,
+    banking_apply_provision_transaction_scope,
     banking_apply_shared_transaction_scope,
+    banking_bulk_reverse_provision,
     banking_bulk_set_shared_expense_settled,
     banking_credit_card_unpaid_groups_payload,
+    banking_provisions_pending_reversal_groups_payload,
     banking_shared_unsettled_groups_payload,
     banking_debt_totals_out,
     banking_provision_sum_by_account,
@@ -48,6 +51,8 @@ from schemas import (
     BankingAccountOut,
     BankingAccountPatch,
     BankingBankOut,
+    BankingBulkReverseProvisionBody,
+    BankingBulkReverseProvisionOut,
     BankingBulkSharedSettledBody,
     BankingBulkSharedSettledOut,
     BankingCreditCardUnpaidGroupedResponse,
@@ -544,6 +549,14 @@ def banking_credit_card_unpaid_grouped(user: BankingUser, db: Session = Depends(
     )
 
 
+@router.get("/provisions/pending-reversal-grouped", response_model=BankingCreditCardUnpaidGroupedResponse)
+def banking_provisions_pending_reversal_grouped(user: BankingUser, db: Session = Depends(get_db)) -> BankingCreditCardUnpaidGroupedResponse:
+    """Provisiones originales sin reversa automática registrada; agrupadas por cuenta."""
+    ensure_default_categories(db, user.id)
+    raw = banking_provisions_pending_reversal_groups_payload(db, user.id)
+    return BankingCreditCardUnpaidGroupedResponse(groups=raw)
+
+
 @router.get("/shared/unsettled-grouped", response_model=BankingSharedUnsettledGroupedResponse)
 def banking_shared_unsettled_grouped(user: BankingUser, db: Session = Depends(get_db)) -> BankingSharedUnsettledGroupedResponse:
     ensure_default_categories(db, user.id)
@@ -558,6 +571,17 @@ def banking_shared_unsettled_grouped(user: BankingUser, db: Session = Depends(ge
             for g in raw
         ]
     )
+
+
+@router.post("/transactions/bulk-reverse-provision", response_model=BankingBulkReverseProvisionOut)
+def banking_transactions_bulk_reverse_provision(
+    body: BankingBulkReverseProvisionBody,
+    user: BankingUser,
+    db: Session = Depends(get_db),
+) -> BankingBulkReverseProvisionOut:
+    ensure_default_categories(db, user.id)
+    n = banking_bulk_reverse_provision(db, user.id, body.transaction_ids)
+    return BankingBulkReverseProvisionOut(created=n)
 
 
 @router.post("/transactions/bulk-shared-settled", response_model=BankingBulkSharedSettledOut)
@@ -578,7 +602,7 @@ def banking_list_transactions(
     page_size: int = Query(50, ge=1, le=500),
     account_id: int | None = Query(None),
     account_ids: Annotated[list[int] | None, Query()] = None,
-    scope: str | None = Query(None, description="credit_card | shared (compartidos). Vacío = todos."),
+    scope: str | None = Query(None, description="credit_card | shared | provisiones. Vacío = todos."),
     full_history: bool = Query(
         False,
         description="Si true, no acota por fechas. Si false, rango explícito o predeterminado (últimos 60 días por fecha del movimiento).",
@@ -590,10 +614,14 @@ def banking_list_transactions(
     db: Session = Depends(get_db),
 ) -> BankingTransactionListOut:
     ensure_default_categories(db, user.id)
-    if scope not in (None, "", "credit_card", "shared"):
-        raise HTTPException(status_code=400, detail="Parámetro scope inválido (use credit_card, shared u omita).")
+    if scope not in (None, "", "credit_card", "shared", "provisiones"):
+        raise HTTPException(
+            status_code=400,
+            detail="Parámetro scope inválido (use credit_card, shared, provisiones u omita).",
+        )
     cc_scope = scope == "credit_card"
     shared_scope = scope == "shared"
+    prov_scope = scope == "provisiones"
     acc_filter: list[int] | None = None
     if account_ids:
         acc_filter = list(dict.fromkeys(account_ids))
@@ -606,6 +634,8 @@ def banking_list_transactions(
         q = banking_apply_credit_card_transaction_scope(db, user.id, q)
     elif shared_scope:
         q = banking_apply_shared_transaction_scope(db, user.id, q)
+    elif prov_scope:
+        q = banking_apply_provision_transaction_scope(db, user.id, q)
     cq = db.query(func.count(BankingTransaction.id)).filter(BankingTransaction.user_id == user.id)
     if acc_filter is not None:
         cq = cq.filter(BankingTransaction.account_id.in_(acc_filter))
@@ -613,6 +643,8 @@ def banking_list_transactions(
         cq = banking_apply_credit_card_transaction_scope(db, user.id, cq)
     elif shared_scope:
         cq = banking_apply_shared_transaction_scope(db, user.id, cq)
+    elif prov_scope:
+        cq = banking_apply_provision_transaction_scope(db, user.id, cq)
     scope_expr = _banking_transactions_scope_expr(
         full_history=full_history,
         accounting_month_from=accounting_month_from,
