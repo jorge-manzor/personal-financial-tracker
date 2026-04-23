@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "./api";
 import { formatMoneyCLP, formatMoneyUSDLabel } from "./format";
+import { localDateISOString } from "./localDate";
 import type { CategoriaType, CurrencyType, TransactionRow, TransactionType } from "./types";
 
 const TIPOS = ["compra", "venta", "dividendo"] as const;
@@ -26,7 +27,7 @@ function isTipo(t: string): t is Tipo {
 }
 
 export function TransactionModal({ open, editing, onClose, onSaved }: Props) {
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => localDateISOString(), []);
   const [fecha, setFecha] = useState(today);
   const [tipo, setTipo] = useState<Tipo>("compra");
   const [activo, setActivo] = useState("");

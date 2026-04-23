@@ -31,6 +31,7 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { apiFetch, fetchJson, patchJson, postJson } from "./api";
 import { formatBankingClpSigned, formatClpDots, parseChileanAmountInput } from "./format";
+import { localDateISOString, localYearMonthString } from "./localDate";
 import type {
   BankingAccountRow,
   BankingCategoryRow,
@@ -2181,7 +2182,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const [editing, setEditing] = useState<BankingTransactionRow | null>(null);
 
   const [accountId, setAccountId] = useState<number | "">("");
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(() => localDateISOString());
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<number | "">("");
@@ -2190,7 +2191,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const [splitParticipants, setSplitParticipants] = useState("2");
   const [sharedExpenseSettled, setSharedExpenseSettled] = useState(false);
   const [creditCardChargePaid, setCreditCardChargePaid] = useState(false);
-  const [accountingMonthYm, setAccountingMonthYm] = useState(() => new Date().toISOString().slice(0, 7));
+  const [accountingMonthYm, setAccountingMonthYm] = useState(() => localYearMonthString());
   const [transferDestinationAccountId, setTransferDestinationAccountId] = useState<number | "">("");
   const [saving, setSaving] = useState(false);
   /** Solo edición de categoría Provisiones: al guardar con Sí se crea la reversa tras actualizar. */
@@ -3264,9 +3265,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     setEditing(null);
     const vis = accounts.filter((a) => a.enabled ?? true);
     setAccountId(vis[0]?.id ?? "");
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateISOString();
     setFecha(today);
-    setAccountingMonthYm(today.slice(0, 7));
+    setAccountingMonthYm(localYearMonthString());
     setAmount("");
     setDescription("");
     setIsShared(false);

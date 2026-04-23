@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "./api";
+import { localDateISOString } from "./localDate";
 import type { ManualAsset } from "./types";
 
 interface SnapshotProps {
@@ -10,7 +11,7 @@ interface SnapshotProps {
 }
 
 export function ManualSnapshotModal({ asset, open, onClose, onSaved }: SnapshotProps) {
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const today = useMemo(() => localDateISOString(), []);
   const [fecha, setFecha] = useState(today);
   const [valor, setValor] = useState("");
   const [saving, setSaving] = useState(false);
