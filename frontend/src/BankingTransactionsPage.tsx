@@ -63,6 +63,62 @@ function defaultBankingTxDateRangeIso(): { from: string; to: string } {
   return { from: iso(from), to: iso(to) };
 }
 
+/** Vista de movimientos (tabs); alinea con query `scope`. */
+type BankingMovementTabScope = "all" | "credit_card" | "shared";
+
+/** Cache SWR: misma semántica que los params de lista en servidor. */
+function bankingTabCacheKey(
+  scope: BankingMovementTabScope,
+  filterAccountIds: number[],
+  fullHistory: boolean,
+  dateFrom: string,
+  dateTo: string,
+): string {
+  return JSON.stringify({
+    s: scope,
+    a: [...filterAccountIds].sort((x, y) => x - y),
+    fh: fullHistory,
+    df: dateFrom,
+    dt: dateTo,
+  });
+}
+
+type BankingTabTxCacheEntry = {
+  items: BankingTransactionRow[];
+  total: number;
+  page: number;
+  sharedUnsettledGroups: BankingSharedUnsettledGroup[];
+};
+
+/** Evita crecimiento indefinido del Map al combinar filtros/pestañas/fechas. */
+const BANKING_TAB_CACHE_MAX_ENTRIES = 24;
+
+function bankingTabCachePut(map: Map<string, BankingTabTxCacheEntry>, key: string, entry: BankingTabTxCacheEntry) {
+  if (map.has(key)) map.delete(key);
+  map.set(key, entry);
+  while (map.size > BANKING_TAB_CACHE_MAX_ENTRIES) {
+    const oldest = map.keys().next().value as string | undefined;
+    if (oldest === undefined) break;
+    map.delete(oldest);
+  }
+}
+
+function isAbortError(e: unknown): boolean {
+  return e instanceof DOMException ? e.name === "AbortError" : e instanceof Error && e.name === "AbortError";
+}
+
+function scheduleIdlePrefetch(cb: () => void, timeoutMs = 900): number {
+  if (typeof requestIdleCallback !== "undefined") {
+    return requestIdleCallback(cb, { timeout: timeoutMs }) as unknown as number;
+  }
+  return window.setTimeout(cb, 380);
+}
+
+function cancelIdlePrefetch(id: number): void {
+  if (typeof cancelIdleCallback !== "undefined") cancelIdleCallback(id as never);
+  else clearTimeout(id);
+}
+
 const BANKING_BALANCE_CARD_ORDER_STORAGE_KEY = "banking_balance_card_order_v1";
 
 function bankingNonCreditAccounts(accounts: BankingAccountRow[]): BankingAccountRow[] {
@@ -2119,6 +2175,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const [categories, setCategories] = useState<BankingCategoryRow[]>([]);
   const [items, setItems] = useState<BankingTransactionRow[]>([]);
   const [loading, setLoading] = useState(true);
+  /** Revalidación en segundo plano (caché hit) — no bloquea la UI. */
+  const [tabRefreshing, setTabRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<BankingTransactionRow | null>(null);
 
@@ -2156,6 +2214,12 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const columnPickerWrapRef = useRef<HTMLDivElement>(null);
   /** Contenedor con scroll de la tabla principal (virtualizada). */
   const bankingTxScrollRef = useRef<HTMLDivElement>(null);
+  /** Clave de cache alineada con el render actual (evita aplicar respuestas obsoletas al cambiar de pestaña). */
+  const bankingViewKeyRef = useRef("");
+  /** Entradas SWR por clave de vista; se invalida en mutaciones. */
+  const tabTxCacheRef = useRef(new Map<string, BankingTabTxCacheEntry>());
+  /** Aborta navegación de página si el usuario cambia de página o vista antes de responder. */
+  const bankingTxPageFetchAbortRef = useRef<AbortController | null>(null);
 
   const columnDndSensors = useSensors(
     useSensor(PointerSensor, {
@@ -2471,71 +2535,136 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     };
   }, [categoryMenuOpen]);
 
-  const buildBankingTxQueryParams = useCallback((page: number) => {
-    const params = new URLSearchParams();
-    params.set("page", String(page));
-    params.set("page_size", String(BANKING_TX_PAGE_SIZE));
-    if (filterAccountIds.length === 1) {
-      params.set("account_id", String(filterAccountIds[0]));
-    } else if (filterAccountIds.length > 1) {
-      for (const id of filterAccountIds) params.append("account_ids", String(id));
-    }
-    if (movementTab === "credit_card") params.set("scope", "credit_card");
-    if (movementTab === "shared") params.set("scope", "shared");
-    if (bankingAccountingFullHistory) {
-      params.set("full_history", "true");
-    } else {
-      let df = bankingTxDateFrom;
-      let dt = bankingTxDateTo;
-      if (df > dt) [df, dt] = [dt, df];
-      params.set("date_from", df);
-      params.set("date_to", dt);
-    }
-    return params;
-  }, [filterAccountIds, movementTab, bankingAccountingFullHistory, bankingTxDateFrom, bankingTxDateTo]);
+  bankingViewKeyRef.current = bankingTabCacheKey(
+    movementTab,
+    filterAccountIds,
+    bankingAccountingFullHistory,
+    bankingTxDateFrom,
+    bankingTxDateTo,
+  );
+  const buildBankingTxQueryParams = useCallback(
+    (page: number, tabScope: BankingMovementTabScope = movementTab) => {
+      const params = new URLSearchParams();
+      params.set("page", String(page));
+      params.set("page_size", String(BANKING_TX_PAGE_SIZE));
+      if (filterAccountIds.length === 1) {
+        params.set("account_id", String(filterAccountIds[0]));
+      } else if (filterAccountIds.length > 1) {
+        for (const id of filterAccountIds) params.append("account_ids", String(id));
+      }
+      if (tabScope === "credit_card") params.set("scope", "credit_card");
+      if (tabScope === "shared") params.set("scope", "shared");
+      if (bankingAccountingFullHistory) {
+        params.set("full_history", "true");
+      } else {
+        let df = bankingTxDateFrom;
+        let dt = bankingTxDateTo;
+        if (df > dt) [df, dt] = [dt, df];
+        params.set("date_from", df);
+        params.set("date_to", dt);
+      }
+      return params;
+    },
+    [filterAccountIds, movementTab, bankingAccountingFullHistory, bankingTxDateFrom, bankingTxDateTo],
+  );
 
-  /** Solo lista paginada (navegación rápida entre páginas). */
-  const fetchBankingTransactionsPage = useCallback(
-    async (page: number) => {
-      const params = buildBankingTxQueryParams(page);
-      const txList = await fetchJson<{
+  /** Respuesta cruda de lista (sin setState). */
+  const loadBankingTransactionsFromNetwork = useCallback(
+    async (page: number, tabScope: BankingMovementTabScope, signal?: AbortSignal) => {
+      const params = buildBankingTxQueryParams(page, tabScope);
+      return fetchJson<{
         items: BankingTransactionRow[];
         total: number;
         page: number;
         page_size: number;
-      }>(`/banking/transactions?${params.toString()}`);
-      setItems(txList.items);
-      setBankingTxTotal(txList.total);
-      setBankingTxPage(txList.page);
+      }>(`/banking/transactions?${params.toString()}`, signal ? { signal } : undefined);
     },
     [buildBankingTxQueryParams],
   );
 
-  /** Cuentas, categorías, resúmenes de deuda y pendientes TC/compartido. */
-  const fetchBankingMeta = useCallback(async () => {
+  /** Meta global + grupos compartidos solo si `tabScope === "shared"`. */
+  const fetchBankingMetaFromNetwork = useCallback(async (tabScope: BankingMovementTabScope, signal?: AbortSignal) => {
+    const init = signal ? { signal } : undefined;
     const [acc, cats, debt, ccUg] = await Promise.all([
-      fetchJson<BankingAccountRow[]>("/banking/accounts"),
-      fetchJson<BankingCategoryRow[]>("/banking/categories"),
-      fetchJson<BankingDebtTotalsOut>("/banking/debt-totals"),
-      fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>("/banking/credit-card/unpaid-grouped"),
+      fetchJson<BankingAccountRow[]>("/banking/accounts", init),
+      fetchJson<BankingCategoryRow[]>("/banking/categories", init),
+      fetchJson<BankingDebtTotalsOut>("/banking/debt-totals", init),
+      fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>("/banking/credit-card/unpaid-grouped", init),
     ]);
     let sharedGroups: BankingSharedUnsettledGroup[] = [];
-    if (movementTab === "shared") {
-      const ug = await fetchJson<{ groups: BankingSharedUnsettledGroup[] }>("/banking/shared/unsettled-grouped");
+    if (tabScope === "shared") {
+      const ug = await fetchJson<{ groups: BankingSharedUnsettledGroup[] }>(
+        "/banking/shared/unsettled-grouped",
+        init,
+      );
       sharedGroups = ug.groups;
     }
-    setAccounts(acc);
-    setBankingDebtTotals(debt);
-    setCategories([...cats].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id));
-    setCcUnpaidGroups(ccUg.groups);
-    setSharedUnsettledGroups(sharedGroups);
-  }, [movementTab]);
+    return {
+      acc,
+      cats,
+      debt,
+      ccGroups: ccUg.groups,
+      sharedGroups,
+    };
+  }, []);
 
+  const applyBankingMetaGlobal = useCallback(
+    (meta: {
+      acc: BankingAccountRow[];
+      cats: BankingCategoryRow[];
+      debt: BankingDebtTotalsOut;
+      ccGroups: BankingCreditCardUnpaidGroup[];
+    }) => {
+      setAccounts(meta.acc);
+      setBankingDebtTotals(meta.debt);
+      setCategories([...meta.cats].sort((a, b) => a.sort_order - b.sort_order || a.id - b.id));
+      setCcUnpaidGroups(meta.ccGroups);
+    },
+    [],
+  );
+
+  /** Carga lista + meta; actualiza estado de movimientos solo si `expectedViewKey` sigue siendo la vista activa. */
+  const reloadBankingDataForScope = useCallback(
+    async (
+      page: number,
+      tabScope: BankingMovementTabScope,
+      expectedViewKey: string,
+      signal?: AbortSignal,
+    ) => {
+      const [txList, meta] = await Promise.all([
+        loadBankingTransactionsFromNetwork(page, tabScope, signal),
+        fetchBankingMetaFromNetwork(tabScope, signal),
+      ]);
+      if (signal?.aborted) return;
+      applyBankingMetaGlobal(meta);
+      if (bankingViewKeyRef.current !== expectedViewKey) return;
+      setItems(txList.items);
+      setBankingTxTotal(txList.total);
+      setBankingTxPage(txList.page);
+      setSharedUnsettledGroups(meta.sharedGroups);
+      bankingTabCachePut(tabTxCacheRef.current, expectedViewKey, {
+        items: txList.items,
+        total: txList.total,
+        page: txList.page,
+        sharedUnsettledGroups: meta.sharedGroups,
+      });
+    },
+    [applyBankingMetaGlobal, fetchBankingMetaFromNetwork, loadBankingTransactionsFromNetwork],
+  );
+
+  /** Tras crear/editar/borrar/marcar: invalidar SWR y recargar vista actual. */
   const reloadBankingFull = useCallback(
     async (page: number) => {
-      await Promise.all([fetchBankingTransactionsPage(page), fetchBankingMeta()]);
+      tabTxCacheRef.current.clear();
+      const k = bankingViewKeyRef.current;
+      setTabRefreshing(true);
+      try {
+        await reloadBankingDataForScope(page, movementTab, k);
+      } finally {
+        setTabRefreshing(false);
+      }
     },
-    [fetchBankingTransactionsPage, fetchBankingMeta],
+    [movementTab, reloadBankingDataForScope],
   );
 
   useEffect(() => {
@@ -2544,16 +2673,112 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
   useEffect(() => {
     let cancelled = false;
+    const ac = new AbortController();
+    const requestKey = bankingTabCacheKey(
+      movementTab,
+      filterAccountIds,
+      bankingAccountingFullHistory,
+      bankingTxDateFrom,
+      bankingTxDateTo,
+    );
+    const cached = tabTxCacheRef.current.get(requestKey);
+
+    const onReloadError = (e: unknown) => {
+      if (!isAbortError(e)) console.error(e);
+    };
+
+    if (cached) {
+      setItems(cached.items);
+      setBankingTxTotal(cached.total);
+      setBankingTxPage(cached.page);
+      setSharedUnsettledGroups(cached.sharedUnsettledGroups);
+      setLoading(false);
+      setTabRefreshing(true);
+      void reloadBankingDataForScope(1, movementTab, requestKey, ac.signal)
+        .catch(onReloadError)
+        .finally(() => {
+          if (!cancelled) setTabRefreshing(false);
+        });
+      return () => {
+        cancelled = true;
+        ac.abort();
+      };
+    }
+
     setLoading(true);
-    void reloadBankingFull(1)
-      .catch(console.error)
+    void reloadBankingDataForScope(1, movementTab, requestKey, ac.signal)
+      .catch(onReloadError)
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
+      ac.abort();
     };
-  }, [reloadBankingFull]);
+  }, [
+    movementTab,
+    filterAccountIds,
+    bankingAccountingFullHistory,
+    bankingTxDateFrom,
+    bankingTxDateTo,
+    reloadBankingDataForScope,
+  ]);
+
+  /** Precarga en idle las otras pestañas con los mismos filtros/fechas para cambio instantáneo. */
+  useEffect(() => {
+    if (loading) return;
+
+    const ac = new AbortController();
+    const idleId = scheduleIdlePrefetch(() => {
+      if (ac.signal.aborted) return;
+      const scopes: BankingMovementTabScope[] = ["all", "credit_card", "shared"];
+      void (async () => {
+        for (const scope of scopes) {
+          if (ac.signal.aborted) return;
+          if (scope === movementTab) continue;
+          const key = bankingTabCacheKey(
+            scope,
+            filterAccountIds,
+            bankingAccountingFullHistory,
+            bankingTxDateFrom,
+            bankingTxDateTo,
+          );
+          if (tabTxCacheRef.current.has(key)) continue;
+          try {
+            const [txList, meta] = await Promise.all([
+              loadBankingTransactionsFromNetwork(1, scope, ac.signal),
+              fetchBankingMetaFromNetwork(scope, ac.signal),
+            ]);
+            if (ac.signal.aborted) return;
+            if (tabTxCacheRef.current.has(key)) continue;
+            bankingTabCachePut(tabTxCacheRef.current, key, {
+              items: txList.items,
+              total: txList.total,
+              page: txList.page,
+              sharedUnsettledGroups: meta.sharedGroups,
+            });
+          } catch (e) {
+            if (!isAbortError(e)) console.error(e);
+          }
+        }
+      })();
+    });
+
+    return () => {
+      cancelIdlePrefetch(idleId);
+      ac.abort();
+    };
+  }, [
+    movementTab,
+    filterAccountIds,
+    bankingAccountingFullHistory,
+    bankingTxDateFrom,
+    bankingTxDateTo,
+    loadBankingTransactionsFromNetwork,
+    fetchBankingMetaFromNetwork,
+    loading,
+  ]);
+
 
   /** Tras cargar o cambiar de página, el scroll de la tabla vuelve arriba. */
   useEffect(() => {
@@ -2569,16 +2794,48 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const goBankingTxPage = useCallback(
     async (nextPage: number) => {
       if (nextPage < 1 || nextPage > bankingTxTotalPages) return;
+      const scope = movementTab;
+      const pageKey = bankingTabCacheKey(
+        scope,
+        filterAccountIds,
+        bankingAccountingFullHistory,
+        bankingTxDateFrom,
+        bankingTxDateTo,
+      );
+      bankingTxPageFetchAbortRef.current?.abort();
+      const ac = new AbortController();
+      bankingTxPageFetchAbortRef.current = ac;
       setLoading(true);
       try {
-        await fetchBankingTransactionsPage(nextPage);
+        const txList = await loadBankingTransactionsFromNetwork(nextPage, scope, ac.signal);
+        if (bankingViewKeyRef.current !== pageKey || ac.signal.aborted) return;
+        setItems(txList.items);
+        setBankingTxTotal(txList.total);
+        setBankingTxPage(txList.page);
+        const prev = tabTxCacheRef.current.get(pageKey);
+        bankingTabCachePut(tabTxCacheRef.current, pageKey, {
+          items: txList.items,
+          total: txList.total,
+          page: txList.page,
+          sharedUnsettledGroups: prev?.sharedUnsettledGroups ?? [],
+        });
       } catch (e) {
-        console.error(e);
+        if (!isAbortError(e)) console.error(e);
       } finally {
-        setLoading(false);
+        if (bankingTxPageFetchAbortRef.current === ac && bankingViewKeyRef.current === pageKey) {
+          setLoading(false);
+        }
       }
     },
-    [fetchBankingTransactionsPage, bankingTxTotalPages],
+    [
+      bankingAccountingFullHistory,
+      bankingTxDateFrom,
+      bankingTxDateTo,
+      bankingTxTotalPages,
+      filterAccountIds,
+      loadBankingTransactionsFromNetwork,
+      movementTab,
+    ],
   );
 
   const toggleBankingTxColumn = useCallback((key: BankingTxColumnKey) => {
@@ -3574,6 +3831,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 {bankingAccountingFullHistory
                   ? "Sin filtro de fechas en servidor. Sigue habiendo 50 movimientos por página."
                   : "Por defecto: últimos 60 días por fecha del movimiento. Amplía las fechas o usa «Todo el historial»."}
+                {tabRefreshing ? <span className="ml-1 text-teal-600">· Actualizando…</span> : null}
               </p>
             </div>
             {items.length === 0 ? (
@@ -3603,6 +3861,19 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   </>
                 ) : null}
               </p>
+              {tabRefreshing ? (
+                <span
+                  className="inline-flex items-center gap-2 text-xs font-medium text-teal-700"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <span
+                    className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-teal-500"
+                    aria-hidden
+                  />
+                  Actualizando datos…
+                </span>
+              ) : null}
               {bankingTxFiltersActive ? (
                 <button
                   type="button"

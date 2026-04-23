@@ -1,18 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { BankingSettingsPage } from "./BankingSettingsPage";
-import { BankingTransactionsPage } from "./BankingTransactionsPage";
 import { apiFetch, fetchJson } from "./api";
 import { clearToken, getToken } from "./auth";
 import { Login } from "./Login";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 import { ActivitySection } from "./ActivitySection";
-import { Dashboard } from "./Dashboard";
 import { ManualSnapshotModal } from "./ManualModals";
 import { FintualConnectModal } from "./FintualConnectModal";
 import { NoServicesPage } from "./NoServicesPage";
-import { Profile } from "./Profile";
 import { runSync, SyncOverlay, type TickerUiState } from "./SyncOverlay";
 import { TransactionModal } from "./TransactionModal";
 import {
@@ -30,6 +26,31 @@ import {
   type TransactionRow,
   type UserMe,
 } from "./types";
+
+const Dashboard = lazy(() => import("./Dashboard").then((m) => ({ default: m.Dashboard })));
+const Profile = lazy(() => import("./Profile").then((m) => ({ default: m.Profile })));
+const BankingTransactionsPage = lazy(() =>
+  import("./BankingTransactionsPage").then((m) => ({ default: m.BankingTransactionsPage })),
+);
+const BankingSettingsPage = lazy(() =>
+  import("./BankingSettingsPage").then((m) => ({ default: m.BankingSettingsPage })),
+);
+
+function RoutePageFallback() {
+  return (
+    <div
+      className="flex min-h-[40vh] items-center justify-center"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <div
+        className="h-10 w-10 animate-spin rounded-full border-2 border-[#30363d] border-t-[#22c55e]"
+        aria-hidden
+      />
+    </div>
+  );
+}
 
 function BootLoader({ message }: { message: string }) {
   return (
@@ -337,108 +358,110 @@ export default function App() {
 
       <main className="pt-14 pl-16">
         {showMain ? (
-          <Routes>
-            <Route
-              path="/profile"
-              element={
-                <Profile
-                  me={me!}
-                  onUpdated={handleProfileUpdated}
-                  onRequestFintualConnect={() => setFintualModalFromProfile(true)}
-                />
-              }
-            />
-            <Route
-              path="/"
-              element={
-                !hasAnyActiveService(me!.services) ? (
-                  <NoServicesPage />
-                ) : investmentsOn ? (
-                  <Dashboard
-                    portfolio={portfolio}
-                    holdings={holdings}
-                    chart={chart}
-                    chartLoading={chartLoading}
-                    period={period}
-                    onPeriod={setPeriod}
-                    chartCurrency={chartCurrency}
-                    onChartCurrency={setChartCurrency}
-                    sectors={sectors}
-                    manualAssets={manualAssets}
-                    fintualGoals={fintualGoals}
-                    onManualSnapshot={(a) => setSnapshotAsset(a)}
-                    onDeleteManual={async (m) => {
-                      if (
-                        !confirm(
-                          `¿Eliminar "${m.nombre}"? Se borrarán también sus valores históricos. Esta acción no se puede deshacer.`,
-                        )
-                      ) {
-                        return;
-                      }
-                      try {
-                        const r = await apiFetch(`/manual-assets/${m.id}`, {
-                          method: "DELETE",
-                        });
-                        if (!r.ok) {
-                          setToast("No se pudo eliminar el activo");
+          <Suspense fallback={<RoutePageFallback />}>
+            <Routes>
+              <Route
+                path="/profile"
+                element={
+                  <Profile
+                    me={me!}
+                    onUpdated={handleProfileUpdated}
+                    onRequestFintualConnect={() => setFintualModalFromProfile(true)}
+                  />
+                }
+              />
+              <Route
+                path="/"
+                element={
+                  !hasAnyActiveService(me!.services) ? (
+                    <NoServicesPage />
+                  ) : investmentsOn ? (
+                    <Dashboard
+                      portfolio={portfolio}
+                      holdings={holdings}
+                      chart={chart}
+                      chartLoading={chartLoading}
+                      period={period}
+                      onPeriod={setPeriod}
+                      chartCurrency={chartCurrency}
+                      onChartCurrency={setChartCurrency}
+                      sectors={sectors}
+                      manualAssets={manualAssets}
+                      fintualGoals={fintualGoals}
+                      onManualSnapshot={(a) => setSnapshotAsset(a)}
+                      onDeleteManual={async (m) => {
+                        if (
+                          !confirm(
+                            `¿Eliminar "${m.nombre}"? Se borrarán también sus valores históricos. Esta acción no se puede deshacer.`,
+                          )
+                        ) {
                           return;
                         }
-                        setToast("Activo eliminado");
-                        await loadAll();
-                      } catch {
-                        setToast("No se pudo eliminar el activo");
-                      }
-                    }}
-                    dataVersion={dataVersion}
-                    onEditTransaction={(tx) => {
-                      setEditingTx(tx);
-                      setTxOpen(true);
-                    }}
-                    onToast={setToast}
-                    onMutate={loadAll}
-                  />
-                ) : bankingOn ? (
-                  <Navigate to="/banking/transactions" replace />
-                ) : (
-                  <NoServicesPage />
-                )
-              }
-            />
-            <Route
-              path="/transactions"
-              element={
-                investmentsOn ? (
-                  <TransactionsRoute
-                    dataVersion={dataVersion}
-                    onEdit={(tx) => {
-                      setEditingTx(tx);
-                      setTxOpen(true);
-                    }}
-                    onToast={setToast}
-                    onMutate={loadAll}
-                  />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/banking/transactions"
-              element={
-                bankingOn ? (
-                  <BankingTransactionsPage onToast={setToast} />
-                ) : (
-                  <Navigate to="/" replace />
-                )
-              }
-            />
-            <Route
-              path="/banking/settings"
-              element={
-                bankingOn ? <BankingSettingsPage onToast={setToast} /> : <Navigate to="/" replace />
-              }
-            />
-          </Routes>
+                        try {
+                          const r = await apiFetch(`/manual-assets/${m.id}`, {
+                            method: "DELETE",
+                          });
+                          if (!r.ok) {
+                            setToast("No se pudo eliminar el activo");
+                            return;
+                          }
+                          setToast("Activo eliminado");
+                          await loadAll();
+                        } catch {
+                          setToast("No se pudo eliminar el activo");
+                        }
+                      }}
+                      dataVersion={dataVersion}
+                      onEditTransaction={(tx) => {
+                        setEditingTx(tx);
+                        setTxOpen(true);
+                      }}
+                      onToast={setToast}
+                      onMutate={loadAll}
+                    />
+                  ) : bankingOn ? (
+                    <Navigate to="/banking/transactions" replace />
+                  ) : (
+                    <NoServicesPage />
+                  )
+                }
+              />
+              <Route
+                path="/transactions"
+                element={
+                  investmentsOn ? (
+                    <TransactionsRoute
+                      dataVersion={dataVersion}
+                      onEdit={(tx) => {
+                        setEditingTx(tx);
+                        setTxOpen(true);
+                      }}
+                      onToast={setToast}
+                      onMutate={loadAll}
+                    />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
+              <Route
+                path="/banking/transactions"
+                element={
+                  bankingOn ? (
+                    <BankingTransactionsPage onToast={setToast} />
+                  ) : (
+                    <Navigate to="/" replace />
+                  )
+                }
+              />
+              <Route
+                path="/banking/settings"
+                element={
+                  bankingOn ? <BankingSettingsPage onToast={setToast} /> : <Navigate to="/" replace />
+                }
+              />
+            </Routes>
+          </Suspense>
         ) : initError ? (
           <div className="flex min-h-[50vh] flex-col items-center justify-center gap-5 px-6 text-center">
             <p className="max-w-lg text-sm text-[#f85149]">{initError}</p>
