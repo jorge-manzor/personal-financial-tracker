@@ -23,6 +23,7 @@ from banking_service import (
     banking_shared_unsettled_groups_payload,
     banking_debt_totals_out,
     banking_provision_sum_by_account,
+    banking_sum_amounts_by_account,
     banking_transaction_counts_by_account,
     count_credit_cards_linked_to_checking,
     create_transaction_row,
@@ -75,6 +76,18 @@ from schemas import (
 
 """Días hacia atrás desde hoy cuando no hay rango explícito ni historial completo."""
 BANKING_TX_DEFAULT_LOOKBACK_DAYS = 60
+
+BANKING_BALANCE_SCOPES = frozenset({"ledger", "through_current_accounting_month"})
+
+
+def _parse_balance_scope(balance_scope: str | None) -> str:
+    v = (balance_scope or "ledger").strip()
+    if v in BANKING_BALANCE_SCOPES:
+        return v
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="balance_scope debe ser ledger o through_current_accounting_month",
+    )
 
 
 def _first_day_next_month(d: date) -> date:
@@ -181,7 +194,16 @@ def banking_list_banks(_user: BankingUser) -> list[dict[str, str]]:
 
 
 @router.get("/accounts", response_model=list[BankingAccountOut])
-def banking_list_accounts(user: BankingUser, db: Session = Depends(get_db)) -> list[dict[str, object]]:
+def banking_list_accounts(
+    user: BankingUser,
+    db: Session = Depends(get_db),
+    balance_scope: str = Query(
+        "ledger",
+        description="ledger=saldo libro; through_current_accounting_month=solo movimientos cuyo mes contable (efectivo) no supera el mes en curso (Chile).",
+    ),
+) -> list[dict[str, object]]:
+    v = _parse_balance_scope(balance_scope)
+    through = v == "through_current_accounting_month"
     repair_phantom_negative_balances_for_user(db, user.id)
     rows = (
         db.query(BankingAccount)
@@ -190,16 +212,38 @@ def banking_list_accounts(user: BankingUser, db: Session = Depends(get_db)) -> l
         .all()
     )
     tx_counts = banking_transaction_counts_by_account(db, user.id) if rows else {}
-    prov_sums = banking_provision_sum_by_account(db, user.id) if rows else {}
+    if not through:
+        prov_sums = banking_provision_sum_by_account(db, user.id) if rows else {}
+        return [
+            banking_account_to_out(db, user.id, a, tx_counts=tx_counts, provision_sums=prov_sums) for a in rows
+        ]
+    sums = banking_sum_amounts_by_account(db, user.id, through_current_accounting_month=True) if rows else {}
+    prov_sums = (
+        banking_provision_sum_by_account(db, user.id, through_current_accounting_month=True) if rows else {}
+    )
     return [
-        banking_account_to_out(db, user.id, a, tx_counts=tx_counts, provision_sums=prov_sums)
+        banking_account_to_out(
+            db,
+            user.id,
+            a,
+            tx_counts=tx_counts,
+            provision_sums=prov_sums,
+            book_balance=float(a.opening_balance) + float(sums.get(int(a.id), 0.0)),
+        )
         for a in rows
     ]
 
 
 @router.get("/debt-totals", response_model=BankingDebtTotalsOut)
-def banking_debt_totals(user: BankingUser, db: Session = Depends(get_db)) -> dict[str, float]:
-    return banking_debt_totals_out(db, user.id)
+def banking_debt_totals(
+    user: BankingUser,
+    db: Session = Depends(get_db),
+    balance_scope: str = Query("ledger", description="Mismo criterio que en GET /banking/accounts (TC pendiente en total deuda)."),
+) -> dict[str, float]:
+    v = _parse_balance_scope(balance_scope)
+    return banking_debt_totals_out(
+        db, user.id, through_current_accounting_month=(v == "through_current_accounting_month")
+    )
 
 
 @router.post("/accounts", response_model=BankingAccountOut)
@@ -534,9 +578,16 @@ def banking_delete_subcategory(subcategory_id: int, user: BankingUser, db: Sessi
 
 
 @router.get("/credit-card/unpaid-grouped", response_model=BankingCreditCardUnpaidGroupedResponse)
-def banking_credit_card_unpaid_grouped(user: BankingUser, db: Session = Depends(get_db)) -> BankingCreditCardUnpaidGroupedResponse:
+def banking_credit_card_unpaid_grouped(
+    user: BankingUser,
+    db: Session = Depends(get_db),
+    balance_scope: str = Query("ledger", description="Filtra cargos con mes contable en curso o anterior; coherente con /banking/accounts."),
+) -> BankingCreditCardUnpaidGroupedResponse:
     ensure_default_categories(db, user.id)
-    raw = banking_credit_card_unpaid_groups_payload(db, user.id)
+    v = _parse_balance_scope(balance_scope)
+    raw = banking_credit_card_unpaid_groups_payload(
+        db, user.id, through_current_accounting_month=(v == "through_current_accounting_month")
+    )
     return BankingCreditCardUnpaidGroupedResponse(
         groups=[
             BankingCreditCardUnpaidGroupOut(

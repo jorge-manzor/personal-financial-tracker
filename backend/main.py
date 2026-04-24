@@ -1192,8 +1192,15 @@ async def sync_stream(
 
 
 @app.get("/dashboard-initial", response_model=DashboardInitialOut)
-def dashboard_initial(user: InvestmentsUser, db: Session = Depends(get_db)) -> DashboardInitialOut:
-    """Carga inicial: portafolio y holdings usando precios en cache (Fintual)."""
+def dashboard_initial(
+    user: InvestmentsUser,
+    db: Session = Depends(get_db),
+    fintual_live: bool = Query(
+        True,
+        description="Si false, no consulta Fintual en red (metas vacías, precios solo cache local).",
+    ),
+) -> DashboardInitialOut:
+    """Carga inicial: portafolio y holdings. Con fintual_live=0 evita Fintual en red hasta sync manual."""
     uid = user.id
     with use_fintual_credentials(user.fintual_session, user.fintual_uid):
         ensure_cache(db, uid, force=False)
@@ -1203,7 +1210,17 @@ def dashboard_initial(user: InvestmentsUser, db: Session = Depends(get_db)) -> D
         logger.warning("ensure_exchange_history: %s", e)
     with use_fintual_credentials(user.fintual_session, user.fintual_uid):
         syms = get_open_tickers(db, uid)
-        prices = asyncio.run(get_current_prices(db, syms, user_id=uid)) if syms else {}
+        if syms:
+            prices = asyncio.run(
+                get_current_prices(
+                    db,
+                    syms,
+                    user_id=uid,
+                    allow_fintual_network=fintual_live,
+                )
+            )
+        else:
+            prices = {}
         p = portfolio_summary(db, uid, prices=prices)
         rows = holdings_with_metrics(db, uid, prices=prices)
         slices_raw = sector_distribution(db, uid, prices=prices)
@@ -1251,8 +1268,11 @@ def dashboard_initial(user: InvestmentsUser, db: Session = Depends(get_db)) -> D
                 ultima_fecha=h.fecha if h else None,
             )
         )
-    with use_fintual_credentials(user.fintual_session, user.fintual_uid):
-        goal_cards = fetch_active_goal_cards(db, user_id=uid)
+    if fintual_live:
+        with use_fintual_credentials(user.fintual_session, user.fintual_uid):
+            goal_cards = fetch_active_goal_cards(db, user_id=uid)
+    else:
+        goal_cards = []
     goals_out = [FintualGoalCardOut(**x) for x in goal_cards]
     return DashboardInitialOut(
         portfolio=PortfolioOut(**p),

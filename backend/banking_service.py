@@ -8,14 +8,14 @@ from __future__ import annotations
 import json
 import logging
 import unicodedata
+from calendar import monthrange
 from datetime import date, datetime, timezone
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import false as sql_false
-from sqlalchemy import func, or_, text
+from sqlalchemy import Date, false as sql_false, func, literal, or_, text
 from sqlalchemy.orm import Session
 
 from models import BankingAccount, BankingCategory, BankingSubcategory, BankingTransaction
@@ -1163,7 +1163,26 @@ def banking_transaction_counts_by_account(db: Session, user_id: int) -> dict[int
     return {int(aid): int(n) for aid, n in rows}
 
 
-def banking_sum_unpaid_credit_card_charges_clp(db: Session, user_id: int) -> float:
+def banking_sum_amounts_by_account(
+    db: Session, user_id: int, *, through_current_accounting_month: bool = False
+) -> dict[int, float]:
+    """
+    Suma de `amount` por cuenta. Si `through_current_accounting_month`, solo movimientos
+    cuyo mes contable efectivo no supera el mes en curso (Chile) — alinea saldos con cierre de mes.
+    """
+    q = (
+        db.query(BankingTransaction.account_id, func.coalesce(func.sum(BankingTransaction.amount), 0.0))
+        .filter(BankingTransaction.user_id == user_id)
+    )
+    if through_current_accounting_month:
+        q = q.filter(banking_filter_transactions_through_current_accounting_month())
+    rows = q.group_by(BankingTransaction.account_id).all()
+    return {int(aid): float(s or 0.0) for aid, s in rows}
+
+
+def banking_sum_unpaid_credit_card_charges_clp(
+    db: Session, user_id: int, *, through_current_accounting_month: bool = False
+) -> float:
     """
     Suma de «deuda» pendiente en TC: egresos (amount < 0) con cargo no marcado como pagado.
     """
@@ -1171,7 +1190,7 @@ def banking_sum_unpaid_credit_card_charges_clp(db: Session, user_id: int) -> flo
         BankingTransaction.credit_card_charge_paid.is_(False),
         BankingTransaction.credit_card_charge_paid.is_(None),
     )
-    total = (
+    q = (
         db.query(func.coalesce(func.sum(-BankingTransaction.amount), 0.0))
         .join(BankingAccount, BankingAccount.id == BankingTransaction.account_id)
         .filter(
@@ -1181,8 +1200,10 @@ def banking_sum_unpaid_credit_card_charges_clp(db: Session, user_id: int) -> flo
             BankingTransaction.amount < 0,
             unpaid,
         )
-        .scalar()
     )
+    if through_current_accounting_month:
+        q = q.filter(banking_filter_transactions_through_current_accounting_month())
+    total = q.scalar()
     return float(total or 0.0)
 
 
@@ -1211,9 +1232,13 @@ def banking_sum_shared_unsettled_clp(db: Session, user_id: int) -> float:
     return round(total, 4)
 
 
-def banking_debt_totals_out(db: Session, user_id: int) -> dict[str, float]:
+def banking_debt_totals_out(
+    db: Session, user_id: int, *, through_current_accounting_month: bool = False
+) -> dict[str, float]:
     return {
-        "credit_card_unpaid_clp": banking_sum_unpaid_credit_card_charges_clp(db, user_id),
+        "credit_card_unpaid_clp": banking_sum_unpaid_credit_card_charges_clp(
+            db, user_id, through_current_accounting_month=through_current_accounting_month
+        ),
         "shared_unsettled_clp": banking_sum_shared_unsettled_clp(db, user_id),
     }
 
@@ -1442,7 +1467,9 @@ def banking_apply_credit_card_transaction_scope(db: Session, user_id: int, q):
     return q.filter(or_(*parts))
 
 
-def banking_credit_card_unpaid_groups_payload(db: Session, user_id: int) -> list[dict[str, Any]]:
+def banking_credit_card_unpaid_groups_payload(
+    db: Session, user_id: int, *, through_current_accounting_month: bool = False
+) -> list[dict[str, Any]]:
     """
     Cargos TC sin marcar pagados (egresos), agrupados por cuenta tarjeta.
     Cada grupo incluye movimientos ordenados por fecha descendente.
@@ -1451,7 +1478,7 @@ def banking_credit_card_unpaid_groups_payload(db: Session, user_id: int) -> list
         BankingTransaction.credit_card_charge_paid.is_(False),
         BankingTransaction.credit_card_charge_paid.is_(None),
     )
-    txs = (
+    q = (
         db.query(BankingTransaction)
         .join(BankingAccount, BankingAccount.id == BankingTransaction.account_id)
         .filter(
@@ -1461,13 +1488,14 @@ def banking_credit_card_unpaid_groups_payload(db: Session, user_id: int) -> list
             BankingTransaction.amount < 0,
             unpaid,
         )
-        .order_by(
-            BankingTransaction.fecha.desc(),
-            BankingTransaction.created_at.desc(),
-            BankingTransaction.id.desc(),
-        )
-        .all()
     )
+    if through_current_accounting_month:
+        q = q.filter(banking_filter_transactions_through_current_accounting_month())
+    txs = q.order_by(
+        BankingTransaction.fecha.desc(),
+        BankingTransaction.created_at.desc(),
+        BankingTransaction.id.desc(),
+    ).all()
     by_acc: dict[int, list[BankingTransaction]] = {}
     for tx in txs:
         aid = int(tx.account_id)
@@ -1488,7 +1516,9 @@ def banking_credit_card_unpaid_groups_payload(db: Session, user_id: int) -> list
     return out
 
 
-def banking_provision_sum_by_account(db: Session, user_id: int) -> dict[int, float]:
+def banking_provision_sum_by_account(
+    db: Session, user_id: int, *, through_current_accounting_month: bool = False
+) -> dict[int, float]:
     """
     Suma de `amount` por cuenta para movimientos cuya categoría es plantilla Provisiones (21),
     o con nombre «Provisiones» (p. ej. legado sin `template_cat_id`).
@@ -1498,13 +1528,14 @@ def banking_provision_sum_by_account(db: Session, user_id: int) -> dict[int, flo
         BankingCategory.template_cat_id == TEMPLATE_CAT_PROVISIONES,
         func.lower(func.trim(BankingCategory.name)) == "provisiones",
     )
-    rows = (
+    q = (
         db.query(BankingTransaction.account_id, func.coalesce(func.sum(BankingTransaction.amount), 0.0))
         .join(BankingCategory, BankingCategory.id == BankingTransaction.category_id)
         .filter(BankingTransaction.user_id == user_id, BankingCategory.user_id == user_id, prov_cat)
-        .group_by(BankingTransaction.account_id)
-        .all()
     )
+    if through_current_accounting_month:
+        q = q.filter(banking_filter_transactions_through_current_accounting_month())
+    rows = q.group_by(BankingTransaction.account_id).all()
     return {int(aid): float(s or 0.0) for aid, s in rows}
 
 
@@ -1515,6 +1546,7 @@ def banking_account_to_out(
     *,
     tx_counts: dict[int, int] | None = None,
     provision_sums: dict[int, float] | None = None,
+    book_balance: float | None = None,
 ) -> dict[str, Any]:
     bs = getattr(acc, "bank_sbif", None)
     bank_name = bank_name_for_sbif(bs)
@@ -1540,7 +1572,7 @@ def banking_account_to_out(
             or 0
         )
         n_tx = int(n_tx)
-    bal = float(acc.balance)
+    bal = float(book_balance) if book_balance is not None else float(acc.balance)
     ps = float(provision_sums.get(acc.id, 0.0)) if provision_sums is not None else 0.0
     return {
         "id": acc.id,
@@ -1733,6 +1765,32 @@ def list_categories_nested(db: Session, user_id: int) -> list[dict[str, Any]]:
 
 def first_day_of_month_calendar(d: date) -> date:
     return date(d.year, d.month, 1)
+
+
+def _last_day_of_current_accounting_month_cl() -> date:
+    """Último día del mes calendario en curso (zona horaria Chile)."""
+    d = datetime.now(ZoneInfo("America/Santiago")).date()
+    y, m = d.year, d.month
+    return date(y, m, monthrange(y, m)[1])
+
+
+def _banking_effective_accounting_first_day_expr():
+    """
+    Primer día del mes contable efectivo: el guardado o el inicio de mes de `fecha` (SQLite `date(fecha, 'start of month')`).
+    """
+    return func.coalesce(
+        BankingTransaction.accounting_month,
+        func.date(BankingTransaction.fecha, "start of month"),
+    )
+
+
+def banking_filter_transactions_through_current_accounting_month():
+    """
+    Incluye movimientos cuyo mes contable (efectivo) no es posterior al mes en curso en Chile.
+    Excluye, por ejemplo, apuntes con mes contable adelantado al mes siguiente.
+    """
+    end = _last_day_of_current_accounting_month_cl()
+    return _banking_effective_accounting_first_day_expr() <= literal(end, type_=Date())
 
 
 def _banking_today_cl() -> date:

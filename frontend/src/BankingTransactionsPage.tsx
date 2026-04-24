@@ -153,6 +153,126 @@ function cancelIdlePrefetch(id: number): void {
 }
 
 const BANKING_BALANCE_CARD_ORDER_STORAGE_KEY = "banking_balance_card_order_v1";
+const BANKING_BALANCE_SCOPE_STORAGE_KEY = "banking_balance_scope_v1";
+
+type BankingBalanceScope = "ledger" | "through_current_accounting_month";
+
+function loadBankingBalanceScope(): BankingBalanceScope {
+  try {
+    const raw = localStorage.getItem(BANKING_BALANCE_SCOPE_STORAGE_KEY);
+    if (raw === "through_current_accounting_month") return "through_current_accounting_month";
+    return "ledger";
+  } catch {
+    return "ledger";
+  }
+}
+
+function saveBankingBalanceScope(s: BankingBalanceScope) {
+  try {
+    localStorage.setItem(BANKING_BALANCE_SCOPE_STORAGE_KEY, s);
+  } catch {
+    /* ignore */
+  }
+}
+
+function bankingBalanceScopeQueryParam(s: BankingBalanceScope): string {
+  return s === "through_current_accounting_month" ? "?balance_scope=through_current_accounting_month" : "";
+}
+
+const BANKING_BALANCE_SCOPE_HELP =
+  "Al estar activo, los saldos incluyen los meses contables futuros. Si está desactivado, los saldos contemplan hasta el mes contable actual.";
+
+/**
+ * Ayuda del interruptor «Actual» — el portal a `body` con `position: fixed` y z-index alto evita
+ * recortes por `overflow` de la tarjeta o que el fondo de la página quede encima.
+ */
+function BankingBalanceScopeHelpButton() {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 300 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const updatePos = useCallback(() => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const w = Math.min(320, window.innerWidth - 20);
+    const left = Math.max(10, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 10));
+    setPos({ top: r.bottom + 8, left, width: w });
+  }, []);
+
+  const show = useCallback(() => {
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+    updatePos();
+    setOpen(true);
+  }, [updatePos]);
+
+  const hideAfterDelay = useCallback(() => {
+    leaveTimerRef.current = setTimeout(() => setOpen(false), 180);
+  }, []);
+
+  const cancelHide = useCallback(() => {
+    if (leaveTimerRef.current) {
+      clearTimeout(leaveTimerRef.current);
+      leaveTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onMove = () => {
+      if (!btnRef.current) return;
+      const r = btnRef.current.getBoundingClientRect();
+      const w = Math.min(320, window.innerWidth - 20);
+      const left = Math.max(10, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 10));
+      setPos((p) => ({ ...p, top: r.bottom + 8, left, width: w }));
+    };
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        onMouseEnter={show}
+        onMouseLeave={hideAfterDelay}
+        onFocus={show}
+        onBlur={hideAfterDelay}
+        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-400/45 banking-dark:text-zinc-500 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-300 banking-dark:focus:ring-amber-500/35"
+        aria-label="Qué hace la opción Actual (saldos de las tarjetas)"
+        aria-describedby={open ? "banking-actual-saldos-help" : undefined}
+      >
+        <span className="text-[10px] font-bold leading-none" aria-hidden>
+          ?
+        </span>
+      </button>
+      {open
+        ? createPortal(
+            <div
+              id="banking-actual-saldos-help"
+              role="tooltip"
+              onMouseEnter={cancelHide}
+              onMouseLeave={() => setOpen(false)}
+              className="pointer-events-auto fixed z-[99999] rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-left text-[11px] font-normal leading-snug text-slate-700 shadow-2xl banking-dark:border-zinc-600 banking-dark:bg-zinc-800 banking-dark:text-zinc-200"
+              style={{ top: pos.top, left: pos.left, width: pos.width, maxWidth: "calc(100vw - 20px)" }}
+            >
+              {BANKING_BALANCE_SCOPE_HELP}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
 
 function bankingNonCreditAccounts(accounts: BankingAccountRow[]): BankingAccountRow[] {
   return accounts.filter((a) => (a.enabled ?? true) && a.product_type !== "tarjeta_credito");
@@ -2377,6 +2497,11 @@ function SiNoField({
 export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | null) => void }) {
   const { isDark } = useBankingTheme();
   const [accounts, setAccounts] = useState<BankingAccountRow[]>([]);
+  /** ledger=libro; through_current_accounting_month=saldos según mes contable ≤ mes en curso (Chile), vía API. */
+  const [bankingBalanceScope, setBankingBalanceScope] = useState<BankingBalanceScope>(loadBankingBalanceScope);
+  /** Ref sincronizado cada render: evita que el callback de meta dependa de `bankingBalanceScope` y re-dispare la carga de la tabla. */
+  const bankingBalanceScopeRef = useRef(bankingBalanceScope);
+  bankingBalanceScopeRef.current = bankingBalanceScope;
   const [bankingDebtTotals, setBankingDebtTotals] = useState<BankingDebtTotalsOut>({
     credit_card_unpaid_clp: 0,
     shared_unsettled_clp: 0,
@@ -2858,9 +2983,23 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     [buildBankingTxQueryParams],
   );
 
+  /** Solo saldos (tarjetas de cuentas / TC en resumen). No afecta la lista de movimientos. */
+  const refreshBalanceCardsMeta = useCallback(async (scope: BankingBalanceScope) => {
+    const bq = bankingBalanceScopeQueryParam(scope);
+    const [acc, debt, ccUg] = await Promise.all([
+      fetchJson<BankingAccountRow[]>(`/banking/accounts${bq}`),
+      fetchJson<BankingDebtTotalsOut>(`/banking/debt-totals${bq}`),
+      fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>(`/banking/credit-card/unpaid-grouped${bq}`),
+    ]);
+    setAccounts(acc);
+    setBankingDebtTotals(debt);
+    setCcUnpaidGroups(ccUg.groups);
+  }, []);
+
   /** Meta global + grupos según pestaña (compartidos, provisiones pendientes de reversa, etc.). */
   const fetchBankingMetaFromNetwork = useCallback(async (tabScope: BankingMovementTabScope, signal?: AbortSignal) => {
     const init = signal ? { signal } : undefined;
+    const bq = bankingBalanceScopeQueryParam(bankingBalanceScopeRef.current);
     /** Evita encadenar awaits: el endpoint de provisiones puede ser pesado; en paralelo llega antes a la UI. */
     const sharedExtra =
       tabScope === "shared"
@@ -2875,10 +3014,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         : Promise.resolve({ groups: [] as BankingCreditCardUnpaidGroup[] });
 
     const [acc, cats, debt, ccUg, ug, pg] = await Promise.all([
-      fetchJson<BankingAccountRow[]>("/banking/accounts", init),
+      fetchJson<BankingAccountRow[]>(`/banking/accounts${bq}`, init),
       fetchJson<BankingCategoryRow[]>("/banking/categories", init),
-      fetchJson<BankingDebtTotalsOut>("/banking/debt-totals", init),
-      fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>("/banking/credit-card/unpaid-grouped", init),
+      fetchJson<BankingDebtTotalsOut>(`/banking/debt-totals${bq}`, init),
+      fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>(`/banking/credit-card/unpaid-grouped${bq}`, init),
       sharedExtra,
       provisionExtra,
     ]);
@@ -2952,6 +3091,20 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     },
     [movementTab, reloadBankingDataForScope],
   );
+
+  const balanceScopeReloadSkipRef = useRef(true);
+  useEffect(() => {
+    saveBankingBalanceScope(bankingBalanceScope);
+  }, [bankingBalanceScope]);
+
+  /** Cambiar "Actual" solo recalcula saldos vía API; no recarga filas de la tabla. */
+  useEffect(() => {
+    if (balanceScopeReloadSkipRef.current) {
+      balanceScopeReloadSkipRef.current = false;
+      return;
+    }
+    void refreshBalanceCardsMeta(bankingBalanceScope);
+  }, [bankingBalanceScope, refreshBalanceCardsMeta]);
 
   useEffect(() => {
     if (movementTab !== "shared") setSelectedSharedIds(new Set());
@@ -4000,7 +4153,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       </div>
       {accounts.length > 0 ? (
         <section aria-labelledby="banking-account-balances-heading">
-          <h2 id="banking-account-balances-heading" className="mb-3 text-lg font-semibold text-slate-800 banking-dark:text-zinc-100">
+          <h2
+            id="banking-account-balances-heading"
+            className="mb-3 text-lg font-semibold text-slate-800 banking-dark:text-zinc-100"
+          >
             Saldos cuentas
           </h2>
           <DndContext sensors={columnDndSensors} collisionDetection={closestCenter} onDragEnd={handleBalanceCardDragEnd}>
@@ -4348,6 +4504,38 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     className={bankingToolbarDateInputClass}
                     aria-label="Fecha hasta (movimiento)"
                   />
+                </div>
+                <div
+                  className="relative z-20 flex items-center gap-1 sm:ml-0.5 sm:border-l sm:border-slate-200 sm:pl-2.5 banking-dark:sm:border-zinc-600"
+                  id="banking-balance-scope-actual-group"
+                >
+                  <span
+                    className="text-xs font-medium text-slate-600 banking-dark:text-zinc-300"
+                    id="banking-balance-scope-actual-label"
+                  >
+                    Actual
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={bankingBalanceScope === "ledger"}
+                    aria-labelledby="banking-balance-scope-actual-label"
+                    onClick={() =>
+                      setBankingBalanceScope((s) => (s === "ledger" ? "through_current_accounting_month" : "ledger"))
+                    }
+                    className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-teal-400/40 focus:ring-offset-1 focus:ring-offset-white banking-dark:focus:ring-amber-500/35 banking-dark:focus:ring-offset-zinc-950 ${
+                      bankingBalanceScope === "ledger"
+                        ? "border-teal-600 bg-teal-500 banking-dark:border-amber-600/90 banking-dark:bg-amber-600"
+                        : "border-slate-300 bg-slate-200 banking-dark:border-zinc-600 banking-dark:bg-zinc-700"
+                    } `}
+                  >
+                    <span
+                      className={`pointer-events-none absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow-sm ring-1 ring-slate-900/5 transition-transform banking-dark:ring-white/10 ${
+                        bankingBalanceScope === "ledger" ? "translate-x-[1.12rem]" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                  <BankingBalanceScopeHelpButton />
                 </div>
                 {tabRefreshing ? <span className="text-[11px] text-slate-500 banking-dark:text-zinc-500">Actualizando…</span> : null}
               </div>

@@ -60,7 +60,12 @@ def _current_price_row_fresh(db: Session, ticker: str) -> tuple[float | None, bo
 
 
 async def get_current_prices(
-    db: Session, tickers: list[str], *, user_id: int, force: bool = False
+    db: Session,
+    tickers: list[str],
+    *,
+    user_id: int,
+    force: bool = False,
+    allow_fintual_network: bool = True,
 ) -> dict[str, float]:
     """Precios actuales vía Fintual (si hay sesión) y cache local."""
     from fintual_client import fintual_configured
@@ -74,7 +79,7 @@ async def get_current_prices(
             if not fresh or px is None:
                 need_fetch = True
                 break
-    if fintual_configured() and syms and need_fetch:
+    if fintual_configured() and syms and need_fetch and allow_fintual_network:
         try:
             sync_current_prices_batch(db, syms, user_id)
         except Exception as e:

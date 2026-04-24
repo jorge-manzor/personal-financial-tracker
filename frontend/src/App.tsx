@@ -68,8 +68,8 @@ function BootLoader({ message }: { message: string }) {
         />
         <p className="text-base font-medium text-white">{message}</p>
         <p className="mt-2 text-xs leading-relaxed text-[#6e7681]">
-          Conectamos con el servidor y, si hace falta, con Fintual para posiciones, movimientos y precios. La primera
-          sincronización puede tardar un poco más.
+          Cargamos tu portafolio y datos almacenados. Para alinear con Fintual (metas y precios vivos) usa
+          &quot;Actualizar&quot; o conecta/actualiza la cookie en Perfil.
         </p>
         <p className="mt-3 break-all font-mono text-[10px] text-[#484f58]">
           {import.meta.env.VITE_API_BASE ?? "http://localhost:8000"}
@@ -116,14 +116,16 @@ export default function App() {
   /** Si el usuario cierra el modal sin conectar Fintual, no volver a bloquear hasta que abra de nuevo desde Perfil o recargue. */
   const [fintualSetupSkipped, setFintualSetupSkipped] = useState(false);
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (opts?: { fintualLive?: boolean }) => {
+    const fintualLive = opts?.fintualLive !== false;
+    const path = fintualLive ? "/dashboard-initial" : "/dashboard-initial?fintual_live=false";
     const d = await fetchJson<{
       portfolio: Portfolio;
       holdings: Holding[];
       sectors: { slices: SectorSlice[] };
       manual_assets: ManualAsset[];
       fintual_goals: FintualGoalCard[];
-    }>("/dashboard-initial");
+    }>(path);
     setPortfolio(d.portfolio);
     setHoldings(d.holdings);
     setSectors(d.sectors.slices);
@@ -192,7 +194,7 @@ export default function App() {
           }
           const st2 = await fetchJson<SyncStatus>("/sync-status");
           setSyncStatus(st2);
-          await loadAll();
+          await loadAll({ fintualLive: true });
           setFxRefreshNonce((n) => n + 1);
         },
         () => {
@@ -246,14 +248,30 @@ export default function App() {
     }
   }, []);
 
-  const handleFintualConnected = useCallback((next: UserMe) => {
-    setFintualModalFromProfile(false);
-    setFintualSetupSkipped(false);
-    setMe(normalizeUserMe(next));
-    setReady(false);
-    setInitError(null);
-    setBootRetry((n) => n + 1);
-  }, []);
+  const handleFintualConnected = useCallback(
+    (next: UserMe) => {
+      setFintualModalFromProfile(false);
+      setFintualSetupSkipped(false);
+      setMe(normalizeUserMe(next));
+      setInitError(null);
+      setReady(false);
+      void (async () => {
+        setBootHint("Cargando datos con Fintual…");
+        try {
+          const st = await fetchJson<SyncStatus>("/sync-status");
+          setSyncStatus(st);
+          await loadAll({ fintualLive: true });
+        } catch (e) {
+          console.error(e);
+          setInitError(
+            `No se pudo cargar el portafolio (${apiBaseHint}). Reintenta o comprueba el servidor.`,
+          );
+          setReady(true);
+        }
+      })();
+    },
+    [apiBaseHint, loadAll],
+  );
 
   const dismissFintualModal = useCallback(() => {
     setFintualModalFromProfile(false);
@@ -288,13 +306,8 @@ export default function App() {
         const st = await fetchJson<SyncStatus>("/sync-status");
         if (cancelled) return;
         setSyncStatus(st);
-        if (st.needs_sync) {
-          setBootHint("Sincronizando con Fintual (posiciones, movimientos y precios)…");
-          beginSync(false, true);
-        } else {
-          setBootHint("Cargando datos del portafolio…");
-          await loadAll();
-        }
+        setBootHint("Cargando datos del portafolio (cache)…");
+        await loadAll({ fintualLive: false });
       } catch (e) {
         console.error(e);
         if (!cancelled) {
@@ -307,7 +320,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [authed, bootRetry, beginSync, loadAll]);
+  }, [authed, bootRetry, loadAll]);
 
   useEffect(() => {
     if (!toast) return;
