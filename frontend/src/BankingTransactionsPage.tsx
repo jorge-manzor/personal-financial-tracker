@@ -2984,17 +2984,25 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   );
 
   /** Solo saldos (tarjetas de cuentas / TC en resumen). No afecta la lista de movimientos. */
-  const refreshBalanceCardsMeta = useCallback(async (scope: BankingBalanceScope) => {
-    const bq = bankingBalanceScopeQueryParam(scope);
-    const [acc, debt, ccUg] = await Promise.all([
-      fetchJson<BankingAccountRow[]>(`/banking/accounts${bq}`),
-      fetchJson<BankingDebtTotalsOut>(`/banking/debt-totals${bq}`),
-      fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>(`/banking/credit-card/unpaid-grouped${bq}`),
-    ]);
-    setAccounts(acc);
-    setBankingDebtTotals(debt);
-    setCcUnpaidGroups(ccUg.groups);
-  }, []);
+  const refreshBalanceCardsMeta = useCallback(
+    async (scope: BankingBalanceScope) => {
+      const bq = bankingBalanceScopeQueryParam(scope);
+      try {
+        const [acc, debt, ccUg] = await Promise.all([
+          fetchJson<BankingAccountRow[]>(`/banking/accounts${bq}`),
+          fetchJson<BankingDebtTotalsOut>(`/banking/debt-totals${bq}`),
+          fetchJson<{ groups: BankingCreditCardUnpaidGroup[] }>(`/banking/credit-card/unpaid-grouped${bq}`),
+        ]);
+        setAccounts(acc);
+        setBankingDebtTotals(debt);
+        setCcUnpaidGroups(ccUg.groups);
+      } catch (e) {
+        console.error(e);
+        onToast("No se pudo recalcular saldos con el filtro de mes contable. Reintenta o recarga la página.");
+      }
+    },
+    [onToast],
+  );
 
   /** Meta global + grupos según pestaña (compartidos, provisiones pendientes de reversa, etc.). */
   const fetchBankingMetaFromNetwork = useCallback(async (tabScope: BankingMovementTabScope, signal?: AbortSignal) => {

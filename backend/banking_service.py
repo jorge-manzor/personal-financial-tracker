@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import HTTPException, status
-from sqlalchemy import Date, false as sql_false, func, literal, or_, text
+from sqlalchemy import Date, cast, false as sql_false, func, literal, or_, text
 from sqlalchemy.orm import Session
 
 from models import BankingAccount, BankingCategory, BankingSubcategory, BankingTransaction
@@ -1175,7 +1175,7 @@ def banking_sum_amounts_by_account(
         .filter(BankingTransaction.user_id == user_id)
     )
     if through_current_accounting_month:
-        q = q.filter(banking_filter_transactions_through_current_accounting_month())
+        q = q.filter(banking_filter_transactions_through_current_accounting_month(db))
     rows = q.group_by(BankingTransaction.account_id).all()
     return {int(aid): float(s or 0.0) for aid, s in rows}
 
@@ -1202,7 +1202,7 @@ def banking_sum_unpaid_credit_card_charges_clp(
         )
     )
     if through_current_accounting_month:
-        q = q.filter(banking_filter_transactions_through_current_accounting_month())
+        q = q.filter(banking_filter_transactions_through_current_accounting_month(db))
     total = q.scalar()
     return float(total or 0.0)
 
@@ -1490,7 +1490,7 @@ def banking_credit_card_unpaid_groups_payload(
         )
     )
     if through_current_accounting_month:
-        q = q.filter(banking_filter_transactions_through_current_accounting_month())
+        q = q.filter(banking_filter_transactions_through_current_accounting_month(db))
     txs = q.order_by(
         BankingTransaction.fecha.desc(),
         BankingTransaction.created_at.desc(),
@@ -1534,7 +1534,7 @@ def banking_provision_sum_by_account(
         .filter(BankingTransaction.user_id == user_id, BankingCategory.user_id == user_id, prov_cat)
     )
     if through_current_accounting_month:
-        q = q.filter(banking_filter_transactions_through_current_accounting_month())
+        q = q.filter(banking_filter_transactions_through_current_accounting_month(db))
     rows = q.group_by(BankingTransaction.account_id).all()
     return {int(aid): float(s or 0.0) for aid, s in rows}
 
@@ -1774,23 +1774,27 @@ def _last_day_of_current_accounting_month_cl() -> date:
     return date(y, m, monthrange(y, m)[1])
 
 
-def _banking_effective_accounting_first_day_expr():
+def _banking_effective_accounting_first_day_for_fecha_expr(db: Session):
     """
-    Primer día del mes contable efectivo: el guardado o el inicio de mes de `fecha` (SQLite `date(fecha, 'start of month')`).
+    Primer día del mes contable inferido por `fecha`: en SQLite, date(fecha, 'start of month');
+    en PostgreSQL, date_trunc (no usar date(…, 'start of month') — no existe en PG).
     """
-    return func.coalesce(
-        BankingTransaction.accounting_month,
-        func.date(BankingTransaction.fecha, "start of month"),
-    )
+    dname = db.get_bind().dialect.name
+    if dname == "postgresql":
+        first_of_fecha = cast(func.date_trunc("month", BankingTransaction.fecha), Date)
+    else:
+        first_of_fecha = func.date(BankingTransaction.fecha, "start of month")
+    return first_of_fecha
 
 
-def banking_filter_transactions_through_current_accounting_month():
+def banking_filter_transactions_through_current_accounting_month(db: Session):
     """
     Incluye movimientos cuyo mes contable (efectivo) no es posterior al mes en curso en Chile.
     Excluye, por ejemplo, apuntes con mes contable adelantado al mes siguiente.
     """
     end = _last_day_of_current_accounting_month_cl()
-    return _banking_effective_accounting_first_day_expr() <= literal(end, type_=Date())
+    first_of = _banking_effective_accounting_first_day_for_fecha_expr(db)
+    return func.coalesce(BankingTransaction.accounting_month, first_of) <= literal(end, type_=Date())
 
 
 def _banking_today_cl() -> date:
