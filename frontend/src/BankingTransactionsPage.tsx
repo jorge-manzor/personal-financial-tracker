@@ -43,6 +43,7 @@ import type {
   BankingProductType,
   BankingTransactionRow,
 } from "./types";
+import { BankingAuxRoundCheckbox } from "./BankingAuxRoundCheckbox";
 
 /** Plantilla seed: Transferencia → Entre cuentas propias */
 const BANKING_TEMPLATE_CAT_TRANSFERENCIA = 19;
@@ -759,70 +760,6 @@ const BANKING_MOVEMENTS_TAB_BTN_IDLE = `${BANKING_MOVEMENTS_TAB_BTN_BASE} border
 const txIconBtnAux =
   "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-500 transition hover:border-slate-400 hover:bg-slate-100 hover:text-slate-800 banking-dark:text-zinc-500 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-200";
 const txIconBtnAuxDanger = `${txIconBtnAux} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 banking-dark:hover:border-rose-900/60 banking-dark:hover:bg-rose-950/50 banking-dark:hover:text-rose-300`;
-
-/** Casilla circular para pendientes TC / compartidos: borde gris → al marcar fondo verde con ✓ (parcial = guión). */
-function BankingAuxRoundCheckbox({
-  checked,
-  indeterminate,
-  onChange,
-  title,
-  "aria-label": ariaLabel,
-}: {
-  checked: boolean;
-  indeterminate?: boolean;
-  onChange: () => void;
-  title?: string;
-  "aria-label": string;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const el = inputRef.current;
-    if (el) el.indeterminate = !!indeterminate;
-  }, [indeterminate]);
-
-  const partial = !!indeterminate;
-
-  return (
-    <label className="inline-flex cursor-pointer select-none items-center justify-center" title={title}>
-      <input
-        ref={inputRef}
-        type="checkbox"
-        className="peer sr-only"
-        checked={checked}
-        onChange={onChange}
-        aria-label={ariaLabel}
-      />
-      <span
-        className={[
-          "flex h-[1.125rem] w-[1.125rem] shrink-0 items-center justify-center rounded-full border-2 transition-[background-color,border-color,box-shadow] duration-150",
-          "peer-focus-visible:ring-2 peer-focus-visible:ring-teal-400/40 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-white banking-dark:peer-focus-visible:ring-amber-500/35 banking-dark:peer-focus-visible:ring-offset-zinc-950",
-          partial
-            ? "border-amber-300 bg-amber-50 shadow-sm banking-dark:border-amber-700/70 banking-dark:bg-amber-950/45 banking-dark:shadow-none"
-            : checked
-              ? "border-teal-500 bg-teal-400 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] banking-dark:border-amber-600 banking-dark:bg-amber-600/92 banking-dark:shadow-[inset_0_1px_0_0_rgba(254,243,199,0.12)]"
-              : "border-slate-300 bg-white hover:border-teal-300 hover:bg-teal-50/50 banking-dark:border-zinc-500 banking-dark:bg-zinc-900 banking-dark:hover:border-amber-700/55 banking-dark:hover:bg-amber-950/40",
-        ].join(" ")}
-        aria-hidden
-      >
-        {partial ? (
-          <span className="h-0.5 w-2 rounded-full bg-amber-100/95 banking-dark:bg-amber-400/80" />
-        ) : checked ? (
-          <svg className="h-2.5 w-2.5 text-white" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-            <path
-              d="M3.75 8.25L6.75 11.25L12.25 4.75"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </svg>
-        ) : null}
-      </span>
-    </label>
-  );
-}
 
 /** Siempre visibles; no se pueden ocultar (sí se pueden reordenar). */
 const BANKING_TX_REQUIRED_COLUMNS: readonly BankingTxColumnKey[] = ["fecha", "monto"];

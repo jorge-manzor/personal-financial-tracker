@@ -20,6 +20,7 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { apiFetch, fetchJson, patchJson, postJson } from "./api";
+import { BankingAuxRoundCheckbox } from "./BankingAuxRoundCheckbox";
 import { BankingThemeToggle, useBankingTheme } from "./BankingThemeContext";
 import { formatBankingClpSigned, formatClpDots, parseChileanAmountInput } from "./format";
 import type { BankingAccountRow } from "./types";
@@ -54,6 +55,28 @@ const bankingProvFilterInputClass =
   "mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:placeholder:text-zinc-500 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
 
 const PROVISION_LABEL_NONE = "__none__";
+
+const LS_PO_PROVISIONS_EXPANDED = "bankingPersonalOrder.provisionsExpanded.v1";
+const LS_PO_SAVINGS_EXPANDED = "bankingPersonalOrder.savingsExpanded.v1";
+
+function readStoredExpanded(key: string, defaultExpanded: boolean): boolean {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === "0") return false;
+    if (raw === "1") return true;
+  } catch {
+    /* private mode */
+  }
+  return defaultExpanded;
+}
+
+function writeStoredExpanded(key: string, expanded: boolean): void {
+  try {
+    localStorage.setItem(key, expanded ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
 
 type ProvisionFilterColKey = "paid" | "descripcion" | "etiqueta" | "monto" | "cuenta";
 
@@ -471,6 +494,23 @@ function GripIcon({ className }: { className?: string }) {
   );
 }
 
+function ChevronExpandIcon({ expanded, className }: { expanded: boolean; className?: string }) {
+  return (
+    <svg
+      className={`${className ?? ""} shrink-0 transition-transform duration-200 ease-out ${expanded ? "rotate-0" : "-rotate-90"}`}
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
 function IconPencil({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
@@ -521,11 +561,15 @@ function PaidToggleButton({
 
 function SortableProvisionRow({
   row,
+  selected,
+  onSelectChange,
   onTogglePaid,
   onEdit,
   onRemove,
 }: {
   row: PersonalProvisionItem;
+  selected: boolean;
+  onSelectChange: (checked: boolean) => void;
   onTogglePaid: (r: PersonalProvisionItem) => void;
   onEdit: (r: PersonalProvisionItem) => void;
   onRemove: (id: number) => void;
@@ -556,6 +600,15 @@ function SortableProvisionRow({
           >
             <GripIcon className="h-4 w-4" />
           </button>
+        </div>
+      </td>
+      <td className={`${provisionTableTdBase} w-9 px-1`}>
+        <div className="flex justify-center" onPointerDown={(e) => e.stopPropagation()}>
+          <BankingAuxRoundCheckbox
+            checked={selected}
+            onChange={() => onSelectChange(!selected)}
+            aria-label={`Seleccionar provisión: ${row.description.slice(0, 80)}`}
+          />
         </div>
       </td>
       <td className={provisionTableTdBase}>
@@ -617,11 +670,15 @@ function SortableProvisionRow({
 
 function StaticProvisionRow({
   row,
+  selected,
+  onSelectChange,
   onTogglePaid,
   onEdit,
   onRemove,
 }: {
   row: PersonalProvisionItem;
+  selected: boolean;
+  onSelectChange: (checked: boolean) => void;
   onTogglePaid: (r: PersonalProvisionItem) => void;
   onEdit: (r: PersonalProvisionItem) => void;
   onRemove: (id: number) => void;
@@ -630,6 +687,15 @@ function StaticProvisionRow({
     <tr className="bg-white transition-colors hover:bg-slate-50/90 banking-dark:bg-zinc-950/40 banking-dark:hover:bg-zinc-900/50">
       <td className={`${provisionTableTdBase} w-10 px-1 text-center text-slate-400 banking-dark:text-zinc-600 sm:px-1`}>
         —
+      </td>
+      <td className={`${provisionTableTdBase} w-9 px-1`}>
+        <div className="flex justify-center">
+          <BankingAuxRoundCheckbox
+            checked={selected}
+            onChange={() => onSelectChange(!selected)}
+            aria-label={`Seleccionar provisión: ${row.description.slice(0, 80)}`}
+          />
+        </div>
       </td>
       <td className={provisionTableTdBase}>
         <div className="flex justify-center">
@@ -744,6 +810,33 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
 
   const [newProvisionModalOpen, setNewProvisionModalOpen] = useState(false);
   const [newSavingsModalOpen, setNewSavingsModalOpen] = useState(false);
+
+  const [provisionsExpanded, setProvisionsExpanded] = useState(() =>
+    readStoredExpanded(LS_PO_PROVISIONS_EXPANDED, true),
+  );
+  const [savingsExpanded, setSavingsExpanded] = useState(() =>
+    readStoredExpanded(LS_PO_SAVINGS_EXPANDED, true),
+  );
+
+  const toggleProvisionsSection = useCallback(() => {
+    setProvisionsExpanded((prev) => {
+      const next = !prev;
+      writeStoredExpanded(LS_PO_PROVISIONS_EXPANDED, next);
+      return next;
+    });
+  }, []);
+
+  const toggleSavingsSection = useCallback(() => {
+    setSavingsExpanded((prev) => {
+      const next = !prev;
+      writeStoredExpanded(LS_PO_SAVINGS_EXPANDED, next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!provisionsExpanded) setHeaderFilterOpen(null);
+  }, [provisionsExpanded]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -963,6 +1056,66 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
     filterAmountMax,
   ]);
 
+  const [selectedProvisionIds, setSelectedProvisionIds] = useState<Set<number>>(() => new Set());
+
+  useEffect(() => {
+    const valid = new Set(provisionItems.map((r) => r.id));
+    setSelectedProvisionIds((prev) => {
+      let changed = false;
+      const next = new Set<number>();
+      for (const id of prev) {
+        if (valid.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [provisionItems]);
+
+  const visibleProvisionRowsForSelection = useMemo(
+    () => (columnFiltersActive ? filteredProvisionItems : sortedProvisionItems),
+    [columnFiltersActive, filteredProvisionItems, sortedProvisionItems],
+  );
+
+  const provisionSelectionStats = useMemo(() => {
+    let sum = 0;
+    let sel = 0;
+    let selWithoutAmount = 0;
+    for (const r of visibleProvisionRowsForSelection) {
+      if (!selectedProvisionIds.has(r.id)) continue;
+      sel += 1;
+      if (r.amount_clp != null) sum += r.amount_clp;
+      else selWithoutAmount += 1;
+    }
+    return { sum, sel, selWithoutAmount };
+  }, [visibleProvisionRowsForSelection, selectedProvisionIds]);
+
+  const toggleProvisionSelected = useCallback((id: number, checked: boolean) => {
+    setSelectedProvisionIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAllVisibleProvisions = useCallback(() => {
+    const visible = columnFiltersActive ? filteredProvisionItems : sortedProvisionItems;
+    setSelectedProvisionIds((prev) => {
+      const next = new Set(prev);
+      const allOn = visible.length > 0 && visible.every((r) => next.has(r.id));
+      if (allOn) {
+        for (const r of visible) next.delete(r.id);
+      } else {
+        for (const r of visible) next.add(r.id);
+      }
+      return next;
+    });
+  }, [columnFiltersActive, filteredProvisionItems, sortedProvisionItems]);
+
+  const allVisibleProvisionsSelected =
+    visibleProvisionRowsForSelection.length > 0 &&
+    provisionSelectionStats.sel === visibleProvisionRowsForSelection.length;
+
   const handleProvisionDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -1043,6 +1196,12 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
       const r = await apiFetch(`/banking/personal-order/provision-items/${id}`, { method: "DELETE" });
       if (!r.ok) throw new Error(String(r.status));
       setProvisionItems((prev) => prev.filter((x) => x.id !== id));
+      setSelectedProvisionIds((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
       setEditingProvision((cur) => (cur?.id === id ? null : cur));
       onToast("Eliminado.");
     } catch {
@@ -1226,26 +1385,47 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
 
         <section className={cardClass} aria-labelledby="prov-heading">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <h2 id="prov-heading" className="text-lg font-semibold text-slate-900 banking-dark:text-zinc-100">
-                Provisiones a tener presente
-              </h2>
-              <p className="mt-1 text-xs text-slate-500 banking-dark:text-zinc-500">
-                La etiqueta es texto libre (ej. «Streaming», «Seguros»): no tiene que coincidir con las categorías de
-                movimientos bancarios. Monto orientativo solo como referencia. Los filtros funcionan como en movimientos
-                bancarios: cada encabezado muestra «Filtrar» o «Filtro activo». Puedes arrastrar filas cuando no hay
-                filtros activos.
-              </p>
-            </div>
+            <h2
+              id="prov-heading"
+              className="min-w-0 flex-1 text-lg font-semibold leading-snug text-slate-900 banking-dark:text-zinc-100"
+            >
+              <button
+                type="button"
+                className="flex w-full items-start gap-3 rounded-xl border border-transparent px-1 py-0.5 text-left outline-none ring-teal-400/0 transition hover:border-slate-200 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-400/35 banking-dark:hover:border-zinc-700 banking-dark:hover:bg-zinc-900/60 banking-dark:focus-visible:ring-amber-500/35"
+                onClick={toggleProvisionsSection}
+                aria-expanded={provisionsExpanded}
+                aria-controls="prov-panel"
+              >
+                <ChevronExpandIcon
+                  expanded={provisionsExpanded}
+                  className="mt-0.5 text-slate-500 banking-dark:text-zinc-400"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block">Provisiones a tener presente</span>
+                  <span className="mt-1 block text-xs font-normal text-slate-500 banking-dark:text-zinc-500">
+                    La etiqueta es texto libre (ej. «Streaming», «Seguros»): no tiene que coincidir con las categorías de
+                    movimientos bancarios. Monto orientativo solo como referencia. Los filtros funcionan como en
+                    movimientos bancarios: cada encabezado muestra «Filtrar» o «Filtro activo». Puedes arrastrar filas
+                    cuando no hay filtros activos.
+                  </span>
+                </span>
+              </button>
+            </h2>
             <button type="button" className={`${btnPrimary} shrink-0`} onClick={openNewProvisionModal}>
               Nueva Provisión
             </button>
           </div>
 
-          {provisionItems.length === 0 ? (
-            <p className="text-sm text-slate-500 banking-dark:text-zinc-500">No hay ítems todavía.</p>
+          {!provisionsExpanded ? (
+            <p className="text-sm text-slate-600 banking-dark:text-zinc-400" role="status">
+              <strong>{provisionItems.length}</strong> ítem(s). Pulsa el encabezado para ver la tabla y los filtros.
+            </p>
+          ) : provisionItems.length === 0 ? (
+            <p id="prov-panel" className="text-sm text-slate-500 banking-dark:text-zinc-500">
+              No hay ítems todavía.
+            </p>
           ) : (
-            <>
+            <div id="prov-panel">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3 banking-dark:border-zinc-800">
                 <p className="text-xs text-slate-500 banking-dark:text-zinc-500">
                   {columnFiltersActive ? (
@@ -1271,7 +1451,39 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                   Ningún ítem coincide con los filtros. Abre cada columna con «Filtrar» y limpia lo que necesites.
                 </p>
               ) : (
-                <div className="overflow-x-auto rounded-xl border border-slate-200 banking-dark:border-zinc-700">
+                <>
+                  {provisionSelectionStats.sel > 0 ? (
+                    <div
+                      className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200/90 bg-teal-50/90 px-3 py-2.5 text-sm banking-dark:border-amber-900/60 banking-dark:bg-amber-950/35"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-teal-900 banking-dark:text-amber-100">
+                          Selección:{" "}
+                          <strong>{provisionSelectionStats.sel}</strong>{" "}
+                          {provisionSelectionStats.sel === 1 ? "ítem visible" : "ítems visibles"}
+                        </p>
+                        <p className="mt-0.5 tabular-nums text-teal-800 banking-dark:text-amber-200/95">
+                          Suma montos ref.: <strong>{formatClpDots(provisionSelectionStats.sum)}</strong>
+                          {provisionSelectionStats.selWithoutAmount > 0 ? (
+                            <span className="ml-2 font-normal text-teal-700/90 banking-dark:text-zinc-400">
+                              · {provisionSelectionStats.selWithoutAmount}{" "}
+                              {provisionSelectionStats.selWithoutAmount === 1 ? "ítem sin" : "ítems sin"} monto ref.
+                            </span>
+                          ) : null}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className={`${btnSecondary} shrink-0 text-xs`}
+                        onClick={() => setSelectedProvisionIds(new Set())}
+                      >
+                        Quitar selección
+                      </button>
+                    </div>
+                  ) : null}
+                  <div className="overflow-x-auto rounded-xl border border-slate-200 banking-dark:border-zinc-700">
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -1279,7 +1491,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                       if (!columnFiltersActive) void handleProvisionDragEnd(e);
                     }}
                   >
-                    <table className="w-full min-w-[860px] border-collapse text-center text-[12px] leading-snug">
+                    <table className="w-full min-w-[908px] border-collapse text-center text-[12px] leading-snug">
                       <thead className="sticky top-0 z-10">
                         <tr className="border-b border-slate-200 bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900/80">
                           <th
@@ -1288,6 +1500,30 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                             aria-label="Orden"
                           >
                             ⋮⋮
+                          </th>
+                          <th
+                            scope="col"
+                            className="w-9 border-b border-slate-200 bg-slate-50 px-1 py-2 banking-dark:border-zinc-700 banking-dark:bg-zinc-900/80"
+                          >
+                            <div className="flex justify-center">
+                              <BankingAuxRoundCheckbox
+                                checked={allVisibleProvisionsSelected}
+                                indeterminate={
+                                  provisionSelectionStats.sel > 0 && !allVisibleProvisionsSelected
+                                }
+                                onChange={toggleSelectAllVisibleProvisions}
+                                title={
+                                  allVisibleProvisionsSelected
+                                    ? "Desmarcar todas las visibles"
+                                    : "Seleccionar todas las visibles"
+                                }
+                                aria-label={
+                                  columnFiltersActive
+                                    ? "Seleccionar todas las provisiones que ves con el filtro actual"
+                                    : "Seleccionar todas las provisiones de la lista"
+                                }
+                              />
+                            </div>
                           </th>
                           <ProvisionColumnHeader
                             colKey="paid"
@@ -1337,6 +1573,8 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                             <StaticProvisionRow
                               key={row.id}
                               row={row}
+                              selected={selectedProvisionIds.has(row.id)}
+                              onSelectChange={(checked) => toggleProvisionSelected(row.id, checked)}
                               onTogglePaid={togglePaid}
                               onEdit={openProvisionEdit}
                               onRemove={removeProvision}
@@ -1350,6 +1588,8 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                               <SortableProvisionRow
                                 key={row.id}
                                 row={row}
+                                selected={selectedProvisionIds.has(row.id)}
+                                onSelectChange={(checked) => toggleProvisionSelected(row.id, checked)}
                                 onTogglePaid={togglePaid}
                                 onEdit={openProvisionEdit}
                                 onRemove={removeProvision}
@@ -1404,32 +1644,54 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                         document.body,
                       )
                     : null}
-                </div>
+                  </div>
+                </>
               )}
-            </>
+            </div>
           )}
         </section>
 
         <section className={cardClass} aria-labelledby="sav-heading">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <h2 id="sav-heading" className="text-lg font-semibold text-slate-900 banking-dark:text-zinc-100">
-                Ahorro por objetivo
-              </h2>
-              <p className="mt-1 text-xs text-slate-500 banking-dark:text-zinc-500">
-                El saldo es solo un registro tuyo (el dinero real sigue en la cuenta del banco). Al crear la meta, el saldo
-                inicial queda registrado; después puedes sumar o restar con montos positivos o negativos.
-              </p>
-            </div>
+            <h2
+              id="sav-heading"
+              className="min-w-0 flex-1 text-lg font-semibold leading-snug text-slate-900 banking-dark:text-zinc-100"
+            >
+              <button
+                type="button"
+                className="flex w-full items-start gap-3 rounded-xl border border-transparent px-1 py-0.5 text-left outline-none ring-teal-400/0 transition hover:border-slate-200 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-400/35 banking-dark:hover:border-zinc-700 banking-dark:hover:bg-zinc-900/60 banking-dark:focus-visible:ring-amber-500/35"
+                onClick={toggleSavingsSection}
+                aria-expanded={savingsExpanded}
+                aria-controls="sav-panel"
+              >
+                <ChevronExpandIcon
+                  expanded={savingsExpanded}
+                  className="mt-0.5 text-slate-500 banking-dark:text-zinc-400"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block">Ahorro por objetivo</span>
+                  <span className="mt-1 block text-xs font-normal text-slate-500 banking-dark:text-zinc-500">
+                    El saldo es solo un registro tuyo (el dinero real sigue en la cuenta del banco). Al crear la meta, el
+                    saldo inicial queda registrado; después puedes sumar o restar con montos positivos o negativos.
+                  </span>
+                </span>
+              </button>
+            </h2>
             <button type="button" className={`${btnPrimary} shrink-0`} onClick={openNewSavingsModal}>
               Nuevo Objetivo
             </button>
           </div>
 
-          {savingsGoals.length === 0 ? (
-            <p className="text-sm text-slate-500 banking-dark:text-zinc-500">No hay metas de ahorro todavía.</p>
+          {!savingsExpanded ? (
+            <p className="text-sm text-slate-600 banking-dark:text-zinc-400" role="status">
+              <strong>{savingsGoals.length}</strong> meta(s). Pulsa el encabezado para ver las tarjetas y los ajustes.
+            </p>
+          ) : savingsGoals.length === 0 ? (
+            <p id="sav-panel" className="text-sm text-slate-500 banking-dark:text-zinc-500">
+              No hay metas de ahorro todavía.
+            </p>
           ) : (
-            <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <ul id="sav-panel" className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {savingsGoals.map((g) => (
                 <li
                   key={g.id}
