@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date, datetime
 from typing import Literal
 
@@ -620,3 +622,62 @@ class PersonalSavingsGoalPatch(BaseModel):
 
 class PersonalSavingsAdjustBody(BaseModel):
     amount: float = Field(..., description="Suma al saldo seguido (puede ser negativo).")
+
+
+SavingsCalculatorMode = Literal["end_date", "target_amount"]
+
+
+class SavingsCalculatorChartPoint(BaseModel):
+    period_index: int
+    period_label: str
+    cumulative_clp: float
+
+
+class SavingsCalculatorPlanOut(BaseModel):
+    id: int
+    name: str
+    mode: SavingsCalculatorMode
+    start_date: date
+    end_date: date | None = None
+    monthly_amount_clp: float
+    initial_balance_clp: float = Field(0.0, description="Saldo al inicio del primer mes (antes del primer aporte).")
+    target_amount_clp: float | None = None
+    months_count: int | None = Field(None, description="Meses entre inicio y fin (modo por fecha).")
+    total_projected_clp: float | None = Field(None, description="Ahorro acumulado al cierre (modo por fecha).")
+    months_needed: int | None = Field(None, description="Meses necesarios para la meta en $ (modo meta).")
+    total_at_goal_clp: float | None = Field(None, description="Ahorro total tras esos meses (≥ meta).")
+    chart: list[SavingsCalculatorChartPoint]
+
+
+class SavingsCalculatorPlanCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    mode: SavingsCalculatorMode
+    start_date: date
+    end_date: date | None = None
+    monthly_amount_clp: float = Field(..., gt=0)
+    initial_balance_clp: float = Field(0.0, ge=0, description="Saldo inicial antes del primer aporte mensual.")
+    target_amount_clp: float | None = Field(None, gt=0)
+
+    @model_validator(mode="after")
+    def validate_mode_fields(self) -> SavingsCalculatorPlanCreate:
+        if self.mode == "end_date":
+            if self.end_date is None:
+                raise ValueError("En modo por fecha fin, debes indicar la fecha final.")
+            if self.end_date < self.start_date:
+                raise ValueError("La fecha fin no puede ser anterior al inicio.")
+        elif self.mode == "target_amount":
+            if self.target_amount_clp is None:
+                raise ValueError("En modo meta en pesos, debes indicar el monto objetivo.")
+            if self.end_date is not None:
+                raise ValueError("En modo meta en pesos no uses fecha fin (déjala vacía).")
+        return self
+
+
+class SavingsCalculatorPlanPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    mode: SavingsCalculatorMode | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    monthly_amount_clp: float | None = Field(default=None, gt=0)
+    initial_balance_clp: float | None = Field(default=None, ge=0)
+    target_amount_clp: float | None = Field(default=None, gt=0)

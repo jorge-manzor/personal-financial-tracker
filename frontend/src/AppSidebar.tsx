@@ -113,6 +113,27 @@ function IconPersonalOrder({ className }: { className?: string }) {
   );
 }
 
+function IconSavingsCalc({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 7h8M8 11h5M8 15h8" />
+      <path d="M16 7h2M17 6v2" />
+    </svg>
+  );
+}
+
 /** Tooltip al hover: el `title` nativo es poco fiable en enlaces con hijos complejos (React Router). */
 function SidebarTooltip({ label }: { label: string }) {
   return (
@@ -204,6 +225,9 @@ export function AppSidebar({
             </SidebarNavLink>
             <SidebarNavLink to="/banking/personal-order" label="Orden personal">
               <IconPersonalOrder className="shrink-0" />
+            </SidebarNavLink>
+            <SidebarNavLink to="/banking/savings-calculator" label="Calculadora ahorros">
+              <IconSavingsCalc className="shrink-0" />
             </SidebarNavLink>
             <SidebarNavLink to="/banking/settings" label="Cuentas bancarias">
               <IconBankSettings className="shrink-0" />

@@ -42,6 +42,7 @@ from auth import (
     verify_password,
 )
 from banking_personal_order_routes import router as banking_personal_order_router
+from savings_calculator_routes import router as savings_calculator_router
 from banking_routes import router as banking_router
 from database import Base, SessionLocal, engine, get_db
 from exchange_service import (
@@ -794,6 +795,7 @@ app.add_middleware(
 
 app.include_router(banking_router, prefix="/banking", tags=["banking"])
 app.include_router(banking_personal_order_router, prefix="/banking", tags=["banking"])
+app.include_router(savings_calculator_router, prefix="/banking", tags=["banking"])
 
 @app.get("/stock-logos/{symbol}.png")
 def stock_logo_png(symbol: str) -> FileResponse:
@@ -1023,6 +1025,29 @@ def _ensure_banking_personal_provision_amount_clp() -> None:
     logger.info("Migración: banking_personal_provision_items.amount_clp añadida")
 
 
+def _ensure_savings_calculator_initial_balance() -> None:
+    """Planes de calculadora: columna `initial_balance_clp` en despliegues previos."""
+    from sqlalchemy import inspect as sa_inspect
+
+    insp = sa_inspect(engine)
+    if not insp.has_table("savings_calculator_plans"):
+        return
+    cols = {c["name"] for c in insp.get_columns("savings_calculator_plans")}
+    if "initial_balance_clp" in cols:
+        return
+    with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            conn.execute(
+                text(
+                    "ALTER TABLE savings_calculator_plans "
+                    "ADD COLUMN IF NOT EXISTS initial_balance_clp DOUBLE PRECISION NOT NULL DEFAULT 0"
+                )
+            )
+        else:
+            conn.execute(text("ALTER TABLE savings_calculator_plans ADD COLUMN initial_balance_clp FLOAT NOT NULL DEFAULT 0"))
+    logger.info("Migración: savings_calculator_plans.initial_balance_clp añadida")
+
+
 def _ensure_banking_personal_provision_category_label() -> None:
     from sqlalchemy import inspect as sa_inspect
 
@@ -1084,6 +1109,7 @@ def _backfill_personal_provision_category_labels() -> None:
 @app.on_event("startup")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
+    _ensure_savings_calculator_initial_balance()
     _ensure_banking_personal_provision_amount_clp()
     _ensure_banking_personal_provision_category_label()
     _backfill_personal_provision_category_labels()

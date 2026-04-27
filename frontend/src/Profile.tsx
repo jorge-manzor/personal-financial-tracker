@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { patchJson, postJson } from "./api";
 import type { UserMe } from "./types";
@@ -151,6 +151,14 @@ export function Profile({
   const [pwOk, setPwOk] = useState(false);
   const [revealFintualSecrets, setRevealFintualSecrets] = useState(false);
 
+  useEffect(() => {
+    if (window.location.hash !== "#servicios") return;
+    const t = window.setTimeout(() => {
+      document.getElementById("profile-servicios")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => window.clearTimeout(t);
+  }, []);
+
   const inv = me.services.investments;
   const bank = me.services.banking;
 
@@ -285,7 +293,10 @@ export function Profile({
         </button>
       </form>
 
-      <div className="rounded-xl border border-[#30363d] bg-[#161b22] p-5">
+      <div
+        id="profile-servicios"
+        className="scroll-mt-28 rounded-xl border border-[#30363d] bg-[#161b22] p-5"
+      >
         <h3 className="text-sm font-semibold text-white">Servicios</h3>
         <p className="mt-1 text-sm text-[#8b949e]">
           Activa solo lo que uses. El portafolio de inversiones se conecta a Fintual para movimientos y precios.

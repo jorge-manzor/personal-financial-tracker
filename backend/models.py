@@ -317,3 +317,21 @@ class BankingPersonalSavingsAdjustment(Base):
     goal_id = Column(Integer, ForeignKey("banking_personal_savings_goals.id"), nullable=False, index=True)
     amount = Column(Float, nullable=False)
     created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+
+
+class SavingsCalculatorPlan(Base):
+    """Simulación / meta de calculadora de ahorros (sin efecto sobre movimientos bancarios)."""
+
+    __tablename__ = "savings_calculator_plans"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    mode = Column(String(32), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)
+    monthly_amount_clp = Column(Float, nullable=False)
+    initial_balance_clp = Column(Float, nullable=False, default=0.0)
+    target_amount_clp = Column(Float, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+    updated_at = Column(DateTime, nullable=False, default=_naive_utc_now)

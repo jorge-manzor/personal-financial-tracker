@@ -1,10 +1,12 @@
 import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { postJson } from "./api";
 import { setToken } from "./auth";
 
 type Mode = "login" | "register";
 
 export function Login({ onSuccess }: { onSuccess: () => void }) {
+  const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -39,6 +41,9 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
         password,
       });
       setToken(data.access_token);
+      if (mode === "register") {
+        navigate("/profile#servicios", { replace: true });
+      }
       onSuccess();
     } catch (err) {
       if (err instanceof Error && err.message === "401") {
