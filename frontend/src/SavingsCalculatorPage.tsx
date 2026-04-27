@@ -194,9 +194,12 @@ function PlanChart({ plan, isDark }: { plan: SavingsCalculatorPlanOut; isDark: b
               fontSize: "12px",
               color: isDark ? "#f4f4f5" : "#0f172a",
             }}
-            formatter={(value: number | undefined) =>
-              value !== undefined ? [formatClpDots(value), "Acumulado"] : ["", ""]
-            }
+            formatter={(value) => {
+              if (value === undefined || value === null) return ["", ""];
+              const num = typeof value === "number" ? value : Number(value);
+              if (!Number.isFinite(num)) return ["", ""];
+              return [formatClpDots(num), "Acumulado"];
+            }}
             labelFormatter={(label) => String(label)}
           />
           <Line type="monotone" dataKey="clp" stroke={stroke} strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
