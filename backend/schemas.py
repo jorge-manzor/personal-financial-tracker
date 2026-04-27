@@ -566,3 +566,57 @@ class BankingBulkReverseProvisionBody(BaseModel):
 
 class BankingBulkReverseProvisionOut(BaseModel):
     created: int
+
+
+class PersonalProvisionItemOut(BaseModel):
+    id: int
+    description: str
+    account_id: int | None = None
+    account_name: str | None = None
+    category_label: str | None = Field(None, description="Etiqueta libre del usuario (no es categoría bancaria).")
+    amount_clp: float | None = Field(None, description="Monto orientativo en CLP (solo orden personal).")
+    paid: bool
+    sort_order: int
+
+
+class PersonalProvisionItemCreate(BaseModel):
+    description: str = Field(..., min_length=1, max_length=4000)
+    account_id: int | None = None
+    category_label: str | None = Field(None, max_length=255, description="Texto libre para agrupar o filtrar.")
+    amount_clp: float | None = Field(None, description="Monto orientativo en CLP (opcional).")
+
+
+class PersonalProvisionItemPatch(BaseModel):
+    description: str | None = Field(default=None, min_length=1, max_length=4000)
+    account_id: int | None = None
+    category_label: str | None = Field(None, max_length=255)
+    amount_clp: float | None = None
+    paid: bool | None = None
+    sort_order: int | None = None
+
+
+class PersonalProvisionReorderBody(BaseModel):
+    item_ids: list[int] = Field(..., min_length=1, description="Orden deseado: primer id = primero en la lista.")
+
+
+class PersonalSavingsGoalOut(BaseModel):
+    id: int
+    title: str
+    account_id: int
+    account_name: str
+    balance_clp: float
+
+
+class PersonalSavingsGoalCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=512)
+    account_id: int = Field(..., ge=1)
+    initial_balance_clp: float = Field(0.0, description="Saldo inicial al crear la meta.")
+
+
+class PersonalSavingsGoalPatch(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=512)
+    account_id: int | None = Field(default=None, ge=1)
+
+
+class PersonalSavingsAdjustBody(BaseModel):
+    amount: float = Field(..., description="Suma al saldo seguido (puede ser negativo).")

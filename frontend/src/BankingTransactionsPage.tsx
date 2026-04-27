@@ -435,16 +435,16 @@ function BankingAccountBalanceCard({
 
   return (
     <div
-      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-slate-300/95 bg-gradient-to-br from-slate-50/95 via-white to-sky-50/35 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-slate-300/50 banking-dark:border-zinc-700/80 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-zinc-950 banking-dark:shadow-[0_6px_28px_-12px_rgba(0,0,0,0.55)] banking-dark:ring-amber-950/25 ${
+      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-slate-300/95 bg-gradient-to-br from-slate-50/95 via-white to-sky-50/35 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-slate-300/50 banking-dark:border-zinc-600 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-zinc-950 banking-dark:shadow-[0_8px_32px_-14px_rgba(0,0,0,0.65)] banking-dark:ring-amber-900/35 ${
         inactive ? "opacity-[0.88]" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-1.5">
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200/95 ring-1 ring-slate-300/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-zinc-600 banking-dark:shadow-none"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200/95 ring-1 ring-slate-300/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-zinc-500/80 banking-dark:shadow-none"
           aria-hidden
         >
-          <svg className="h-4 w-4 text-slate-700 banking-dark:text-amber-200/75" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 text-slate-700 banking-dark:text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -452,15 +452,15 @@ function BankingAccountBalanceCard({
             />
           </svg>
         </div>
-        <span className="max-w-[55%] shrink-0 truncate rounded-full bg-slate-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-700 ring-1 ring-slate-300/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-200/85 banking-dark:ring-amber-950/50">
+        <span className="max-w-[55%] shrink-0 truncate rounded-full bg-slate-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-700 ring-1 ring-slate-300/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-300 banking-dark:ring-amber-800/45">
           {bankingProductBadgeLabel(a.product_type)}
         </span>
       </div>
 
-      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-200">{a.name}</p>
+      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-100">{a.name}</p>
 
       <p
-        className="mt-1.5 text-lg font-semibold tabular-nums tracking-tight text-slate-800 banking-dark:text-zinc-100"
+        className="mt-1.5 text-lg font-semibold tabular-nums tracking-tight text-slate-800 banking-dark:text-zinc-50"
         title={
           liquid
             ? `Saldo real (libro): incluye provisiones en el saldo libro; menos cargos en TC no pagados asociados a esta cuenta (${formatClpDots(unpaidCut)}).`
@@ -469,14 +469,14 @@ function BankingAccountBalanceCard({
       >
         {formatClpDots(saldoReal)}
       </p>
-      <div className="mt-1 border-t border-slate-300 pt-1 banking-dark:border-zinc-700">
+      <div className="mt-1 border-t border-slate-300 pt-1 banking-dark:border-zinc-600/90">
         <div
           className={`grid gap-x-2 gap-y-0 leading-none ${unpaidCut > 0 ? "grid-cols-3" : "grid-cols-2"}`}
         >
           <div className="min-w-0">
             <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Saldo actual</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-600 banking-dark:text-zinc-200"
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-600 banking-dark:text-zinc-100"
               title="Efectivo en cuenta (libro menos neto de Provisiones)."
             >
               {formatClpDots(atBank)}
@@ -486,7 +486,7 @@ function BankingAccountBalanceCard({
             <div className="min-w-0 text-right">
               <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Deuda TC</p>
               <p
-                className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400/85"
+                className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400"
                 title="Cargos en tarjeta(s) asociada(s) a esta cuenta marcados como no pagados."
               >
                 {formatClpDots(unpaidCut)}
@@ -496,7 +496,7 @@ function BankingAccountBalanceCard({
           <div className="min-w-0 text-right">
             <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Provisiones</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400/85"
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400"
               title="Monto neto en categoría Provisiones (reversas netean)."
             >
               {formatClpDots(Math.abs(prov))}
@@ -530,25 +530,25 @@ function BankingNonCreditTotalBalanceCard({
 
   return (
     <div
-      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-emerald-300/85 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/50 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-emerald-200/65 banking-dark:border-amber-950/35 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-amber-950/[0.12] banking-dark:shadow-[0_6px_28px_-12px_rgba(0,0,0,0.55)] banking-dark:ring-amber-950/30 ${
+      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-emerald-300/85 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/50 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-emerald-200/65 banking-dark:border-zinc-600 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-amber-950/[0.14] banking-dark:shadow-[0_8px_32px_-14px_rgba(0,0,0,0.65)] banking-dark:ring-amber-900/35 ${
         inactive ? "opacity-[0.88]" : ""
       }`}
     >
       <div className="flex items-start justify-between gap-1.5">
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-200/90 ring-1 ring-emerald-300/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-amber-950/40 banking-dark:shadow-none"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-200/90 ring-1 ring-emerald-300/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-amber-800/45 banking-dark:shadow-none"
           aria-hidden
         >
-          <svg className="h-4 w-4 text-emerald-800/90 banking-dark:text-amber-200/75" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 text-emerald-800/90 banking-dark:text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-emerald-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-900/85 ring-1 ring-emerald-300/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-200/90 banking-dark:ring-amber-950/45">
+        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-emerald-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-900/85 ring-1 ring-emerald-300/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-300 banking-dark:ring-amber-800/45">
           Total
         </span>
       </div>
 
-      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-200">Saldo real</p>
+      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-100">Saldo real</p>
 
       <p
         className="mt-1.5 text-lg font-semibold tabular-nums tracking-tight text-slate-800 banking-dark:text-zinc-50"
@@ -556,14 +556,14 @@ function BankingNonCreditTotalBalanceCard({
       >
         {formatClpDots(totalReal)}
       </p>
-      <div className="mt-1 border-t border-emerald-400/75 pt-1 banking-dark:border-zinc-700">
+      <div className="mt-1 border-t border-emerald-400/75 pt-1 banking-dark:border-zinc-600/90">
         <div
           className={`grid gap-x-2 gap-y-0 leading-none ${unpaidLinked > 0 ? "grid-cols-3" : "grid-cols-2"}`}
         >
           <div className="min-w-0">
             <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Saldo actual</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-700 banking-dark:text-zinc-200"
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-700 banking-dark:text-zinc-100"
               title="Suma de saldos «en banco» solo en cuentas incluidas en el total (sin efecto neto de Provisiones)."
             >
               {formatClpDots(totalAtBank)}
@@ -573,7 +573,7 @@ function BankingNonCreditTotalBalanceCard({
             <div className="min-w-0 text-right">
               <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Deuda TC</p>
               <p
-                className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400/85"
+                className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400"
                 title="Suma de cargos TC no pagados solo si la cuenta corriente de liquidación está incluida en el total (Configuración)."
               >
                 {formatClpDots(unpaidLinked)}
@@ -583,7 +583,7 @@ function BankingNonCreditTotalBalanceCard({
           <div className="min-w-0 text-right">
             <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Provisiones</p>
             <p
-              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400/85"
+              className="mt-0.5 truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400"
               title="Suma del valor absoluto del neto en Provisiones solo en cuentas incluidas en el total."
             >
               {formatClpDots(provisionSumDisplay)}
@@ -597,7 +597,7 @@ function BankingNonCreditTotalBalanceCard({
 
 /** Deuda pago compartido — gradiente violeta muy suave, alineado al resto de tarjetas de saldo. */
 const BANKING_SHARED_DEBT_CARD_CLASS =
-  "flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-slate-300/95 bg-gradient-to-br from-slate-50/95 via-white to-violet-50/40 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-slate-300/50 backdrop-blur-sm banking-dark:border-zinc-700/80 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-amber-950/[0.08] banking-dark:shadow-[0_6px_28px_-12px_rgba(0,0,0,0.55)] banking-dark:ring-amber-950/22";
+  "flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-slate-300/95 bg-gradient-to-br from-slate-50/95 via-white to-violet-50/40 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-slate-300/50 backdrop-blur-sm banking-dark:border-zinc-600 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-amber-950/[0.1] banking-dark:shadow-[0_8px_32px_-14px_rgba(0,0,0,0.65)] banking-dark:ring-amber-900/35";
 
 /** Gastos compartidos sin liquidar: suma de la parte por persona (|monto| ÷ participantes). */
 function BankingSharedUnsettledDebtCard({ amountClp }: { amountClp: number }) {
@@ -606,10 +606,10 @@ function BankingSharedUnsettledDebtCard({ amountClp }: { amountClp: number }) {
     <div className={`${BANKING_SHARED_DEBT_CARD_CLASS} ${inactive ? "opacity-[0.88]" : ""}`}>
       <div className="flex items-start justify-between gap-1.5">
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-200/90 ring-1 ring-violet-300/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-amber-950/35 banking-dark:shadow-none"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-200/90 ring-1 ring-violet-300/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-amber-800/45 banking-dark:shadow-none"
           aria-hidden
         >
-          <svg className="h-4 w-4 text-violet-900/80 banking-dark:text-amber-200/75" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 text-violet-900/80 banking-dark:text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -617,11 +617,11 @@ function BankingSharedUnsettledDebtCard({ amountClp }: { amountClp: number }) {
             />
           </svg>
         </div>
-        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-violet-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-900/85 ring-1 ring-violet-300/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-200/88 banking-dark:ring-amber-950/45">
+        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-violet-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-violet-900/85 ring-1 ring-violet-300/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-300 banking-dark:ring-amber-800/45">
           Compartido
         </span>
       </div>
-      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-200">Deuda Pago Compartido</p>
+      <p className="mt-2 line-clamp-2 min-h-[2rem] text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-100">Deuda Pago Compartido</p>
       <p
         className="mt-1.5 text-lg font-semibold tabular-nums tracking-tight text-slate-800 banking-dark:text-zinc-50"
         title="Suma de |monto| ÷ número de participantes en cada movimiento compartido sin liquidar. Equivale a sumar lo que corresponde por persona en cada gasto (reparto equitativo)."

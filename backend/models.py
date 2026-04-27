@@ -271,3 +271,49 @@ class BankingTransaction(Base):
     accounting_month = Column(Date, nullable=True, index=True)
     # Movimiento gemelo (transferencia entre cuentas propias): id del otro apunte.
     peer_transaction_id = Column(Integer, nullable=True, index=True)
+
+
+class BankingPersonalProvisionItem(Base):
+    """
+    Recordatorio personal de qué provisionar (no crea movimientos bancarios).
+    """
+
+    __tablename__ = "banking_personal_provision_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    description = Column(Text, nullable=False)
+    account_id = Column(Integer, ForeignKey("banking_accounts.id"), nullable=True, index=True)
+    category_id = Column(Integer, ForeignKey("banking_categories.id"), nullable=True, index=True)
+    subcategory_id = Column(Integer, ForeignKey("banking_subcategories.id"), nullable=True, index=True)
+    category_label = Column(String(255), nullable=True)
+    amount_clp = Column(Float, nullable=True)
+    paid = Column(Boolean, nullable=False, default=False)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+    updated_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+
+
+class BankingPersonalSavingsGoal(Base):
+    """Meta de ahorro informal (saldo seguido aparte del libro bancario)."""
+
+    __tablename__ = "banking_personal_savings_goals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey("banking_accounts.id"), nullable=False, index=True)
+    title = Column(String(512), nullable=False)
+    balance_clp = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+    updated_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+
+
+class BankingPersonalSavingsAdjustment(Base):
+    """Movimiento sobre el saldo seguido de una meta de ahorro (incluye saldo inicial)."""
+
+    __tablename__ = "banking_personal_savings_adjustments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    goal_id = Column(Integer, ForeignKey("banking_personal_savings_goals.id"), nullable=False, index=True)
+    amount = Column(Float, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=_naive_utc_now)

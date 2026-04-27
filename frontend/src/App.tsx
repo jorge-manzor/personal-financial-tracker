@@ -36,6 +36,9 @@ const BankingTransactionsPage = lazy(() =>
 const BankingSettingsPage = lazy(() =>
   import("./BankingSettingsPage").then((m) => ({ default: m.BankingSettingsPage })),
 );
+const BankingPersonalOrderPage = lazy(() =>
+  import("./BankingPersonalOrderPage").then((m) => ({ default: m.BankingPersonalOrderPage })),
+);
 
 function RoutePageFallback() {
   return (
@@ -474,6 +477,12 @@ export default function App() {
                 path="/banking/settings"
                 element={
                   bankingOn ? <BankingSettingsPage onToast={setToast} /> : <Navigate to="/" replace />
+                }
+              />
+              <Route
+                path="/banking/personal-order"
+                element={
+                  bankingOn ? <BankingPersonalOrderPage onToast={setToast} /> : <Navigate to="/" replace />
                 }
               />
             </Routes>

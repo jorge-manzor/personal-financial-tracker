@@ -112,8 +112,10 @@ function BankingEnabledToggle({
         e.stopPropagation();
         if (!disabled) onChange(!enabled);
       }}
-      className={`inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border p-[3px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 ${
-        enabled ? "justify-end border-teal-400 bg-teal-500 shadow-sm" : "justify-start border-slate-300 bg-slate-100"
+      className={`inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border p-[3px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white banking-dark:focus-visible:ring-amber-500/40 banking-dark:focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 ${
+        enabled
+          ? "justify-end border-teal-400 bg-teal-500 shadow-sm banking-dark:border-amber-600 banking-dark:bg-amber-600"
+          : "justify-start border-slate-300 bg-slate-100 banking-dark:border-zinc-600 banking-dark:bg-zinc-800"
       }`}
     >
       <span className="pointer-events-none block h-3.5 w-3.5 shrink-0 rounded-full bg-white shadow" />
@@ -125,18 +127,20 @@ function BankingEnabledToggle({
 function CategoryDragPreview({ cat, expanded }: { cat: BankingCategoryRow; expanded: boolean }) {
   return (
     <div
-      className="pointer-events-none box-border w-full min-w-[min(100%,42rem)] max-w-full cursor-grabbing overflow-hidden rounded-xl border border-teal-200 bg-white shadow-2xl shadow-teal-900/15 ring-2 ring-teal-200/80"
+      className="pointer-events-none box-border w-full min-w-[min(100%,42rem)] max-w-full cursor-grabbing overflow-hidden rounded-xl border border-teal-200 bg-white shadow-2xl shadow-teal-900/15 ring-2 ring-teal-200/80 banking-dark:border-amber-700/40 banking-dark:bg-zinc-900 banking-dark:shadow-black/40 banking-dark:ring-amber-600/25"
       style={softCategorySurface(cat.color)}
     >
       <div className="flex items-center gap-2 px-4 py-2.5">
-        <IconGripVertical className="h-4 w-4 shrink-0 text-slate-500" />
+        <IconGripVertical className="h-4 w-4 shrink-0 text-slate-500 banking-dark:text-zinc-400" />
         <span className="min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: cat.color }}>
           {cat.name}
         </span>
-        <span className="shrink-0 text-xs text-slate-500">({cat.subcategories.length})</span>
+        <span className="shrink-0 text-xs text-slate-500 banking-dark:text-zinc-400">
+          ({cat.subcategories.length})
+        </span>
       </div>
       {expanded ? (
-        <div className="border-t border-slate-300 px-4 py-2.5 text-[11px] leading-relaxed text-slate-500">
+        <div className="border-t border-slate-300 px-4 py-2.5 text-[11px] leading-relaxed text-slate-500 banking-dark:border-zinc-600 banking-dark:text-zinc-400">
           {cat.subcategories.length} subcategorías · arrastra el asa ⋮⋮ para orden (también en movimientos)
         </div>
       ) : null}
@@ -295,7 +299,7 @@ const btnGreenBanking =
   "rounded-xl border border-teal-400/80 bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:from-teal-600 hover:to-emerald-600 disabled:opacity-50 banking-dark:border-amber-600/45 banking-dark:bg-gradient-to-r banking-dark:from-amber-600 banking-dark:to-amber-500 banking-dark:text-zinc-950 banking-dark:hover:from-amber-500 banking-dark:hover:to-amber-400 banking-dark:hover:border-amber-500/50";
 
 const iconBtn =
-  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 disabled:opacity-40 banking-dark:text-zinc-500 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200/90";
+  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 disabled:opacity-40 banking-dark:text-zinc-400 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200";
 const iconBtnDanger = `${iconBtn} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 banking-dark:hover:border-rose-900 banking-dark:hover:bg-rose-950/40 banking-dark:hover:text-rose-300`;
 
 const selectFieldClass =
@@ -303,6 +307,18 @@ const selectFieldClass =
 
 const bankingSettingsCardClass =
   "rounded-xl border border-slate-300 bg-white p-5 shadow-sm banking-dark:border-zinc-700 banking-dark:bg-zinc-950 banking-dark:shadow-none";
+
+/** Ayudas y etiquetas: legibles sobre zinc-950 / zinc-900. */
+const settingsMuted = "text-slate-500 banking-dark:text-zinc-400";
+const settingsGhostBtn =
+  "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50 banking-dark:border-zinc-500 banking-dark:bg-zinc-900 banking-dark:text-zinc-100 banking-dark:hover:border-zinc-400 banking-dark:hover:bg-zinc-800";
+
+const settingsGhostBtnSm =
+  "shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50 banking-dark:border-zinc-500 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-800";
+
+/** Asa de arrastre / chevron en filas de categoría. */
+const categoryHandleHover =
+  "text-slate-500 hover:bg-teal-50 hover:text-teal-800 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200";
 
 const PRODUCT_TYPE_OPTIONS: { value: BankingProductType; label: string }[] = [
   { value: "cuenta_corriente", label: "Cuenta Corriente" },
@@ -805,7 +821,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
         <h2 className="text-lg font-semibold text-slate-900 banking-dark:text-zinc-100">Configuración bancaria</h2>
-        <p className="mt-1 text-sm text-slate-500 banking-dark:text-zinc-500">
+        <p className="mt-1 text-sm text-slate-500 banking-dark:text-zinc-400">
           Productos (cuentas) y categorías del catálogo del servidor. Activa las categorías y subcategorías que quieras
           usar en movimientos manuales; personaliza el color y el orden con el asa (⋮⋮). Al final verás categorías de
           uso interno (siempre activas, sin interruptor).
@@ -820,7 +836,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
             <h3 id="banking-accounts-heading" className="text-base font-semibold text-slate-900 banking-dark:text-zinc-100">
               Productos
             </h3>
-            <p className="mt-1 text-sm text-slate-500 banking-dark:text-zinc-500">
+            <p className="mt-1 text-sm text-slate-500 banking-dark:text-zinc-400">
               Activa la visibilidad en «Nuevo movimiento» y, en cuentas líquidas, si suman en el «Saldo real» del
               resumen en Movimientos (excluye respaldos o cuentas transitorias). El saldo se gestiona en el backend.
             </p>
@@ -834,16 +850,19 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
 
         <div className={bankingSettingsCardClass}>
           {loading ? (
-            <p className="text-sm text-slate-500">Cargando…</p>
+            <p className={`text-sm ${settingsMuted}`}>Cargando…</p>
           ) : accounts.length === 0 ? (
-            <p className="text-sm text-slate-500">No hay productos todavía. Usa «Agregar producto».</p>
+            <p className={`text-sm ${settingsMuted}`}>No hay productos todavía. Usa «Agregar producto».</p>
           ) : (
-            <ul className="space-y-0 divide-y divide-slate-100" role="list">
+            <ul
+              className="space-y-0 divide-y divide-slate-100 banking-dark:divide-zinc-800"
+              role="list"
+            >
               {accounts.map((a) => (
                 <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800">{a.name}</p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-sm font-medium text-slate-800 banking-dark:text-zinc-100">{a.name}</p>
+                    <p className={`text-xs ${settingsMuted}`}>
                       {productTypeLabel(a.product_type)}
                       {a.bank_name ? ` · ${a.bank_name}` : ""}
                       {a.product_type === "tarjeta_credito" && a.linked_checking_account_name
@@ -860,7 +879,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                       }}
                     >
                       <span
-                        className="max-w-[3.25rem] shrink-0 text-[10px] leading-tight text-slate-500"
+                        className={`max-w-[3.25rem] shrink-0 text-[10px] leading-tight ${settingsMuted}`}
                         title="Visible al registrar movimientos"
                       >
                         Activa
@@ -886,7 +905,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                         }}
                       >
                         <span
-                          className="max-w-[3.25rem] shrink-0 text-[10px] leading-tight text-slate-500"
+                          className={`max-w-[3.25rem] shrink-0 text-[10px] leading-tight ${settingsMuted}`}
                           title="Incluir en saldo total del resumen en Movimientos"
                         >
                           En total
@@ -936,10 +955,13 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
       <section className="space-y-4" aria-labelledby="banking-categories-heading">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h3 id="banking-categories-heading" className="text-base font-semibold text-slate-900">
+            <h3
+              id="banking-categories-heading"
+              className="text-base font-semibold text-slate-900 banking-dark:text-zinc-100"
+            >
               Categorías y subcategorías
             </h3>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className={`mt-1 text-sm ${settingsMuted}`}>
               Categorías iniciales desde el servidor; puedes añadir las tuyas, editar nombre y color (salvo plantilla
               fijada) y crear subcategorías en cualquier categoría manual o de plantilla. Las subcategorías propias se
               pueden renombrar aunque la categoría esté fijada por plantilla. El interruptor controla visibilidad en
@@ -962,9 +984,9 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
 
         <div className={bankingSettingsCardClass}>
           {newCategoryForm ? (
-            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-dashed border-teal-200 bg-teal-50/50 p-4 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-dashed border-teal-200 bg-teal-50/50 p-4 banking-dark:border-teal-900/45 banking-dark:bg-teal-950/35 sm:flex-row sm:flex-wrap sm:items-end">
               <label className="min-w-[12rem] flex-1 text-sm">
-                <span className="text-xs text-slate-500">Nombre</span>
+                <span className={`text-xs ${settingsMuted}`}>Nombre</span>
                 <input
                   type="text"
                   value={newCategoryForm.name}
@@ -975,12 +997,12 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                 />
               </label>
               <label className="flex shrink-0 items-center gap-2">
-                <span className="text-xs text-slate-500">Color</span>
+                <span className={`text-xs ${settingsMuted}`}>Color</span>
                 <input
                   type="color"
                   value={newCategoryForm.color}
                   onChange={(e) => setNewCategoryForm({ ...newCategoryForm, color: e.target.value })}
-                  className="h-10 w-14 cursor-pointer rounded-lg border border-slate-300 bg-white p-1 shadow-sm"
+                  className="h-10 w-14 cursor-pointer rounded-lg border border-slate-300 bg-white p-1 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-900"
                   title="Color de la categoría"
                 />
               </label>
@@ -997,7 +1019,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                   type="button"
                   disabled={busyKey !== null}
                   onClick={() => setNewCategoryForm(null)}
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50"
+                  className={settingsGhostBtn}
                 >
                   Cancelar
                 </button>
@@ -1005,9 +1027,9 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
             </div>
           ) : null}
           {loading ? (
-            <p className="text-sm text-slate-500">Cargando categorías…</p>
+            <p className={`text-sm ${settingsMuted}`}>Cargando categorías…</p>
           ) : categories.length === 0 ? (
-            <p className="text-sm text-slate-500">
+            <p className={`text-sm ${settingsMuted}`}>
               No hay categorías disponibles. Comprueba que exista el archivo de catálogo en el servidor.
             </p>
           ) : (
@@ -1024,7 +1046,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                     <SortableCategoryWrapper key={cat.id} id={cat.id} disabled={busyKey !== null}>
                       {(handle) => (
                         <details
-                          className="group overflow-hidden rounded-xl border border-slate-300/80 bg-white/70"
+                          className="group overflow-hidden rounded-xl border border-slate-300/80 bg-white/70 banking-dark:border-zinc-600 banking-dark:bg-zinc-900/50"
                           style={softCategorySurface(cat.color)}
                           open={expandedCategoryIds.has(cat.id)}
                           onToggle={(e) => {
@@ -1037,7 +1059,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                             });
                           }}
                         >
-                          <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-slate-300/80 px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
+                          <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-slate-300/80 px-3 py-2.5 marker:content-none banking-dark:border-zinc-600 sm:px-4 [&::-webkit-details-marker]:hidden">
                             <CategoryDragHandleButton
                               setActivatorNodeRef={handle.setActivatorNodeRef}
                               attributes={handle.attributes}
@@ -1045,14 +1067,14 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                               disabled={busyKey !== null}
                               title="Arrastrar para reordenar"
                               aria-label="Arrastrar para reordenar categoría"
-                              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 text-slate-500 hover:bg-teal-50 hover:text-teal-800 active:cursor-grabbing ${
+                              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 ${categoryHandleHover} active:cursor-grabbing ${
                                 busyKey !== null ? "cursor-not-allowed opacity-40" : "cursor-grab"
                               }`}
                             >
                               <IconGripVertical className="block h-4 w-4" />
                             </CategoryDragHandleButton>
                     <span
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition-transform duration-200 group-open:rotate-180"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 banking-dark:text-zinc-400 transition-transform duration-200 group-open:rotate-180"
                       aria-hidden
                     >
                       <IconChevronDown className="block h-4 w-4" />
@@ -1062,7 +1084,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                       <>
                         <input
                           type="text"
-                          className="min-w-[10rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25"
+                          className="min-w-[10rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-100 banking-dark:focus:border-amber-600/55 banking-dark:focus:ring-amber-500/20"
                           value={categoryFullEdit.name}
                           onChange={(e) =>
                             setCategoryFullEdit({ ...categoryFullEdit, name: e.target.value })
@@ -1070,7 +1092,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           onClick={(e) => e.stopPropagation()}
                           aria-label="Nombre de categoría"
                         />
-                        <span className="shrink-0 text-xs text-slate-500">({cat.subcategories.length})</span>
+                        <span className={`shrink-0 text-xs ${settingsMuted}`}>({cat.subcategories.length})</span>
                         <div
                           className={`flex shrink-0 items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
                           onClick={(e) => {
@@ -1096,7 +1118,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           onChange={(e) =>
                             setCategoryFullEdit({ ...categoryFullEdit, color: e.target.value })
                           }
-                          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm"
+                          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-900"
                           title="Color"
                           onClick={(e) => e.stopPropagation()}
                         />
@@ -1120,7 +1142,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                             e.stopPropagation();
                             setCategoryFullEdit(null);
                           }}
-                          className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50"
+                          className={settingsGhostBtnSm}
                         >
                           Cancelar
                         </button>
@@ -1143,11 +1165,11 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                     ) : categoryEdit?.id === cat.id ? (
                       <>
                         <p
-                          className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800"
+                          className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800 banking-dark:text-zinc-100"
                           style={{ color: cat.color }}
                         >
                           {cat.name}{" "}
-                          <span className="font-normal text-slate-500">({cat.subcategories.length})</span>
+                          <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
                         </p>
                         <div
                           className={`flex shrink-0 items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
@@ -1172,7 +1194,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           type="color"
                           value={categoryEdit.color}
                           onChange={(e) => setCategoryEdit({ ...categoryEdit, color: e.target.value })}
-                          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm"
+                          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-900"
                           title="Color"
                           onClick={(e) => e.stopPropagation()}
                         />
@@ -1196,7 +1218,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                             e.stopPropagation();
                             setCategoryEdit(null);
                           }}
-                          className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50"
+                          className={settingsGhostBtnSm}
                         >
                           Cancelar
                         </button>
@@ -1204,11 +1226,11 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                     ) : (
                       <>
                         <p
-                          className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800"
+                          className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800 banking-dark:text-zinc-100"
                           style={{ color: cat.color }}
                         >
                           {cat.name}{" "}
-                          <span className="font-normal text-slate-500">({cat.subcategories.length})</span>
+                          <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
                         </p>
                         <div className="ml-auto flex h-8 shrink-0 items-center gap-2">
                           <div
@@ -1284,8 +1306,8 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                 <div
                                   className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2 py-2 text-xs ${
                                     parentEnabled
-                                      ? "border-slate-300 bg-slate-50/90 text-slate-700"
-                                      : "cursor-not-allowed border-slate-300 bg-slate-100/80 text-slate-500"
+                                      ? "border-slate-300 bg-slate-50/90 text-slate-700 banking-dark:border-zinc-600 banking-dark:bg-zinc-900/65 banking-dark:text-zinc-200"
+                                      : "cursor-not-allowed border-slate-300 bg-slate-100/80 text-slate-500 banking-dark:border-zinc-700 banking-dark:bg-zinc-900/40 banking-dark:text-zinc-500"
                                   }`}
                                   aria-disabled={!parentEnabled}
                                 >
@@ -1297,7 +1319,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                       disabled={dragDisabled}
                                       title="Arrastrar para reordenar subcategorías"
                                       aria-label="Arrastrar para reordenar subcategoría"
-                                      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 text-slate-500 hover:bg-teal-50 hover:text-teal-800 active:cursor-grabbing ${
+                                      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 ${categoryHandleHover} active:cursor-grabbing ${
                                         dragDisabled ? "cursor-not-allowed opacity-40" : "cursor-grab"
                                       }`}
                                     >
@@ -1306,7 +1328,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                     {bankingSubcategoryAllowsRename(cat, s) && subNameEdit?.id === s.id ? (
                                       <input
                                         type="text"
-                                        className="min-w-0 flex-1 rounded border border-teal-300 bg-white px-1.5 py-1 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-teal-400/35"
+                                        className="min-w-0 flex-1 rounded border border-teal-300 bg-white px-1.5 py-1 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-teal-400/35 banking-dark:border-amber-600/45 banking-dark:bg-zinc-900 banking-dark:text-zinc-100 banking-dark:focus:ring-amber-500/25"
                                         value={subNameEdit.name}
                                         onChange={(e) =>
                                           setSubNameEdit({ ...subNameEdit, name: e.target.value })
@@ -1315,7 +1337,9 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                         aria-label="Nombre de subcategoría"
                                       />
                                     ) : (
-                                      <span className={`min-w-0 flex-1 ${!parentEnabled ? "text-slate-500" : ""}`}>
+                                      <span
+                                        className={`min-w-0 flex-1 ${!parentEnabled ? `${settingsMuted}` : ""}`}
+                                      >
                                         {s.name}
                                       </span>
                                     )}
@@ -1323,7 +1347,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                       <button
                                         type="button"
                                         title="Renombrar subcategoría"
-                                        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-teal-50 hover:text-teal-800"
+                                        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${categoryHandleHover}`}
                                         disabled={busyKey !== null || !parentEnabled}
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -1349,7 +1373,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                         <button
                                           type="button"
                                           disabled={busyKey !== null}
-                                          className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50"
+                                          className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-800 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-700"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             setSubNameEdit(null);
@@ -1390,11 +1414,11 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           );
                         })}
                       </SortableContext>
-                      <li className="mt-2 flex list-none flex-wrap items-center gap-2 border-t border-slate-300 pt-3">
+                      <li className="mt-2 flex list-none flex-wrap items-center gap-2 border-t border-slate-300 pt-3 banking-dark:border-zinc-700">
                         <input
                           type="text"
                           placeholder="Nueva subcategoría…"
-                          className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
+                          className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-600/50 banking-dark:focus:ring-amber-500/15"
                           value={newSubDraft[cat.id] ?? ""}
                           onChange={(e) =>
                             setNewSubDraft((d) => ({ ...d, [cat.id]: e.target.value }))
@@ -1423,7 +1447,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                   ))}
               </SortableContext>
               {reservedCategories.length > 0 ? (
-                <p className="text-xs leading-relaxed text-slate-500">
+                <p className={`text-xs leading-relaxed ${settingsMuted}`}>
                   Categorías reservadas para la aplicación (siempre activas; no aparecen al agregar movimientos a mano). El
                   color sí se puede personalizar.
                 </p>
@@ -1431,7 +1455,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
               {reservedCategories.map((cat) => (
                 <div key={cat.id}>
                   <details
-                    className="group overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50/50"
+                    className="group overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50/50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900/35"
                     style={softCategorySurface(cat.color)}
                     open={expandedCategoryIds.has(cat.id)}
                     onToggle={(e) => {
@@ -1444,10 +1468,10 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                       });
                     }}
                   >
-                    <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-slate-300/80 px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-slate-300/80 px-3 py-2.5 marker:content-none banking-dark:border-zinc-600 sm:px-4 [&::-webkit-details-marker]:hidden">
                       <span className="inline-flex h-8 w-8 shrink-0" aria-hidden />
                       <span
-                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 transition-transform duration-200 group-open:rotate-180"
+                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 banking-dark:text-zinc-400 transition-transform duration-200 group-open:rotate-180"
                         aria-hidden
                       >
                         <IconChevronDown className="block h-4 w-4" />
@@ -1456,14 +1480,14 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                         {categoryEdit?.id === cat.id ? (
                           <>
                             <p
-                              className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800"
+                              className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800 banking-dark:text-zinc-100"
                               style={{ color: cat.color }}
                             >
                               {cat.name}{" "}
-                              <span className="font-normal text-slate-500">({cat.subcategories.length})</span>
+                              <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
                             </p>
                             <span
-                              className="shrink-0 rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-slate-500"
+                              className={`shrink-0 rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide banking-dark:border-zinc-600 banking-dark:bg-zinc-800 ${settingsMuted}`}
                               title="No se puede desactivar; la app usa estas categorías internamente."
                             >
                               Siempre activa
@@ -1472,7 +1496,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                               type="color"
                               value={categoryEdit.color}
                               onChange={(e) => setCategoryEdit({ ...categoryEdit, color: e.target.value })}
-                              className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm"
+                              className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-900"
                               title="Color"
                               onClick={(e) => e.stopPropagation()}
                             />
@@ -1496,7 +1520,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                 e.stopPropagation();
                                 setCategoryEdit(null);
                               }}
-                              className="shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50"
+                              className={settingsGhostBtnSm}
                             >
                               Cancelar
                             </button>
@@ -1504,15 +1528,15 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                         ) : (
                           <>
                             <p
-                              className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800"
+                              className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800 banking-dark:text-zinc-100"
                               style={{ color: cat.color }}
                             >
                               {cat.name}{" "}
-                              <span className="font-normal text-slate-500">({cat.subcategories.length})</span>
+                              <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
                             </p>
                             <div className="ml-auto flex h-8 shrink-0 items-center gap-2">
                               <span
-                                className="shrink-0 rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-slate-500"
+                                className={`shrink-0 rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide banking-dark:border-zinc-600 banking-dark:bg-zinc-800 ${settingsMuted}`}
                                 title="No se puede desactivar; la app usa estas categorías internamente."
                               >
                                 Siempre activa
@@ -1549,7 +1573,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                             return (
                               <SortableSubcategoryWrapper key={s.id} subId={s.id} disabled={dragDisabled}>
                                 {(handle) => (
-                                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs text-slate-600 shadow-sm">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs text-slate-600 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-900/70 banking-dark:text-zinc-300">
                                     <div className="flex min-w-0 flex-1 items-center gap-2">
                                       <CategoryDragHandleButton
                                         setActivatorNodeRef={handle.setActivatorNodeRef}
@@ -1558,7 +1582,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                         disabled={dragDisabled}
                                         title="Arrastrar para reordenar subcategorías"
                                         aria-label="Arrastrar para reordenar subcategoría"
-                                        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 text-slate-500 hover:bg-teal-50 hover:text-teal-800 active:cursor-grabbing ${
+                                        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 ${categoryHandleHover} active:cursor-grabbing ${
                                           dragDisabled ? "cursor-not-allowed opacity-40" : "cursor-grab"
                                         }`}
                                       >
@@ -1567,7 +1591,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                       <span className="min-w-0 flex-1">{s.name}</span>
                                     </div>
                                     <span
-                                      className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-slate-500"
+                                      className={`shrink-0 text-[10px] font-medium uppercase tracking-wide ${settingsMuted}`}
                                       title="Las subcategorías de esta categoría están siempre activas para la aplicación."
                                     >
                                       Activa
@@ -1601,26 +1625,32 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
         </div>
       </section>
 
-      <p className="text-center text-xs text-slate-500">
-        <Link to="/banking/transactions" className="font-medium text-teal-700 hover:text-teal-900 hover:underline">
+      <p className={`text-center text-xs ${settingsMuted}`}>
+        <Link
+          to="/banking/transactions"
+          className="font-medium text-teal-700 hover:text-teal-900 hover:underline banking-dark:text-amber-400 banking-dark:hover:text-amber-300"
+        >
           Ir a movimientos
         </Link>
       </p>
 
       {accountModalOpen && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[2px]"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[2px] banking-dark:bg-black/55"
           role="dialog"
           aria-modal="true"
           aria-labelledby="banking-product-modal-title"
         >
-          <div className="w-full max-w-lg rounded-xl border border-slate-300 bg-white p-6 shadow-2xl shadow-teal-900/10">
-            <h3 id="banking-product-modal-title" className="text-base font-semibold text-slate-900">
+          <div className="w-full max-w-lg rounded-xl border border-slate-300 bg-white p-6 shadow-2xl shadow-teal-900/10 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:shadow-black/40">
+            <h3
+              id="banking-product-modal-title"
+              className="text-base font-semibold text-slate-900 banking-dark:text-zinc-100"
+            >
               {editingAccount ? "Editar producto" : "Nuevo producto"}
             </h3>
             <div className="mt-5 space-y-4">
               <label className="block">
-                <span className="text-xs text-slate-500">Nombre</span>
+                <span className={`text-xs ${settingsMuted}`}>Nombre</span>
                 <input
                   value={productName}
                   onChange={(e) => setProductName(e.target.value)}
@@ -1629,7 +1659,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                 />
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Tipo de producto</span>
+                <span className={`text-xs ${settingsMuted}`}>Tipo de producto</span>
                 <select
                   value={productType}
                   onChange={(e) => {
@@ -1647,7 +1677,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                 </select>
               </label>
               <label className="block">
-                <span className="text-xs text-slate-500">Banco</span>
+                <span className={`text-xs ${settingsMuted}`}>Banco</span>
                 <select
                   value={bankSbif}
                   onChange={(e) => setBankSbif(e.target.value)}
@@ -1663,8 +1693,8 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
               </label>
               {productType === "tarjeta_credito" ? (
                 <label className="block">
-                  <span className="text-xs text-slate-500">Cuenta Corriente asociada</span>
-                  <p className="mt-1 text-[11px] leading-snug text-slate-500">
+                  <span className={`text-xs ${settingsMuted}`}>Cuenta Corriente asociada</span>
+                  <p className={`mt-1 text-[11px] leading-snug ${settingsMuted}`}>
                     Mismo banco que la tarjeta. Sirve para registrar pagos de la tarjeta desde la cuenta correcta.
                   </p>
                   <select
@@ -1683,16 +1713,16 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                     ))}
                   </select>
                   {bankSbif.trim() !== "" && linkedCheckingOptions.length === 0 ? (
-                    <p className="mt-1.5 text-xs text-amber-800/95">
+                    <p className="mt-1.5 text-xs text-amber-800/95 banking-dark:text-amber-200">
                       No tienes una cuenta corriente en este banco. Agrégala primero y vuelve a editar esta tarjeta.
                     </p>
                   ) : null}
                 </label>
               ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50/90 px-3 py-3 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50/90 px-3 py-3 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-800/75">
                 <div className="min-w-0">
-                  <span className="text-xs font-medium text-slate-800">Activa</span>
-                  <p className="mt-1 text-[11px] leading-snug text-slate-500">
+                  <span className="text-xs font-medium text-slate-800 banking-dark:text-zinc-100">Activa</span>
+                  <p className={`mt-1 text-[11px] leading-snug ${settingsMuted}`}>
                     Visible al registrar movimientos. Si está desactivado, no aparece al elegir cuenta (solo CLP en el
                     sistema).
                   </p>
@@ -1706,10 +1736,10 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                 />
               </div>
               {productType !== "tarjeta_credito" ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50/90 px-3 py-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50/90 px-3 py-3 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-800/75">
                   <div className="min-w-0">
-                    <span className="text-xs font-medium text-slate-800">En total</span>
-                    <p className="mt-1 text-[11px] leading-snug text-slate-500">
+                    <span className="text-xs font-medium text-slate-800 banking-dark:text-zinc-100">En total</span>
+                    <p className={`mt-1 text-[11px] leading-snug ${settingsMuted}`}>
                       Incluir en «Saldo real» del resumen en Movimientos. Si está desactivado, la cuenta no suma en la
                       tarjeta Total (útil para respaldos o transitorias). La deuda de tarjeta asociada a esta cuenta
                       tampoco descuenta ese total.
@@ -1740,7 +1770,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                   setAccountModalOpen(false);
                   setEditingAccount(null);
                 }}
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50"
+                className={settingsGhostBtn}
               >
                 Cancelar
               </button>

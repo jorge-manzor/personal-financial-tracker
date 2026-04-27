@@ -41,6 +41,7 @@ from auth import (
     user_services,
     verify_password,
 )
+from banking_personal_order_routes import router as banking_personal_order_router
 from banking_routes import router as banking_router
 from database import Base, SessionLocal, engine, get_db
 from exchange_service import (
@@ -792,6 +793,7 @@ app.add_middleware(
 )
 
 app.include_router(banking_router, prefix="/banking", tags=["banking"])
+app.include_router(banking_personal_order_router, prefix="/banking", tags=["banking"])
 
 @app.get("/stock-logos/{symbol}.png")
 def stock_logo_png(symbol: str) -> FileResponse:
@@ -998,9 +1000,93 @@ def _backfill_banking_category_colors() -> None:
         db.close()
 
 
+def _ensure_banking_personal_provision_amount_clp() -> None:
+    """Si la tabla existía sin `amount_clp` (despliegues previos), añade la columna."""
+    from sqlalchemy import inspect as sa_inspect
+
+    insp = sa_inspect(engine)
+    if not insp.has_table("banking_personal_provision_items"):
+        return
+    cols = {c["name"] for c in insp.get_columns("banking_personal_provision_items")}
+    if "amount_clp" in cols:
+        return
+    with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            conn.execute(
+                text(
+                    "ALTER TABLE banking_personal_provision_items "
+                    "ADD COLUMN IF NOT EXISTS amount_clp DOUBLE PRECISION"
+                )
+            )
+        else:
+            conn.execute(text("ALTER TABLE banking_personal_provision_items ADD COLUMN amount_clp FLOAT"))
+    logger.info("Migración: banking_personal_provision_items.amount_clp añadida")
+
+
+def _ensure_banking_personal_provision_category_label() -> None:
+    from sqlalchemy import inspect as sa_inspect
+
+    insp = sa_inspect(engine)
+    if not insp.has_table("banking_personal_provision_items"):
+        return
+    cols = {c["name"] for c in insp.get_columns("banking_personal_provision_items")}
+    if "category_label" in cols:
+        return
+    with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            conn.execute(
+                text(
+                    "ALTER TABLE banking_personal_provision_items "
+                    "ADD COLUMN IF NOT EXISTS category_label VARCHAR(255)"
+                )
+            )
+        else:
+            conn.execute(
+                text("ALTER TABLE banking_personal_provision_items ADD COLUMN category_label VARCHAR(255)")
+            )
+    logger.info("Migración: banking_personal_provision_items.category_label añadida")
+
+
+def _backfill_personal_provision_category_labels() -> None:
+    """Una vez: copia nombres de categorías bancarias legacy a category_label (texto libre)."""
+    from models import BankingCategory, BankingPersonalProvisionItem, BankingSubcategory
+
+    db = SessionLocal()
+    try:
+        rows = (
+            db.query(BankingPersonalProvisionItem)
+            .filter(
+                BankingPersonalProvisionItem.category_label.is_(None),
+                BankingPersonalProvisionItem.category_id.isnot(None),
+            )
+            .all()
+        )
+        if not rows:
+            return
+        for r in rows:
+            parts: list[str] = []
+            if r.category_id:
+                c = db.query(BankingCategory).filter(BankingCategory.id == r.category_id).first()
+                if c and c.name:
+                    parts.append(str(c.name).strip())
+            if r.subcategory_id:
+                s = db.query(BankingSubcategory).filter(BankingSubcategory.id == r.subcategory_id).first()
+                if s and s.name:
+                    parts.append(str(s.name).strip())
+            if parts:
+                r.category_label = " · ".join(parts)[:255]
+        db.commit()
+        logger.info("Backfill: category_label desde categorías legacy (orden personal).")
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
+    _ensure_banking_personal_provision_amount_clp()
+    _ensure_banking_personal_provision_category_label()
+    _backfill_personal_provision_category_labels()
     if _db_is_sqlite():
         _migrate_db()
         _migrate_banking_schema()
