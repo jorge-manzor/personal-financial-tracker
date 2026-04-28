@@ -1347,7 +1347,8 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
     }
   };
 
-  const pageWrapClass = `banking-theme min-h-full ${
+  /** Al menos el alto visible bajo el header fijo (`h-14`), para no dejar ver el shell `#0d1117` debajo del contenido. */
+  const pageWrapClass = `banking-theme w-full min-h-[calc(100dvh-3.5rem)] ${
     isDark
       ? "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(251,191,36,0.055),transparent_52%),linear-gradient(to_bottom,#0d0d0d,#070707)] text-zinc-300"
       : "bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100/80 text-slate-800"

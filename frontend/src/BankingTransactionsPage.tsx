@@ -4354,7 +4354,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
   return (
     <div
-      className={`banking-theme min-h-full ${
+      className={`banking-theme w-full min-h-[calc(100dvh-3.5rem)] ${
         isDark
           ? "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(251,191,36,0.055),transparent_52%),linear-gradient(to_bottom,#0d0d0d,#070707)] text-zinc-300"
           : "bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100/80 text-slate-800"
