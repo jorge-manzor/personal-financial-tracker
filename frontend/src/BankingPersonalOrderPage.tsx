@@ -23,6 +23,49 @@ import { apiFetch, fetchJson, patchJson, postJson } from "./api";
 import { BankingAuxRoundCheckbox } from "./BankingAuxRoundCheckbox";
 import { BankingThemeToggle, useBankingTheme } from "./BankingThemeContext";
 import { formatBankingClpSigned, formatClpDots, parseChileanAmountInput } from "./format";
+
+function savingsGoalProgressPercent(balance: number, target: number | null | undefined): number | null {
+  if (target == null || !(target > 0)) return null;
+  return Math.round((balance / target) * 100);
+}
+
+type PersonalSavingsAdjustment = {
+  id: number;
+  goal_id: number;
+  amount: number;
+  created_at: string;
+};
+
+function groupSavingsAdjustmentsByGoal(rows: PersonalSavingsAdjustment[]): Record<number, PersonalSavingsAdjustment[]> {
+  const m: Record<number, PersonalSavingsAdjustment[]> = {};
+  for (const r of rows) {
+    if (!m[r.goal_id]) m[r.goal_id] = [];
+    m[r.goal_id].push(r);
+  }
+  for (const k of Object.keys(m)) {
+    m[Number(k)].sort(
+      (a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime() || a.id - b.id,
+    );
+  }
+  return m;
+}
+
+function formatSavingsAdjustmentWhen(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString("es-CL", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
 import type { BankingAccountRow } from "./types";
 
 type PersonalProvisionItem = {
@@ -42,6 +85,8 @@ type PersonalSavingsGoal = {
   account_id: number;
   account_name: string;
   balance_clp: number;
+  /** Monto meta CLP; null/undefined = solo seguimiento, sin % */
+  target_amount_clp?: number | null;
 };
 
 const cardClass =
@@ -795,8 +840,13 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
   const [newSavTitle, setNewSavTitle] = useState("");
   const [newSavAccountId, setNewSavAccountId] = useState<number | "">("");
   const [newSavInitial, setNewSavInitial] = useState("");
+  /** Monto objetivo opcional al crear (vacío = solo control de saldo). */
+  const [newSavTarget, setNewSavTarget] = useState("");
 
   const [adjustInputs, setAdjustInputs] = useState<Record<number, string>>({});
+  const [savingsAdjustmentsByGoal, setSavingsAdjustmentsByGoal] = useState<
+    Record<number, PersonalSavingsAdjustment[]>
+  >({});
 
   const [editingProvision, setEditingProvision] = useState<PersonalProvisionItem | null>(null);
   const [epDesc, setEpDesc] = useState("");
@@ -807,6 +857,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
   const [editingSavings, setEditingSavings] = useState<PersonalSavingsGoal | null>(null);
   const [svTitle, setSvTitle] = useState("");
   const [svAccountId, setSvAccountId] = useState<number | "">("");
+  const [svTarget, setSvTarget] = useState("");
 
   const [newProvisionModalOpen, setNewProvisionModalOpen] = useState(false);
   const [newSavingsModalOpen, setNewSavingsModalOpen] = useState(false);
@@ -844,6 +895,11 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
     }),
   );
 
+  const fetchSavingsAdjustmentsMap = useCallback(async () => {
+    const adj = await fetchJson<PersonalSavingsAdjustment[]>("/banking/personal-order/savings-adjustments");
+    setSavingsAdjustmentsByGoal(groupSavingsAdjustmentsByGoal(adj));
+  }, []);
+
   const loadAll = useCallback(async () => {
     const [acc, prov, sav] = await Promise.all([
       fetchJson<BankingAccountRow[]>("/banking/accounts"),
@@ -853,7 +909,12 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
     setAccounts(acc.filter((a) => (a.enabled ?? true) !== false));
     setProvisionItems(prov);
     setSavingsGoals(sav);
-  }, []);
+    try {
+      await fetchSavingsAdjustmentsMap();
+    } catch {
+      setSavingsAdjustmentsByGoal({});
+    }
+  }, [fetchSavingsAdjustmentsMap]);
 
   useEffect(() => {
     let cancelled = false;
@@ -928,6 +989,8 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
     if (!editingSavings) return;
     setSvTitle(editingSavings.title);
     setSvAccountId(editingSavings.account_id);
+    const tg = editingSavings.target_amount_clp;
+    setSvTarget(tg != null && tg > 0 ? String(Math.round(tg)) : "");
   }, [editingSavings]);
 
   useEffect(() => {
@@ -1220,18 +1283,35 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
       return;
     }
     const initial = parseChileanAmountInput(newSavInitial.trim() || "0");
+    let targetPayload: number | null = null;
+    const tgtRaw = newSavTarget.trim();
+    if (tgtRaw !== "") {
+      const tp = parseChileanAmountInput(tgtRaw);
+      if (!Number.isFinite(tp) || tp <= 0) {
+        onToast("El monto objetivo no es válido; déjalo vacío si solo quieres llevar el saldo.");
+        return;
+      }
+      targetPayload = tp;
+    }
     try {
       const row = await postJson<PersonalSavingsGoal>("/banking/personal-order/savings-goals", {
         title: t,
         account_id: newSavAccountId,
         initial_balance_clp: initial,
+        target_amount_clp: targetPayload,
       });
       setSavingsGoals((prev) => [...prev, row]);
       setNewSavTitle("");
       setNewSavAccountId("");
       setNewSavInitial("");
+      setNewSavTarget("");
       setNewSavingsModalOpen(false);
       onToast("Meta de ahorro creada.");
+      try {
+        await fetchSavingsAdjustmentsMap();
+      } catch {
+        /* historial: recarga en próxima visita */
+      }
     } catch {
       onToast("No se pudo crear la meta.");
     }
@@ -1252,6 +1332,11 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
       setSavingsGoals((prev) => prev.map((x) => (x.id === g.id ? updated : x)));
       setAdjustInputs((m) => ({ ...m, [g.id]: "" }));
       onToast("Saldo actualizado.");
+      try {
+        await fetchSavingsAdjustmentsMap();
+      } catch {
+        /* historial: recarga con la página */
+      }
     } catch {
       onToast("No se pudo aplicar el ajuste.");
     }
@@ -1264,6 +1349,11 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
       if (!r.ok) throw new Error(String(r.status));
       setSavingsGoals((prev) => prev.filter((x) => x.id !== id));
       setEditingSavings((cur) => (cur?.id === id ? null : cur));
+      setSavingsAdjustmentsByGoal((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
       onToast("Meta eliminada.");
     } catch {
       onToast("No se pudo eliminar.");
@@ -1286,6 +1376,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
     setNewSavTitle("");
     setNewSavAccountId("");
     setNewSavInitial("");
+    setNewSavTarget("");
     setNewSavingsModalOpen(true);
   }, []);
 
@@ -1334,10 +1425,23 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
       onToast("Selecciona una cuenta.");
       return;
     }
+    let targetPatch: number | null;
+    const tgtTrim = svTarget.trim();
+    if (tgtTrim === "") {
+      targetPatch = null;
+    } else {
+      const tp = parseChileanAmountInput(tgtTrim);
+      if (!Number.isFinite(tp) || tp <= 0) {
+        onToast("Monto objetivo no válido; vacía el campo para solo seguimiento de saldo.");
+        return;
+      }
+      targetPatch = tp;
+    }
     try {
       const updated = await patchJson<PersonalSavingsGoal>(`/banking/personal-order/savings-goals/${editingSavings.id}`, {
         title: t,
         account_id: svAccountId,
+        target_amount_clp: targetPatch,
       });
       setSavingsGoals((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
       setEditingSavings(null);
@@ -1672,8 +1776,10 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                 <span className="min-w-0 flex-1">
                   <span className="block">Ahorro por objetivo</span>
                   <span className="mt-1 block text-xs font-normal text-slate-500 banking-dark:text-zinc-500">
-                    El saldo es solo un registro tuyo (el dinero real sigue en la cuenta del banco). Al crear la meta, el
-                    saldo inicial queda registrado; después puedes sumar o restar con montos positivos o negativos.
+                    El saldo es solo un registro tuyo (el dinero real sigue en la cuenta del banco). Puedes definir un
+                    monto objetivo opcional para ver el % de avance; si no, la tarjeta sirve solo para ir actualizando el
+                    saldo al cierre de mes u otro control. Cada ajuste queda guardado en el historial del servidor. Usa
+                    montos + o − como antes.
                   </span>
                 </span>
               </button>
@@ -1693,7 +1799,20 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
             </p>
           ) : (
             <ul id="sav-panel" className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {savingsGoals.map((g) => (
+              {savingsGoals.map((g) => {
+                const target = g.target_amount_clp ?? null;
+                const pct = savingsGoalProgressPercent(g.balance_clp, target);
+                const barPct =
+                  pct != null && target != null && target > 0
+                    ? Math.min(100, Math.max(0, (g.balance_clp / target) * 100))
+                    : 0;
+                const hist = savingsAdjustmentsByGoal[g.id] ?? [];
+                let running = 0;
+                const histRows = hist.map((h) => {
+                  running += h.amount;
+                  return { ...h, balanceAfter: running };
+                });
+                return (
                 <li
                   key={g.id}
                   className="flex min-h-0 min-w-0 flex-col rounded-xl border border-slate-100 bg-slate-50/80 p-4 banking-dark:border-zinc-700 banking-dark:bg-zinc-950/40"
@@ -1734,6 +1853,36 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                       </div>
                     </div>
                   </div>
+                  {pct != null && target != null ? (
+                    <div className="mt-3">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-500">
+                          Avance al objetivo
+                        </span>
+                        <span className="text-sm font-bold tabular-nums text-teal-900 banking-dark:text-amber-200">
+                          {pct}%
+                        </span>
+                      </div>
+                      <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-slate-200/90 banking-dark:bg-zinc-800">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-teal-500 to-teal-600 banking-dark:from-amber-600 banking-dark:to-amber-500"
+                          style={{ width: `${barPct}%` }}
+                          role="progressbar"
+                          aria-valuenow={pct}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-label={`Avance ${pct} por ciento`}
+                        />
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-slate-500 banking-dark:text-zinc-500">
+                        Objetivo: <span className="tabular-nums text-slate-700 banking-dark:text-zinc-300">{formatClpDots(target)}</span>
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-[11px] leading-snug text-slate-500 banking-dark:text-zinc-500">
+                      Sin monto objetivo: solo seguimiento del saldo (p. ej. cierre de mes).
+                    </p>
+                  )}
                   <div className="mt-4 flex flex-1 flex-col gap-3">
                     <div className="w-full">
                       <label className={labelClass}>Ajuste CLP (+ o −)</label>
@@ -1750,9 +1899,62 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                         Aplicar
                       </button>
                     </div>
+                    <details className="rounded-lg border border-slate-200/90 bg-white/60 p-2 banking-dark:border-zinc-700 banking-dark:bg-zinc-950/35">
+                      <summary className="cursor-pointer select-none text-xs font-semibold text-slate-600 outline-none banking-dark:text-zinc-400">
+                        Historial de movimientos ({hist.length})
+                      </summary>
+                      {histRows.length === 0 ? (
+                        <p className="mt-2 text-[11px] leading-snug text-slate-500 banking-dark:text-zinc-500">
+                          Sin movimientos registrados. Si el saldo inicial fue 0, el primer ajuste creará la primera línea.
+                        </p>
+                      ) : (
+                        <div className="mt-2 max-h-44 overflow-auto rounded-md border border-slate-100 banking-dark:border-zinc-800">
+                          <table className="w-full min-w-0 border-collapse text-left text-[11px]">
+                            <thead className="sticky top-0 bg-slate-100/95 banking-dark:bg-zinc-900/95">
+                              <tr>
+                                <th className="px-2 py-1.5 font-semibold text-slate-600 banking-dark:text-zinc-400">
+                                  Fecha
+                                </th>
+                                <th className="px-2 py-1.5 text-right font-semibold text-slate-600 banking-dark:text-zinc-400">
+                                  Movimiento
+                                </th>
+                                <th className="px-2 py-1.5 text-right font-semibold text-slate-600 banking-dark:text-zinc-400">
+                                  Saldo después
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {histRows.map((row) => (
+                                <tr
+                                  key={row.id}
+                                  className="border-t border-slate-100 banking-dark:border-zinc-800"
+                                >
+                                  <td className="whitespace-nowrap px-2 py-1.5 tabular-nums text-slate-700 banking-dark:text-zinc-300">
+                                    {formatSavingsAdjustmentWhen(row.created_at)}
+                                  </td>
+                                  <td
+                                    className={`px-2 py-1.5 text-right font-medium tabular-nums ${
+                                      row.amount >= 0
+                                        ? "text-teal-800 banking-dark:text-teal-400"
+                                        : "text-rose-700 banking-dark:text-rose-400"
+                                    }`}
+                                  >
+                                    {formatBankingClpSigned(row.amount)}
+                                  </td>
+                                  <td className="px-2 py-1.5 text-right tabular-nums text-slate-800 banking-dark:text-zinc-100">
+                                    {formatBankingClpSigned(row.balanceAfter)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </details>
                   </div>
                 </li>
-              ))}
+              );
+              })}
             </ul>
           )}
         </section>
@@ -1850,7 +2052,8 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                 Editar meta de ahorro
               </h3>
               <p className="mt-1 text-xs text-slate-500 banking-dark:text-zinc-500">
-                El saldo seguido no se edita aquí; usa los ajustes en la tarjeta.
+                El saldo seguido se actualiza con «Aplicar» en la tarjeta. El monto objetivo es opcional: vacía el campo
+                para seguir solo el saldo sin porcentaje.
               </p>
               <div className="mt-4 space-y-3">
                 <div>
@@ -1871,6 +2074,16 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                       </option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Monto objetivo (CLP, opcional)</label>
+                  <input
+                    className={`${inputClass} tabular-nums`}
+                    inputMode="decimal"
+                    value={svTarget}
+                    onChange={(e) => setSvTarget(e.target.value)}
+                    placeholder="Vacío = solo seguimiento de saldo"
+                  />
                 </div>
               </div>
               <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -2019,6 +2232,16 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                       placeholder="0"
                     />
                   </div>
+                </div>
+                <div>
+                  <label className={labelClass}>Monto objetivo (CLP, opcional)</label>
+                  <input
+                    className={`${inputClass} tabular-nums`}
+                    inputMode="decimal"
+                    value={newSavTarget}
+                    onChange={(e) => setNewSavTarget(e.target.value)}
+                    placeholder="Si lo dejas vacío, solo verás el saldo sin % de avance"
+                  />
                 </div>
               </div>
               <div className="mt-6 flex flex-wrap justify-end gap-2">

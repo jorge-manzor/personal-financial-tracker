@@ -304,6 +304,8 @@ class BankingPersonalSavingsGoal(Base):
     account_id = Column(Integer, ForeignKey("banking_accounts.id"), nullable=False, index=True)
     title = Column(String(512), nullable=False)
     balance_clp = Column(Float, nullable=False, default=0.0)
+    # Meta en CLP opcional; NULL = solo seguimiento de saldo sin % de completitud.
+    target_amount_clp = Column(Float, nullable=True)
     created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
     updated_at = Column(DateTime, nullable=False, default=_naive_utc_now)
 

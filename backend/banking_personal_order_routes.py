@@ -16,6 +16,7 @@ from schemas import (
     PersonalProvisionItemPatch,
     PersonalProvisionReorderBody,
     PersonalSavingsAdjustBody,
+    PersonalSavingsAdjustmentOut,
     PersonalSavingsGoalCreate,
     PersonalSavingsGoalOut,
     PersonalSavingsGoalPatch,
@@ -203,13 +204,43 @@ def reset_all_provision_paid(user: BankingUser, db: Session = Depends(get_db)) -
 def _savings_goal_to_out(db: Session, g: BankingPersonalSavingsGoal) -> PersonalSavingsGoalOut:
     acc = db.query(BankingAccount).filter(BankingAccount.id == g.account_id).first()
     name = acc.name.strip() if acc else ""
+    targ = g.target_amount_clp
     return PersonalSavingsGoalOut(
         id=int(g.id),
         title=str(g.title).strip(),
         account_id=int(g.account_id),
         account_name=name,
         balance_clp=float(g.balance_clp or 0.0),
+        target_amount_clp=float(targ) if targ is not None else None,
     )
+
+
+@router.get("/personal-order/savings-adjustments", response_model=list[PersonalSavingsAdjustmentOut])
+def list_savings_adjustments(user: BankingUser, db: Session = Depends(get_db)) -> list[PersonalSavingsAdjustmentOut]:
+    """Historial de movimientos sobre saldos seguidos (todas las metas del usuario)."""
+    rows = (
+        db.query(BankingPersonalSavingsAdjustment)
+        .join(
+            BankingPersonalSavingsGoal,
+            BankingPersonalSavingsGoal.id == BankingPersonalSavingsAdjustment.goal_id,
+        )
+        .filter(BankingPersonalSavingsGoal.user_id == user.id)
+        .order_by(
+            BankingPersonalSavingsAdjustment.goal_id.asc(),
+            BankingPersonalSavingsAdjustment.created_at.asc(),
+            BankingPersonalSavingsAdjustment.id.asc(),
+        )
+        .all()
+    )
+    return [
+        PersonalSavingsAdjustmentOut(
+            id=int(r.id),
+            goal_id=int(r.goal_id),
+            amount=float(r.amount),
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
 
 
 @router.get("/personal-order/savings-goals", response_model=list[PersonalSavingsGoalOut])
@@ -237,6 +268,7 @@ def create_savings_goal(
         account_id=body.account_id,
         title=body.title.strip(),
         balance_clp=bal,
+        target_amount_clp=float(body.target_amount_clp) if body.target_amount_clp is not None else None,
         created_at=_now(),
         updated_at=_now(),
     )
@@ -269,12 +301,15 @@ def patch_savings_goal(
     )
     if not g:
         raise HTTPException(status_code=404, detail="Meta no encontrada.")
-    if body.title is not None:
-        g.title = body.title.strip()
-    if body.account_id is not None:
-        if not get_account_for_user(db, user.id, body.account_id):
+    patch = body.model_dump(exclude_unset=True)
+    if "title" in patch and patch["title"] is not None:
+        g.title = str(patch["title"]).strip()
+    if "account_id" in patch and patch["account_id"] is not None:
+        if not get_account_for_user(db, user.id, int(patch["account_id"])):
             raise HTTPException(status_code=404, detail="Cuenta no encontrada.")
-        g.account_id = body.account_id
+        g.account_id = int(patch["account_id"])
+    if "target_amount_clp" in patch:
+        g.target_amount_clp = patch["target_amount_clp"]
     g.updated_at = _now()
     db.commit()
     db.refresh(g)

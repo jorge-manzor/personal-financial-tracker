@@ -1072,6 +1072,29 @@ def _ensure_banking_personal_provision_category_label() -> None:
     logger.info("Migración: banking_personal_provision_items.category_label añadida")
 
 
+def _ensure_banking_personal_savings_target_amount() -> None:
+    """Metas de ahorro: columna opcional `target_amount_clp` (objetivo para % de completitud)."""
+    from sqlalchemy import inspect as sa_inspect
+
+    insp = sa_inspect(engine)
+    if not insp.has_table("banking_personal_savings_goals"):
+        return
+    cols = {c["name"] for c in insp.get_columns("banking_personal_savings_goals")}
+    if "target_amount_clp" in cols:
+        return
+    with engine.begin() as conn:
+        if engine.dialect.name == "postgresql":
+            conn.execute(
+                text(
+                    "ALTER TABLE banking_personal_savings_goals "
+                    "ADD COLUMN IF NOT EXISTS target_amount_clp DOUBLE PRECISION"
+                )
+            )
+        else:
+            conn.execute(text("ALTER TABLE banking_personal_savings_goals ADD COLUMN target_amount_clp FLOAT"))
+    logger.info("Migración: banking_personal_savings_goals.target_amount_clp añadida")
+
+
 def _backfill_personal_provision_category_labels() -> None:
     """Una vez: copia nombres de categorías bancarias legacy a category_label (texto libre)."""
     from models import BankingCategory, BankingPersonalProvisionItem, BankingSubcategory
@@ -1112,6 +1135,7 @@ def on_startup() -> None:
     _ensure_savings_calculator_initial_balance()
     _ensure_banking_personal_provision_amount_clp()
     _ensure_banking_personal_provision_category_label()
+    _ensure_banking_personal_savings_target_amount()
     _backfill_personal_provision_category_labels()
     if _db_is_sqlite():
         _migrate_db()

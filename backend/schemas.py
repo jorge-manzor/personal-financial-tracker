@@ -607,21 +607,57 @@ class PersonalSavingsGoalOut(BaseModel):
     account_id: int
     account_name: str
     balance_clp: float
+    target_amount_clp: float | None = None
 
 
 class PersonalSavingsGoalCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=512)
     account_id: int = Field(..., ge=1)
     initial_balance_clp: float = Field(0.0, description="Saldo inicial al crear la meta.")
+    target_amount_clp: float | None = Field(
+        default=None,
+        description="Monto objetivo CLP; omitir o null = solo seguimiento de saldo (sin %).",
+    )
+
+    @field_validator("target_amount_clp", mode="after")
+    @classmethod
+    def target_must_be_positive(cls, v: float | None) -> float | None:
+        if v is None:
+            return None
+        if v <= 0:
+            raise ValueError("El objetivo debe ser mayor que 0")
+        return v
 
 
 class PersonalSavingsGoalPatch(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=512)
     account_id: int | None = Field(default=None, ge=1)
+    target_amount_clp: float | None = Field(
+        default=None,
+        description="Nuevo objetivo CLP; null explícito quita el objetivo.",
+    )
+
+    @field_validator("target_amount_clp", mode="after")
+    @classmethod
+    def patch_target_positive(cls, v: float | None) -> float | None:
+        if v is None:
+            return None
+        if v <= 0:
+            raise ValueError("El objetivo debe ser mayor que 0")
+        return v
 
 
 class PersonalSavingsAdjustBody(BaseModel):
     amount: float = Field(..., description="Suma al saldo seguido (puede ser negativo).")
+
+
+class PersonalSavingsAdjustmentOut(BaseModel):
+    """Línea de historial: ingreso/egreso al saldo seguido (incluye saldo inicial al crear la meta)."""
+
+    id: int
+    goal_id: int
+    amount: float
+    created_at: datetime
 
 
 SavingsCalculatorMode = Literal["end_date", "target_amount"]
