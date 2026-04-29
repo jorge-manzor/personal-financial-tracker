@@ -601,6 +601,17 @@ class PersonalProvisionReorderBody(BaseModel):
     item_ids: list[int] = Field(..., min_length=1, description="Orden deseado: primer id = primero en la lista.")
 
 
+class PersonalProvisionRegisterMovementsBody(BaseModel):
+    accounting_month: date = Field(..., description="Mes contable (día 1 del mes, ej. 2026-04-01).")
+    item_ids: list[int] = Field(..., min_length=1)
+
+
+class PersonalProvisionRegisterMovementsOut(BaseModel):
+    created: int
+    skipped: int
+    messages: list[str] = Field(default_factory=list)
+
+
 class PersonalSavingsGoalOut(BaseModel):
     id: int
     title: str

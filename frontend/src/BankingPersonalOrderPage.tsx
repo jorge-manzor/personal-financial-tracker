@@ -21,6 +21,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 import { apiFetch, fetchJson, patchJson, postJson } from "./api";
 import { BankingAuxRoundCheckbox } from "./BankingAuxRoundCheckbox";
+import { localYearMonthString } from "./localDate";
 import { BankingThemeToggle, useBankingTheme } from "./BankingThemeContext";
 import { formatBankingClpSigned, formatClpDots, parseChileanAmountInput } from "./format";
 
@@ -860,6 +861,9 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
   const [svTarget, setSvTarget] = useState("");
 
   const [newProvisionModalOpen, setNewProvisionModalOpen] = useState(false);
+  const [registerMovesModalOpen, setRegisterMovesModalOpen] = useState(false);
+  const [registerMovesYm, setRegisterMovesYm] = useState(() => localYearMonthString());
+  const [registerMovesSaving, setRegisterMovesSaving] = useState(false);
   const [newSavingsModalOpen, setNewSavingsModalOpen] = useState(false);
 
   const [provisionsExpanded, setProvisionsExpanded] = useState(() =>
@@ -994,18 +998,26 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
   }, [editingSavings]);
 
   useEffect(() => {
-    if (!editingProvision && !editingSavings && !newProvisionModalOpen && !newSavingsModalOpen) return;
+    if (
+      !editingProvision &&
+      !editingSavings &&
+      !newProvisionModalOpen &&
+      !newSavingsModalOpen &&
+      !registerMovesModalOpen
+    )
+      return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setEditingProvision(null);
         setEditingSavings(null);
         setNewProvisionModalOpen(false);
         setNewSavingsModalOpen(false);
+        setRegisterMovesModalOpen(false);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [editingProvision, editingSavings, newProvisionModalOpen, newSavingsModalOpen]);
+  }, [editingProvision, editingSavings, newProvisionModalOpen, newSavingsModalOpen, registerMovesModalOpen]);
 
   const accountsSorted = useMemo(
     () => [...accounts].sort((a, b) => a.name.localeCompare(b.name, "es")),
@@ -1152,6 +1164,15 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
     return { sum, sel, selWithoutAmount };
   }, [visibleProvisionRowsForSelection, selectedProvisionIds]);
 
+  /** Ítems seleccionados en la vista actual (respeta filtros de tabla). */
+  const selectedVisibleProvisionIds = useMemo(() => {
+    const ids: number[] = [];
+    for (const r of visibleProvisionRowsForSelection) {
+      if (selectedProvisionIds.has(r.id)) ids.push(r.id);
+    }
+    return ids;
+  }, [visibleProvisionRowsForSelection, selectedProvisionIds]);
+
   const toggleProvisionSelected = useCallback((id: number, checked: boolean) => {
     setSelectedProvisionIds((prev) => {
       const next = new Set(prev);
@@ -1174,6 +1195,44 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
       return next;
     });
   }, [columnFiltersActive, filteredProvisionItems, sortedProvisionItems]);
+
+  const openRegisterMovesModal = useCallback(() => {
+    setRegisterMovesYm(localYearMonthString());
+    setRegisterMovesModalOpen(true);
+  }, []);
+
+  const confirmRegisterProvisionMoves = async () => {
+    if (selectedVisibleProvisionIds.length === 0) {
+      onToast("No hay ítems seleccionados en la vista actual.");
+      return;
+    }
+    const accountingIso = `${registerMovesYm}-01`;
+    setRegisterMovesSaving(true);
+    try {
+      const out = await postJson<{
+        created: number;
+        skipped: number;
+        messages: string[];
+      }>("/banking/personal-order/provision-items/register-movements", {
+        accounting_month: accountingIso,
+        item_ids: selectedVisibleProvisionIds,
+      });
+      setRegisterMovesModalOpen(false);
+      const head = `Movimientos creados: ${out.created}.${out.skipped > 0 ? ` Omitidos: ${out.skipped}.` : ""}`;
+      if (out.messages.length > 0) {
+        const extra = out.messages.slice(0, 4).join(" ");
+        const more =
+          out.messages.length > 4 ? ` …(+${out.messages.length - 4} aviso(s))` : "";
+        onToast(`${head} ${extra}${more}`);
+      } else {
+        onToast(head);
+      }
+    } catch (e) {
+      onToast(e instanceof Error ? e.message : "No se pudo registrar en movimientos bancarios.");
+    } finally {
+      setRegisterMovesSaving(false);
+    }
+  };
 
   const allVisibleProvisionsSelected =
     visibleProvisionRowsForSelection.length > 0 &&
@@ -1579,13 +1638,23 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                           ) : null}
                         </p>
                       </div>
-                      <button
-                        type="button"
-                        className={`${btnSecondary} shrink-0 text-xs`}
-                        onClick={() => setSelectedProvisionIds(new Set())}
-                      >
-                        Quitar selección
-                      </button>
+                      <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          className={`${btnPrimary} text-xs`}
+                          onClick={openRegisterMovesModal}
+                          title="Crea movimientos en categoría Provisiones (monto negativo, cargo TC no pagado si aplica)"
+                        >
+                          Al libro bancario…
+                        </button>
+                        <button
+                          type="button"
+                          className={`${btnSecondary} text-xs`}
+                          onClick={() => setSelectedProvisionIds(new Set())}
+                        >
+                          Quitar selección
+                        </button>
+                      </div>
                     </div>
                   ) : null}
                   <div className="overflow-x-auto rounded-xl border border-slate-200 banking-dark:border-zinc-700">
@@ -2092,6 +2161,65 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                 </button>
                 <button type="button" className={btnPrimary} onClick={() => void saveSavingsEdit()}>
                   Guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {registerMovesModalOpen ? (
+          <div className={modalBackdropClass} role="presentation">
+            <button
+              type="button"
+              aria-label="Cerrar"
+              className="absolute inset-0 cursor-default bg-transparent"
+              onClick={() => !registerMovesSaving && setRegisterMovesModalOpen(false)}
+            />
+            <div
+              className={modalPanelClass}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="reg-moves-modal-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 id="reg-moves-modal-title" className="text-lg font-semibold text-slate-900 banking-dark:text-zinc-100">
+                Registrar en movimientos bancarios
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600 banking-dark:text-zinc-400">
+                Se creará un movimiento por cada ítem seleccionado en esta vista: categoría{" "}
+                <strong>Provisiones</strong>, monto <strong>negativo</strong> según el monto de referencia,{" "}
+                <strong>fecha de hoy</strong> y <strong>mes contable</strong> el que elijas abajo. En tarjeta de crédito el
+                cargo queda <strong>sin pagar</strong> para que puedas gestionarlo en Movimientos bancarios.
+              </p>
+              <div className="mt-4">
+                <label className={labelClass} htmlFor="reg-moves-month">
+                  Mes contable
+                </label>
+                <input
+                  id="reg-moves-month"
+                  className={`${inputClass} tabular-nums`}
+                  type="month"
+                  value={registerMovesYm}
+                  onChange={(e) => setRegisterMovesYm(e.target.value)}
+                  disabled={registerMovesSaving}
+                />
+              </div>
+              <div className="mt-6 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  className={btnSecondary}
+                  disabled={registerMovesSaving}
+                  onClick={() => setRegisterMovesModalOpen(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className={btnPrimary}
+                  disabled={registerMovesSaving || selectedVisibleProvisionIds.length === 0}
+                  onClick={() => void confirmRegisterProvisionMoves()}
+                >
+                  {registerMovesSaving ? "Creando…" : "Crear movimientos"}
                 </button>
               </div>
             </div>

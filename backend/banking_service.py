@@ -18,7 +18,13 @@ from fastapi import HTTPException, status
 from sqlalchemy import Date, cast, false as sql_false, func, literal, or_, text
 from sqlalchemy.orm import Session
 
-from models import BankingAccount, BankingCategory, BankingSubcategory, BankingTransaction
+from models import (
+    BankingAccount,
+    BankingCategory,
+    BankingPersonalProvisionItem,
+    BankingSubcategory,
+    BankingTransaction,
+)
 
 
 def _names_locked(cat: BankingCategory | None) -> bool:
@@ -1008,6 +1014,122 @@ def ensure_default_categories(
     repair_suscripciones_provisiones_duplicated_tpl(db, user_id)
     _prune_bank_subcategories_not_in_default_json(db, user_id)
     _ensure_template_subcategories_complete(db, user_id)
+
+
+def get_user_provisiones_default_category_subcategory(db: Session, user_id: int) -> tuple[int, int]:
+    """Primera categoría plantilla Provisiones (21) y su primera subcategoría habilitada."""
+    ensure_default_categories(db, user_id)
+    cat = (
+        db.query(BankingCategory)
+        .filter(
+            BankingCategory.user_id == user_id,
+            BankingCategory.template_cat_id == TEMPLATE_CAT_PROVISIONES,
+        )
+        .order_by(BankingCategory.sort_order, BankingCategory.id)
+        .first()
+    )
+    if not cat:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se encontró la categoría Provisiones. Recarga la página o revisa el catálogo bancario.",
+        )
+    sub = (
+        db.query(BankingSubcategory)
+        .filter(
+            BankingSubcategory.user_id == user_id,
+            BankingSubcategory.category_id == cat.id,
+        )
+        .order_by(BankingSubcategory.sort_order, BankingSubcategory.id)
+        .first()
+    )
+    if not sub:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="La categoría Provisiones no tiene subcategorías.",
+        )
+    return int(cat.id), int(sub.id)
+
+
+def register_bank_movements_from_personal_provision_items(
+    db: Session,
+    user_id: int,
+    *,
+    accounting_month: date,
+    item_ids: list[int],
+) -> tuple[int, int, list[str]]:
+    """
+    Crea movimientos bancarios en categoría Provisiones, monto negativo = egreso,
+    referencia al monto del ítem personal. Tarjeta de crédito: cargo marcado como no pagado.
+    Fecha del movimiento = hoy (Chile); mes contable = el elegido por el usuario.
+    """
+    cat_id, sub_id = get_user_provisiones_default_category_subcategory(db, user_id)
+    am = first_day_of_month_calendar(accounting_month)
+    fecha_hoy = _banking_today_cl()
+    seen: set[int] = set()
+    created = 0
+    skipped = 0
+    messages: list[str] = []
+
+    for raw_id in item_ids:
+        if raw_id in seen:
+            continue
+        seen.add(raw_id)
+        row = (
+            db.query(BankingPersonalProvisionItem)
+            .filter(
+                BankingPersonalProvisionItem.id == raw_id,
+                BankingPersonalProvisionItem.user_id == user_id,
+            )
+            .first()
+        )
+        if not row:
+            skipped += 1
+            messages.append(f"Ítem {raw_id}: no encontrado.")
+            continue
+        desc_short = (str(row.description).strip() or "Sin descripción")[:48]
+        if row.account_id is None:
+            skipped += 1
+            messages.append(f"«{desc_short}»: falta cuenta asociada en el recordatorio.")
+            continue
+        if row.amount_clp is None or float(row.amount_clp) == 0.0:
+            skipped += 1
+            messages.append(f"«{desc_short}»: el monto de referencia debe ser distinto de cero.")
+            continue
+
+        amt = -abs(float(row.amount_clp))
+        base = str(row.description).strip() or "Provisión"
+        lab = getattr(row, "category_label", None)
+        lab_s = lab.strip() if isinstance(lab, str) else ""
+        description = f"{base} ({lab_s})" if lab_s else base
+
+        acc = get_account_for_user(db, user_id, int(row.account_id))
+        pt = getattr(acc, "product_type", None) if acc else None
+        cc_paid = False if pt == "tarjeta_credito" else None
+
+        try:
+            create_transaction_row(
+                db,
+                user_id,
+                account_id=int(row.account_id),
+                fecha=fecha_hoy,
+                amount=amt,
+                description=description,
+                category_id=cat_id,
+                subcategory_id=sub_id,
+                credit_card_charge_paid=cc_paid,
+                accounting_month=am,
+            )
+            created += 1
+        except HTTPException as e:
+            skipped += 1
+            detail = e.detail
+            if isinstance(detail, list):
+                detail_s = "; ".join(str(x) for x in detail)
+            else:
+                detail_s = str(detail)
+            messages.append(f"«{desc_short}»: {detail_s}")
+
+    return created, skipped, messages
 
 
 def reapply_banking_template_all_users(

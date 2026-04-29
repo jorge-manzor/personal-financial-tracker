@@ -7,13 +7,15 @@ from sqlalchemy.orm import Session
 from starlette.responses import Response
 
 from auth import BankingUser
-from banking_service import get_account_for_user
+from banking_service import get_account_for_user, register_bank_movements_from_personal_provision_items
 from database import get_db
 from models import BankingAccount, BankingPersonalProvisionItem, BankingPersonalSavingsAdjustment, BankingPersonalSavingsGoal
 from schemas import (
     PersonalProvisionItemCreate,
     PersonalProvisionItemOut,
     PersonalProvisionItemPatch,
+    PersonalProvisionRegisterMovementsBody,
+    PersonalProvisionRegisterMovementsOut,
     PersonalProvisionReorderBody,
     PersonalSavingsAdjustBody,
     PersonalSavingsAdjustmentOut,
@@ -189,6 +191,26 @@ def delete_provision_item(item_id: int, user: BankingUser, db: Session = Depends
     db.delete(row)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/personal-order/provision-items/register-movements", response_model=PersonalProvisionRegisterMovementsOut)
+def register_personal_provisions_as_bank_movements(
+    body: PersonalProvisionRegisterMovementsBody,
+    user: BankingUser,
+    db: Session = Depends(get_db),
+) -> PersonalProvisionRegisterMovementsOut:
+    """
+    Crea movimientos reales en el libro bancario por cada recordatorio seleccionado:
+    categoría Provisiones, monto negativo según monto de referencia, fecha de hoy (Chile) y
+    mes contable elegido; cargos de TC como no pagados para poder gestionarlos en Movimientos.
+    """
+    created, skipped, messages = register_bank_movements_from_personal_provision_items(
+        db,
+        user.id,
+        accounting_month=body.accounting_month,
+        item_ids=body.item_ids,
+    )
+    return PersonalProvisionRegisterMovementsOut(created=created, skipped=skipped, messages=messages)
 
 
 @router.post("/personal-order/provision-items/reset-paid", status_code=status.HTTP_204_NO_CONTENT)
