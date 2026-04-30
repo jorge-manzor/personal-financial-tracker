@@ -671,6 +671,19 @@ class PersonalSavingsAdjustmentOut(BaseModel):
     created_at: datetime
 
 
+class PersonalSavingsAdjustmentPatch(BaseModel):
+    """Sustituye el monto del movimiento; el saldo seguido se recalcula (quita el anterior y suma el nuevo)."""
+
+    amount: float = Field(..., description="Nuevo monto del movimiento (distinto de cero).")
+
+    @field_validator("amount")
+    @classmethod
+    def amount_nonzero(cls, v: float) -> float:
+        if v == 0:
+            raise ValueError("El monto no puede ser cero")
+        return v
+
+
 SavingsCalculatorMode = Literal["end_date", "target_amount"]
 
 

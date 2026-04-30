@@ -866,6 +866,10 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
   const [registerMovesSaving, setRegisterMovesSaving] = useState(false);
   const [newSavingsModalOpen, setNewSavingsModalOpen] = useState(false);
 
+  const [editingSavingsAdjustment, setEditingSavingsAdjustment] = useState<PersonalSavingsAdjustment | null>(null);
+  const [editSavingsAdjAmount, setEditSavingsAdjAmount] = useState("");
+  const [savingSavingsAdjEdit, setSavingSavingsAdjEdit] = useState(false);
+
   const [provisionsExpanded, setProvisionsExpanded] = useState(() =>
     readStoredExpanded(LS_PO_PROVISIONS_EXPANDED, true),
   );
@@ -901,6 +905,15 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
 
   const fetchSavingsAdjustmentsMap = useCallback(async () => {
     const adj = await fetchJson<PersonalSavingsAdjustment[]>("/banking/personal-order/savings-adjustments");
+    setSavingsAdjustmentsByGoal(groupSavingsAdjustmentsByGoal(adj));
+  }, []);
+
+  const reloadSavingsSection = useCallback(async () => {
+    const [sav, adj] = await Promise.all([
+      fetchJson<PersonalSavingsGoal[]>("/banking/personal-order/savings-goals"),
+      fetchJson<PersonalSavingsAdjustment[]>("/banking/personal-order/savings-adjustments"),
+    ]);
+    setSavingsGoals(sav);
     setSavingsAdjustmentsByGoal(groupSavingsAdjustmentsByGoal(adj));
   }, []);
 
@@ -1001,6 +1014,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
     if (
       !editingProvision &&
       !editingSavings &&
+      !editingSavingsAdjustment &&
       !newProvisionModalOpen &&
       !newSavingsModalOpen &&
       !registerMovesModalOpen
@@ -1010,6 +1024,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
       if (e.key === "Escape") {
         setEditingProvision(null);
         setEditingSavings(null);
+        setEditingSavingsAdjustment(null);
         setNewProvisionModalOpen(false);
         setNewSavingsModalOpen(false);
         setRegisterMovesModalOpen(false);
@@ -1017,7 +1032,14 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [editingProvision, editingSavings, newProvisionModalOpen, newSavingsModalOpen, registerMovesModalOpen]);
+  }, [
+    editingProvision,
+    editingSavings,
+    editingSavingsAdjustment,
+    newProvisionModalOpen,
+    newSavingsModalOpen,
+    registerMovesModalOpen,
+  ]);
 
   const accountsSorted = useMemo(
     () => [...accounts].sort((a, b) => a.name.localeCompare(b.name, "es")),
@@ -1414,6 +1436,48 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
         return next;
       });
       onToast("Meta eliminada.");
+    } catch {
+      onToast("No se pudo eliminar.");
+    }
+  };
+
+  const openEditSavingsAdjustment = useCallback((row: PersonalSavingsAdjustment) => {
+    setEditingSavingsAdjustment(row);
+    setEditSavingsAdjAmount(String(row.amount));
+  }, []);
+
+  const saveSavingsAdjustmentEdit = async () => {
+    if (!editingSavingsAdjustment) return;
+    const amt = parseChileanAmountInput(editSavingsAdjAmount.trim());
+    if (!Number.isFinite(amt) || amt === 0) {
+      onToast("Indica un monto distinto de cero.");
+      return;
+    }
+    setSavingSavingsAdjEdit(true);
+    try {
+      const updated = await patchJson<PersonalSavingsGoal>(
+        `/banking/personal-order/savings-adjustments/${editingSavingsAdjustment.id}`,
+        { amount: amt },
+      );
+      setSavingsGoals((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+      setEditingSavingsAdjustment(null);
+      await fetchSavingsAdjustmentsMap();
+      onToast("Movimiento actualizado.");
+    } catch {
+      onToast("No se pudo guardar.");
+    } finally {
+      setSavingSavingsAdjEdit(false);
+    }
+  };
+
+  const removeSavingsAdjustmentRow = async (adj: PersonalSavingsAdjustment) => {
+    if (!confirm("¿Eliminar este movimiento del historial? El saldo seguido se actualizará.")) return;
+    try {
+      const r = await apiFetch(`/banking/personal-order/savings-adjustments/${adj.id}`, { method: "DELETE" });
+      if (!r.ok) throw new Error(String(r.status));
+      await reloadSavingsSection();
+      setEditingSavingsAdjustment((cur) => (cur?.id === adj.id ? null : cur));
+      onToast("Movimiento eliminado.");
     } catch {
       onToast("No se pudo eliminar.");
     }
@@ -1978,7 +2042,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                         </p>
                       ) : (
                         <div className="mt-2 max-h-44 overflow-auto rounded-md border border-slate-100 banking-dark:border-zinc-800">
-                          <table className="w-full min-w-0 border-collapse text-left text-[11px]">
+                          <table className="w-full min-w-[280px] border-collapse text-left text-[11px]">
                             <thead className="sticky top-0 bg-slate-100/95 banking-dark:bg-zinc-900/95">
                               <tr>
                                 <th className="px-2 py-1.5 font-semibold text-slate-600 banking-dark:text-zinc-400">
@@ -1989,6 +2053,9 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                                 </th>
                                 <th className="px-2 py-1.5 text-right font-semibold text-slate-600 banking-dark:text-zinc-400">
                                   Saldo después
+                                </th>
+                                <th className="w-px whitespace-nowrap px-1 py-1.5 text-center font-semibold text-slate-600 banking-dark:text-zinc-400">
+                                  <span className="sr-only">Acciones</span>
                                 </th>
                               </tr>
                             </thead>
@@ -2012,6 +2079,28 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                                   </td>
                                   <td className="px-2 py-1.5 text-right tabular-nums text-slate-800 banking-dark:text-zinc-100">
                                     {formatBankingClpSigned(row.balanceAfter)}
+                                  </td>
+                                  <td className="whitespace-nowrap px-1 py-1">
+                                    <div className="flex items-center justify-end gap-0.5">
+                                      <button
+                                        type="button"
+                                        title="Editar movimiento"
+                                        aria-label="Editar movimiento"
+                                        className={`${poIconBtn} !h-7 !w-7`}
+                                        onClick={() => openEditSavingsAdjustment(row)}
+                                      >
+                                        <IconPencil className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        title="Eliminar movimiento"
+                                        aria-label="Eliminar movimiento"
+                                        className={`${poIconBtnDanger} !h-7 !w-7`}
+                                        onClick={() => void removeSavingsAdjustmentRow(row)}
+                                      >
+                                        <IconTrash className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
                                   </td>
                                 </tr>
                               ))}
@@ -2161,6 +2250,63 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                 </button>
                 <button type="button" className={btnPrimary} onClick={() => void saveSavingsEdit()}>
                   Guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {editingSavingsAdjustment ? (
+          <div className={modalBackdropClass} role="presentation">
+            <button
+              type="button"
+              aria-label="Cerrar"
+              className="absolute inset-0 cursor-default bg-transparent"
+              onClick={() => !savingSavingsAdjEdit && setEditingSavingsAdjustment(null)}
+            />
+            <div
+              className={modalPanelClass}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="edit-sav-adj-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 id="edit-sav-adj-title" className="text-lg font-semibold text-slate-900 banking-dark:text-zinc-100">
+                Editar movimiento
+              </h3>
+              <p className="mt-1 text-xs text-slate-500 banking-dark:text-zinc-500">
+                {savingsGoals.find((x) => x.id === editingSavingsAdjustment.goal_id)?.title ?? "Meta"} ·{" "}
+                {formatSavingsAdjustmentWhen(editingSavingsAdjustment.created_at)}
+              </p>
+              <div className="mt-4">
+                <label className={labelClass} htmlFor="edit-sav-adj-amt">
+                  Monto CLP (+ o −)
+                </label>
+                <input
+                  id="edit-sav-adj-amt"
+                  className={`${inputClass} tabular-nums`}
+                  inputMode="decimal"
+                  value={editSavingsAdjAmount}
+                  onChange={(e) => setEditSavingsAdjAmount(e.target.value)}
+                  disabled={savingSavingsAdjEdit}
+                />
+              </div>
+              <div className="mt-6 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  className={btnSecondary}
+                  disabled={savingSavingsAdjEdit}
+                  onClick={() => setEditingSavingsAdjustment(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className={btnPrimary}
+                  disabled={savingSavingsAdjEdit}
+                  onClick={() => void saveSavingsAdjustmentEdit()}
+                >
+                  {savingSavingsAdjEdit ? "Guardando…" : "Guardar"}
                 </button>
               </div>
             </div>

@@ -19,6 +19,7 @@ from schemas import (
     PersonalProvisionReorderBody,
     PersonalSavingsAdjustBody,
     PersonalSavingsAdjustmentOut,
+    PersonalSavingsAdjustmentPatch,
     PersonalSavingsGoalCreate,
     PersonalSavingsGoalOut,
     PersonalSavingsGoalPatch,
@@ -336,6 +337,74 @@ def patch_savings_goal(
     db.commit()
     db.refresh(g)
     return _savings_goal_to_out(db, g)
+
+
+@router.patch("/personal-order/savings-adjustments/{adjustment_id}", response_model=PersonalSavingsGoalOut)
+def patch_savings_adjustment(
+    adjustment_id: int,
+    body: PersonalSavingsAdjustmentPatch,
+    user: BankingUser,
+    db: Session = Depends(get_db),
+) -> PersonalSavingsGoalOut:
+    adj = (
+        db.query(BankingPersonalSavingsAdjustment)
+        .join(
+            BankingPersonalSavingsGoal,
+            BankingPersonalSavingsGoal.id == BankingPersonalSavingsAdjustment.goal_id,
+        )
+        .filter(
+            BankingPersonalSavingsAdjustment.id == adjustment_id,
+            BankingPersonalSavingsGoal.user_id == user.id,
+        )
+        .first()
+    )
+    if not adj:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado.")
+    g = (
+        db.query(BankingPersonalSavingsGoal)
+        .filter(BankingPersonalSavingsGoal.id == adj.goal_id, BankingPersonalSavingsGoal.user_id == user.id)
+        .first()
+    )
+    if not g:
+        raise HTTPException(status_code=404, detail="Meta no encontrada.")
+    old = float(adj.amount)
+    new = float(body.amount)
+    g.balance_clp = float(g.balance_clp or 0.0) - old + new
+    adj.amount = new
+    g.updated_at = _now()
+    db.commit()
+    db.refresh(g)
+    return _savings_goal_to_out(db, g)
+
+
+@router.delete("/personal-order/savings-adjustments/{adjustment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_savings_adjustment(adjustment_id: int, user: BankingUser, db: Session = Depends(get_db)) -> Response:
+    adj = (
+        db.query(BankingPersonalSavingsAdjustment)
+        .join(
+            BankingPersonalSavingsGoal,
+            BankingPersonalSavingsGoal.id == BankingPersonalSavingsAdjustment.goal_id,
+        )
+        .filter(
+            BankingPersonalSavingsAdjustment.id == adjustment_id,
+            BankingPersonalSavingsGoal.user_id == user.id,
+        )
+        .first()
+    )
+    if not adj:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado.")
+    g = (
+        db.query(BankingPersonalSavingsGoal)
+        .filter(BankingPersonalSavingsGoal.id == adj.goal_id, BankingPersonalSavingsGoal.user_id == user.id)
+        .first()
+    )
+    if not g:
+        raise HTTPException(status_code=404, detail="Meta no encontrada.")
+    g.balance_clp = float(g.balance_clp or 0.0) - float(adj.amount)
+    g.updated_at = _now()
+    db.delete(adj)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/personal-order/savings-goals/{goal_id}/adjust", response_model=PersonalSavingsGoalOut)
