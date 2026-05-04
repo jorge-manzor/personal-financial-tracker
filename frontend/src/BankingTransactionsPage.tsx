@@ -791,7 +791,7 @@ function BankingNonCreditTotalBalanceCard({
 const BANKING_SHARED_DEBT_CARD_CLASS =
   "flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-slate-300/95 bg-gradient-to-br from-slate-50/95 via-white to-violet-50/40 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-slate-300/50 backdrop-blur-sm banking-dark:border-zinc-600 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-amber-950/[0.1] banking-dark:shadow-[0_8px_32px_-14px_rgba(0,0,0,0.65)] banking-dark:ring-amber-900/35";
 
-/** Gastos compartidos sin liquidar: suma de la parte por persona (|monto| ÷ participantes). */
+/** Gastos compartidos sin liquidar: neto por persona (devoluciones positivas restan del total). */
 function BankingSharedUnsettledDebtCard({
   amountClp,
   privacyKey,
@@ -843,10 +843,10 @@ function BankingSharedUnsettledDebtCard({
         text={formatClpDots(amountClp)}
         visible={amountsVisible}
         className="mt-1.5 block text-lg font-semibold tabular-nums tracking-tight text-slate-800 banking-dark:text-zinc-50"
-        title="Suma de |monto| ÷ número de participantes en cada movimiento compartido sin liquidar. Equivale a sumar lo que corresponde por persona en cada gasto (reparto equitativo)."
+        title="Neto en cuotas por persona: egresos suman, ingresos y devoluciones restan (mismo criterio que monto ÷ participantes con signo)."
       />
       <p className="mt-1 line-clamp-3 text-[11px] italic leading-snug text-slate-500 banking-dark:text-zinc-400">
-        Suma por persona (tu parte en cada gasto; para repartir transferencias).
+        Cuota neta por persona; las devoluciones compartidas reducen este total.
       </p>
     </div>
   );
@@ -2187,14 +2187,14 @@ function BankingCcPendingChargesTable({
   );
 }
 
-/** Cuota por persona en un movimiento compartido (usa `amount_per_person` del backend si existe). */
+/** Cuota por persona con signo (egreso negativo, devolución positiva); alinea con el total de la tarjeta. */
 function sharedPendingPerPersonClp(row: BankingTransactionRow): number {
   const ap = row.amount_per_person;
   if (ap != null && !Number.isNaN(Number(ap))) {
-    return Math.abs(Number(ap));
+    return Number(ap);
   }
   const n = row.split_participants != null && row.split_participants >= 1 ? row.split_participants : 1;
-  return Math.abs(row.amount) / n;
+  return row.amount / n;
 }
 
 /** Pendientes compartidos: mismas columnas auxiliares que TC + selección y liquidación grupal. */

@@ -1331,8 +1331,11 @@ def banking_sum_unpaid_credit_card_charges_clp(
 
 def banking_sum_shared_unsettled_clp(db: Session, user_id: int) -> float:
     """
-    Suma de (|monto| / participantes) en compartidos sin liquidar: total a reconocer «por persona»
-    (lo que corresponde que te transfieran los demás respecto del gasto compartido).
+    Neto de gastos compartidos sin liquidar en «cuota por persona», con signo del movimiento.
+
+    Por movimiento se usa (monto / participantes): egresos negativos suman deuda neta; ingresos o
+    devoluciones positivos restan. El valor devuelto es ``-sum(monto/n)``, de modo que —como antes—
+    predominan números positivos cuando hay gastos netos (convención de la tarjeta «Deuda»).
     """
     rows = (
         db.query(BankingTransaction)
@@ -1343,15 +1346,17 @@ def banking_sum_shared_unsettled_clp(db: Session, user_id: int) -> float:
         )
         .all()
     )
-    total = 0.0
+    sum_signed_shares = 0.0
     for t in rows:
         n_raw = getattr(t, "split_participants", None)
         if n_raw is None or int(n_raw) < 1:
             n = 2
         else:
             n = int(n_raw)
-        total += abs(float(t.amount)) / float(n)
-    return round(total, 4)
+        sum_signed_shares += float(t.amount) / float(n)
+    # Tarjeta «Deuda»: signo opuesto a la suma contable de (monto/n). Gasto (monto<0) aporta positivo;
+    # ingreso/devolución (monto>0) resta del total mostrado.
+    return round(-sum_signed_shares, 4)
 
 
 def banking_debt_totals_out(
@@ -1930,7 +1935,7 @@ def _banking_amount_per_person(tx: BankingTransaction) -> float | None:
     n = getattr(tx, "split_participants", None)
     if n is None or int(n) < 1:
         return None
-    return round(abs(float(tx.amount)) / float(n), 4)
+    return round(float(tx.amount) / float(n), 4)
 
 
 def transaction_to_out(

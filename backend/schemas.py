@@ -311,8 +311,8 @@ class BankingDebtTotalsOut(BaseModel):
     shared_unsettled_clp: float = Field(
         ...,
         description=(
-            "Suma de (|monto| / participantes) en gastos compartidos sin liquidar: "
-            "equivalente a sumar lo que corresponde por persona en cada movimiento."
+            "Neto en cuotas por persona en compartidos sin liquidar: -sum(monto/participantes); "
+            "egresos aumentan el valor, ingresos/devoluciones lo reducen."
         ),
     )
 
@@ -515,7 +515,7 @@ class BankingTransactionOut(BaseModel):
     accounting_month: date | None = None
     amount_per_person: float | None = Field(
         default=None,
-        description="abs(amount)/split_participants cuando is_shared.",
+        description="amount/split_participants cuando is_shared (con signo: egreso negativo, ingreso positivo).",
     )
     peer_transaction_id: int | None = None
     is_provision_reversal: bool = Field(

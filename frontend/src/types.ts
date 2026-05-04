@@ -245,7 +245,10 @@ export interface BankingAccountRow {
 /** Respuesta GET /banking/debt-totals */
 export interface BankingDebtTotalsOut {
   credit_card_unpaid_clp: number;
-  /** Suma de |monto|/participantes en compartidos sin liquidar (parte por persona). */
+  /**
+   * Neto compartido sin liquidar: -sum(monto/participantes); egresos suben el valor,
+   * devoluciones/ingresos positivos lo bajan (alineado al backend).
+   */
   shared_unsettled_clp: number;
 }
 
@@ -305,7 +308,7 @@ export interface BankingTransactionRow {
   shared_expense_settled: boolean;
   credit_card_charge_paid: boolean | null;
   accounting_month: string | null;
-  /** Calculado en servidor si is_shared: abs(amount)/split_participants */
+  /** Si is_shared: amount/split_participants con signo (devolución positiva resta en totales). */
   amount_per_person?: number | null;
   /** Movimiento gemelo (transferencia entre cuentas propias). */
   peer_transaction_id?: number | null;
