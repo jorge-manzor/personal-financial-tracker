@@ -569,8 +569,9 @@ def sync_credit_card_payment_mirror(
     cc_tx: BankingTransaction,
 ) -> None:
     """
-    Al marcar pagado un cargo en tarjeta de crédito, crea un egreso negativo en la cuenta corriente
-    asociada (categoría Pago Tarjeta de Credito). Al desmarcar, elimina ese movimiento.
+    Al marcar pagado un movimiento en tarjeta de crédito, refleja en la cuenta corriente asociada
+    un movimiento categoría Pago Tarjeta de Credito: egreso si el cargo es negativo, ingreso si
+    es una devolución (monto positivo). Al desmarcar, elimina ese movimiento.
     """
     acc = get_account_for_user(db, user_id, cc_tx.account_id)
     if not acc:
@@ -624,7 +625,8 @@ def sync_credit_card_payment_mirror(
         .first()
     )
 
-    amt_out = -abs(float(cc_tx.amount))
+    # Mismo signo que el movimiento en TC: cargo negativo → egreso en CC; devolución positiva → ingreso en CC.
+    amt_out = float(cc_tx.amount)
     desc_src = (cc_tx.description or "").strip()
     pay_desc = f"Pago TC — {desc_src}" if desc_src else "Pago Tarjeta de Credito"
     # El egreso en cuenta corriente debe reflejar el día en que se marca pagado el cargo, no la fecha del consumo.
@@ -1306,7 +1308,8 @@ def banking_sum_unpaid_credit_card_charges_clp(
     db: Session, user_id: int, *, through_current_accounting_month: bool = False
 ) -> float:
     """
-    Suma de «deuda» pendiente en TC: egresos (amount < 0) con cargo no marcado como pagado.
+    Neto pendiente en TC: suma de ``-amount`` en movimientos no marcados como pagados.
+    Cargos (amount<0) suman deuda; devoluciones (amount>0) la restan.
     """
     unpaid = or_(
         BankingTransaction.credit_card_charge_paid.is_(False),
@@ -1319,7 +1322,6 @@ def banking_sum_unpaid_credit_card_charges_clp(
             BankingTransaction.user_id == user_id,
             BankingAccount.user_id == user_id,
             BankingAccount.product_type == "tarjeta_credito",
-            BankingTransaction.amount < 0,
             unpaid,
         )
     )
@@ -1598,8 +1600,8 @@ def banking_credit_card_unpaid_groups_payload(
     db: Session, user_id: int, *, through_current_accounting_month: bool = False
 ) -> list[dict[str, Any]]:
     """
-    Cargos TC sin marcar pagados (egresos), agrupados por cuenta tarjeta.
-    Cada grupo incluye movimientos ordenados por fecha descendente.
+    Movimientos en cuenta TC sin marcar como pagados (incluye devoluciones con monto > 0),
+    agrupados por cuenta tarjeta. Orden por fecha descendente.
     """
     unpaid = or_(
         BankingTransaction.credit_card_charge_paid.is_(False),
@@ -1612,7 +1614,6 @@ def banking_credit_card_unpaid_groups_payload(
             BankingTransaction.user_id == user_id,
             BankingAccount.user_id == user_id,
             BankingAccount.product_type == "tarjeta_credito",
-            BankingTransaction.amount < 0,
             unpaid,
         )
     )

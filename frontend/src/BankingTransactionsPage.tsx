@@ -289,11 +289,11 @@ function bankingAccountAtBank(a: BankingAccountRow): number {
   return a.balance_at_bank !== undefined ? a.balance_at_bank : a.balance - p;
 }
 
-/** Deuda pendiente CLP por grupo de cargos TC (egresos no pagados). Coincide con backend sum(-amount). */
+/** Neto pendiente TC: sum(-amount); cargos negativos suman, devoluciones positivas restan. Alineado al backend. */
 function sumUnpaidTcDebtFromItems(items: BankingTransactionRow[]): number {
   let s = 0;
   for (const tx of items) {
-    if (tx.amount < 0) s += -tx.amount;
+    s += -tx.amount;
   }
   return s;
 }
@@ -1962,10 +1962,9 @@ function BankingVirtualizedMainTxTableBody({
   );
 }
 
-/** Monto en CLP que aporta un cargo TC a la deuda (egreso negativo → valor positivo). */
-function tcChargeDebtMagnitudeClp(row: BankingTransactionRow): number {
-  if (row.amount < 0) return -row.amount;
-  return Math.abs(row.amount);
+/** Neto que aporta al pendiente TC: `-amount` (cargo negativo aumenta lo adeudado; devolución positiva lo reduce). */
+function tcUnpaidNetContributionClp(row: BankingTransactionRow): number {
+  return -row.amount;
 }
 
 /** Tabla de cargos TC pendientes de pagar (mismas columnas visibles que la tabla principal + Pagado). */
@@ -2010,7 +2009,7 @@ function BankingCcPendingChargesTable({
     let s = 0;
     for (const row of rows) {
       if (!selectedIds.has(row.id)) continue;
-      s += tcChargeDebtMagnitudeClp(row);
+      s += tcUnpaidNetContributionClp(row);
     }
     return s;
   }, [rows, selectedIds]);
@@ -2036,7 +2035,7 @@ function BankingCcPendingChargesTable({
   return (
     <section className="mb-6 space-y-2" aria-labelledby={`cc-pending-heading-${accountId}`}>
       <h3 id={`cc-pending-heading-${accountId}`} className={BANKING_AUX_SECTION_HEADING_CLASS}>
-        Cargos pendientes · {accountHeading}
+        Pendientes sin marcar pagado · {accountHeading}
       </h3>
       <div
         className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs leading-snug ${
@@ -2057,7 +2056,7 @@ function BankingCcPendingChargesTable({
             </>
           ) : (
             <span className="text-slate-400 banking-dark:text-zinc-500">
-              Marca cargos para ver la suma y alinearla con el monto que transferirás desde la cuenta corriente asociada.
+              Marca movimientos para ver la suma neta (devoluciones restan) y alinearla con lo que liquidarás desde la cuenta corriente asociada.
             </span>
           )}
         </p>

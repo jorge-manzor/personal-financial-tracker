@@ -306,7 +306,7 @@ class BankingDebtTotalsOut(BaseModel):
 
     credit_card_unpaid_clp: float = Field(
         ...,
-        description="Suma de cargos en cuentas tarjeta de crédito marcados como no pagados (egresos).",
+        description="Neto sum(-monto) en TC no pagados: egresos suman, devoluciones restan.",
     )
     shared_unsettled_clp: float = Field(
         ...,

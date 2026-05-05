@@ -244,6 +244,7 @@ export interface BankingAccountRow {
 
 /** Respuesta GET /banking/debt-totals */
 export interface BankingDebtTotalsOut {
+  /** Neto sum(-monto) en TC no pagados; devoluciones positivas restan. */
   credit_card_unpaid_clp: number;
   /**
    * Neto compartido sin liquidar: -sum(monto/participantes); egresos suben el valor,
