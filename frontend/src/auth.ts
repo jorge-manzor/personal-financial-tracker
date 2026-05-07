@@ -27,6 +27,16 @@ export function clearToken(): void {
   localStorage.removeItem(LEGACY_STORAGE_KEY);
 }
 
+/** Limpia sesión y notifica a la app (p. ej. tras 401). Idempotente. */
+export function logoutSession(): void {
+  clearToken();
+  try {
+    window.dispatchEvent(new CustomEvent("zendo:auth-logout"));
+  } catch {
+    /* no window en tests */
+  }
+}
+
 export function authHeaders(): Record<string, string> {
   const t = getToken();
   return t ? { Authorization: `Bearer ${t}` } : {};

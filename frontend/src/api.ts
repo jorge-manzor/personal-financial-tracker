@@ -1,15 +1,19 @@
 import { API_BASE } from "./config";
-import { authHeaders } from "./auth";
+import { authHeaders, logoutSession } from "./auth";
 
 export async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const headers = new Headers(init?.headers);
   const ah = authHeaders();
   if (ah.Authorization) headers.set("Authorization", ah.Authorization);
-  return fetch(`${API_BASE}${path}`, {
+  const r = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers,
     cache: init?.cache ?? "no-store",
   });
+  if (r.status === 401) {
+    logoutSession();
+  }
+  return r;
 }
 
 async function readJsonBody<T>(r: Response, pathForErrors: string): Promise<T> {

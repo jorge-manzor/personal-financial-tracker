@@ -818,6 +818,12 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/")
+def root_probe() -> dict[str, str]:
+    """Algunos hosts hacen probe HTTP a `/`; misma respuesta que `/health` para evitar 404 en reinicios."""
+    return {"status": "ok"}
+
+
 @app.post("/auth/register", response_model=TokenOut)
 def auth_register(body: UserRegister, db: Session = Depends(get_db)) -> TokenOut:
     email = body.email.strip().lower()

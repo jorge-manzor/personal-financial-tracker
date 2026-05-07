@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { apiFetch, fetchJson } from "./api";
-import { clearToken, getToken } from "./auth";
+import { getToken, logoutSession } from "./auth";
 import { Login } from "./Login";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
@@ -121,6 +121,18 @@ export default function App() {
   const [fintualModalFromProfile, setFintualModalFromProfile] = useState(false);
   /** Si el usuario cierra el modal sin conectar Fintual, no volver a bloquear hasta que abra de nuevo desde Perfil o recargue. */
   const [fintualSetupSkipped, setFintualSetupSkipped] = useState(false);
+
+  /** 401 en cualquier llamada autenticada: limpia token en api.ts y nos devuelve al login sin spam de errores. */
+  useEffect(() => {
+    function onAuthLogout() {
+      setAuthed(false);
+      setMe(null);
+      setInitError(null);
+      setReady(false);
+    }
+    window.addEventListener("zendo:auth-logout", onAuthLogout);
+    return () => window.removeEventListener("zendo:auth-logout", onAuthLogout);
+  }, []);
 
   const loadAll = useCallback(async (opts?: { fintualLive?: boolean }) => {
     const fintualLive = opts?.fintualLive !== false;
@@ -317,6 +329,9 @@ export default function App() {
       } catch (e) {
         console.error(e);
         if (!cancelled) {
+          if (e instanceof Error && e.message === "401") {
+            return;
+          }
           setInitError(
             `Sin respuesta del servidor (${apiBaseHint}). Tras reiniciar el backend puede tardar unos segundos; reintenta o comprueba que uvicorn esté en marcha.`,
           );
@@ -351,7 +366,7 @@ export default function App() {
     <div className="min-h-full bg-[#0d1117]">
       <AppSidebar
         onLogout={() => {
-          clearToken();
+          logoutSession();
           window.location.reload();
         }}
         investmentsEnabled={investmentsOn}
