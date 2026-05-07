@@ -313,6 +313,8 @@ export interface BankingTransactionRow {
   amount_per_person?: number | null;
   /** Movimiento gemelo (transferencia entre cuentas propias). */
   peer_transaction_id?: number | null;
+  /** Pago TC en cuenta corriente (vinculado al cargo); el monto suele ser editable pese al peer. */
+  cc_payment_mirror?: boolean;
   /** Reversa generada por la app; no editable, solo eliminar. */
   is_provision_reversal?: boolean;
   counterpart_account_id?: number | null;

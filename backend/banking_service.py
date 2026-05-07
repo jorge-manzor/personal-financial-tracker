@@ -635,10 +635,13 @@ def sync_credit_card_payment_mirror(
     now_ts = datetime.now(timezone.utc).replace(tzinfo=None)
 
     if existing:
-        existing.amount = amt_out
-        existing.fecha = pay_fecha
+        diff_amt = abs(float(existing.amount) - amt_out)
+        customized = diff_amt >= 1.0
+        if not customized:
+            existing.amount = amt_out
+            existing.fecha = pay_fecha
+            existing.accounting_month = acct_m
         existing.description = pay_desc
-        existing.accounting_month = acct_m
         existing.category_id = cat_id
         existing.subcategory_id = sub_id
         db.flush()
@@ -1769,6 +1772,29 @@ def get_category_for_user(db: Session, user_id: int, category_id: int) -> Bankin
     )
 
 
+def _is_credit_card_payment_mirror(db: Session, user_id: int, tx: BankingTransaction) -> bool:
+    """
+    Movimiento en cuenta líquida creado al marcar pagado un cargo TC (peer → fila en tarjeta),
+    categoría plantilla Pago Tarjeta de Crédito. El usuario puede editar monto/fecha sin romper el vínculo.
+    """
+    peer_id = getattr(tx, "peer_transaction_id", None)
+    if peer_id is None:
+        return False
+    cc = (
+        db.query(BankingTransaction)
+        .filter(BankingTransaction.user_id == user_id, BankingTransaction.id == int(peer_id))
+        .first()
+    )
+    if not cc:
+        return False
+    cc_acc = get_account_for_user(db, user_id, int(cc.account_id))
+    if not cc_acc or getattr(cc_acc, "product_type", None) != "tarjeta_credito":
+        return False
+    cat = get_category_for_user(db, user_id, int(tx.category_id))
+    tpl = getattr(cat, "template_cat_id", None) if cat else None
+    return tpl is not None and int(tpl) == TEMPLATE_CAT_PAGO_TARJETA_CREDITO
+
+
 def get_subcategory_for_user(db: Session, user_id: int, subcategory_id: int) -> BankingSubcategory | None:
     return (
         db.query(BankingSubcategory)
@@ -1978,6 +2004,7 @@ def transaction_to_out(
         "accounting_month": getattr(tx, "accounting_month", None),
         "amount_per_person": _banking_amount_per_person(tx),
         "peer_transaction_id": getattr(tx, "peer_transaction_id", None),
+        "cc_payment_mirror": _is_credit_card_payment_mirror(db, int(tx.user_id), tx),
         "is_provision_reversal": _is_provision_reversal_movement(db, tx.user_id, tx),
         **_transaction_counterpart_fields(db, tx),
     }
@@ -2409,7 +2436,7 @@ def patch_transaction_row(
     old_shared_settled = bool(getattr(tx, "shared_expense_settled", False))
     old_cc_paid = getattr(tx, "credit_card_charge_paid", None)
 
-    if getattr(tx, "peer_transaction_id", None):
+    if getattr(tx, "peer_transaction_id", None) and not _is_credit_card_payment_mirror(db, user_id, tx):
         raise HTTPException(
             status_code=400,
             detail="Este movimiento está vinculado a una transferencia entre cuentas propias. Elimínalo si necesitas cambiar cuenta, monto o fecha.",

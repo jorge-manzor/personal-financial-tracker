@@ -51,6 +51,24 @@ const BANKING_TEMPLATE_SUB_ENTRE_CUENTAS_PROPIAS = 1901;
 /** Plantilla seed: categoría Provisiones (reversa solo para estos movimientos). */
 const BANKING_TEMPLATE_CAT_PROVISIONES = 21;
 
+/** Bloquea editar filas con peer salvo el pago TC reflejado en cuenta corriente. */
+function bankingTxRowEditDisabled(row: BankingTransactionRow): boolean {
+  if (row.is_provision_reversal === true) return true;
+  if (row.peer_transaction_id == null) return false;
+  return row.cc_payment_mirror !== true;
+}
+
+function bankingTxRowEditTitle(row: BankingTransactionRow): string {
+  if (row.is_provision_reversal === true) return "Las reversas de provisión solo se pueden eliminar";
+  if (row.peer_transaction_id != null && row.cc_payment_mirror !== true) {
+    return "Las transferencias entre cuentas propias no se pueden editar aquí";
+  }
+  if (row.cc_payment_mirror === true) {
+    return "Editar: puedes ajustar el monto pagado desde cuenta corriente (p. ej. menos por devoluciones)";
+  }
+  return "Editar movimiento";
+}
+
 /** Movimientos por página (coincide con GET /banking/transactions `page_size`). */
 const BANKING_TX_PAGE_SIZE = 50;
 
@@ -1927,14 +1945,8 @@ function BankingVirtualizedMainTxTableBody({
               <div className="flex items-center justify-center gap-0.5">
                 <button
                   type="button"
-                  disabled={row.peer_transaction_id != null || row.is_provision_reversal === true}
-                  title={
-                    row.peer_transaction_id != null
-                      ? "Las transferencias entre cuentas propias no se pueden editar aquí"
-                      : row.is_provision_reversal === true
-                        ? "Las reversas de provisión solo se pueden eliminar"
-                        : "Editar movimiento"
-                  }
+                  disabled={bankingTxRowEditDisabled(row)}
+                  title={bankingTxRowEditTitle(row)}
                   onClick={() => openEdit(row)}
                   className={`${txIconBtn} disabled:pointer-events-none disabled:opacity-30`}
                 >
@@ -2158,14 +2170,8 @@ function BankingCcPendingChargesTable({
                     <div className="flex items-center justify-center gap-0.5">
                       <button
                         type="button"
-                        disabled={row.peer_transaction_id != null || row.is_provision_reversal === true}
-                        title={
-                          row.peer_transaction_id != null
-                            ? "Las transferencias entre cuentas propias no se pueden editar aquí"
-                            : row.is_provision_reversal === true
-                              ? "Las reversas de provisión solo se pueden eliminar"
-                              : "Editar movimiento"
-                        }
+                        disabled={bankingTxRowEditDisabled(row)}
+                        title={bankingTxRowEditTitle(row)}
                         onClick={() => openEdit(row)}
                         className={`${txIconBtnAux} disabled:pointer-events-none disabled:opacity-30`}
                       >
@@ -2368,14 +2374,8 @@ function BankingSharedPendingChargesTable({
                     <div className="flex items-center justify-center gap-0.5">
                       <button
                         type="button"
-                        disabled={row.peer_transaction_id != null || row.is_provision_reversal === true}
-                        title={
-                          row.peer_transaction_id != null
-                            ? "Las transferencias entre cuentas propias no se pueden editar aquí"
-                            : row.is_provision_reversal === true
-                              ? "Las reversas de provisión solo se pueden eliminar"
-                              : "Editar movimiento"
-                        }
+                        disabled={bankingTxRowEditDisabled(row)}
+                        title={bankingTxRowEditTitle(row)}
                         onClick={() => openEdit(row)}
                         className={`${txIconBtnAux} disabled:pointer-events-none disabled:opacity-30`}
                       >
@@ -2531,14 +2531,8 @@ function BankingProvisionPendingTable({
                     <div className="flex items-center justify-center gap-0.5">
                       <button
                         type="button"
-                        disabled={row.peer_transaction_id != null || row.is_provision_reversal === true}
-                        title={
-                          row.peer_transaction_id != null
-                            ? "Las transferencias entre cuentas propias no se pueden editar aquí"
-                            : row.is_provision_reversal === true
-                              ? "Las reversas de provisión solo se pueden eliminar"
-                              : "Editar movimiento"
-                        }
+                        disabled={bankingTxRowEditDisabled(row)}
+                        title={bankingTxRowEditTitle(row)}
                         onClick={() => openEdit(row)}
                         className={`${txIconBtnAux} disabled:pointer-events-none disabled:opacity-30`}
                       >
@@ -4183,9 +4177,12 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   }
 
   async function removeRow(row: BankingTransactionRow) {
-    const msg = row.peer_transaction_id
-      ? "¿Eliminar esta transferencia entre cuentas? Se eliminarán los dos movimientos enlazados y se ajustarán los saldos."
-      : "¿Eliminar este movimiento? El saldo de la cuenta se ajustará.";
+    const msg =
+      row.peer_transaction_id && row.cc_payment_mirror === true
+        ? "¿Eliminar este pago en cuenta corriente? El cargo en la tarjeta volverá a figurar como no pagado."
+        : row.peer_transaction_id
+          ? "¿Eliminar esta transferencia entre cuentas? Se eliminarán los dos movimientos enlazados y se ajustarán los saldos."
+          : "¿Eliminar este movimiento? El saldo de la cuenta se ajustará.";
     if (!confirm(msg)) return;
     try {
       const r = await apiFetch(`/banking/transactions/${row.id}`, { method: "DELETE" });
@@ -4206,7 +4203,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       await patchJson<BankingTransactionRow>(`/banking/transactions/${row.id}`, {
         credit_card_charge_paid: true,
       });
-      onToast("Cargo marcado como pagado; se registró el egreso en la cuenta corriente asociada.");
+      onToast(
+        "Cargo marcado como pagado; se registró el movimiento en la cuenta corriente. Puedes editarlo ahí para ajustar el monto pagado si hubo devoluciones.",
+      );
       await reloadBankingFull(bankingTxPage);
     } catch (e) {
       onToast(e instanceof Error ? e.message : "No se pudo marcar como pagado");

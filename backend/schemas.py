@@ -518,6 +518,10 @@ class BankingTransactionOut(BaseModel):
         description="amount/split_participants cuando is_shared (con signo: egreso negativo, ingreso positivo).",
     )
     peer_transaction_id: int | None = None
+    cc_payment_mirror: bool = Field(
+        default=False,
+        description="Pago TC reflejado en cuenta corriente (peer→cargo TC); editable monto/fecha pese al peer.",
+    )
     is_provision_reversal: bool = Field(
         default=False,
         description="True si es reversa automática de provisión (solo lectura / borrar).",
