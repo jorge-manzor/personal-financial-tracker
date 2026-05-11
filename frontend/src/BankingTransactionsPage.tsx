@@ -4204,7 +4204,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         credit_card_charge_paid: true,
       });
       onToast(
-        "Cargo marcado como pagado; se registró el movimiento en la cuenta corriente. Puedes editarlo ahí para ajustar el monto pagado si hubo devoluciones.",
+        row.amount >= 0
+          ? "Marcado como pagado en la tarjeta (sin movimiento en cuenta corriente)."
+          : "Cargo marcado como pagado; se registró el movimiento en la cuenta corriente. Puedes editarlo ahí para ajustar el monto pagado si hubo devoluciones.",
       );
       await reloadBankingFull(bankingTxPage);
     } catch (e) {

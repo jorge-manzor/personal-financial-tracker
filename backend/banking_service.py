@@ -569,9 +569,13 @@ def sync_credit_card_payment_mirror(
     cc_tx: BankingTransaction,
 ) -> None:
     """
-    Al marcar pagado un movimiento en tarjeta de crédito, refleja en la cuenta corriente asociada
-    un movimiento categoría Pago Tarjeta de Credito: egreso si el cargo es negativo, ingreso si
-    es una devolución (monto positivo). Al desmarcar, elimina ese movimiento.
+    Al marcar pagado un cargo en tarjeta (monto < 0), crea/actualiza el egreso en cuenta corriente
+    asociada (categoría Pago Tarjeta de Credito).
+
+    Las devoluciones / movimientos positivos en TC solo cambian el flag «pagado» en la tarjeta:
+    no generan movimiento en cuenta corriente (el reembolso ya está en el libro de la TC).
+
+    Al desmarcar pagado, elimina el espejo en cuenta corriente si existía.
     """
     acc = get_account_for_user(db, user_id, cc_tx.account_id)
     if not acc:
@@ -587,6 +591,13 @@ def sync_credit_card_payment_mirror(
     now_paid = bool(cc_tx.credit_card_charge_paid)
 
     if not now_paid:
+        deleted = _delete_cc_payment_transactions_for_charge(db, user_id, cc_tx.id)
+        for aid in deleted:
+            reconcile_banking_account_balance(db, aid)
+        return
+
+    # Ingreso/devolución en TC: solo reconciliación del estado de cuenta; sin línea en cuenta corriente.
+    if float(cc_tx.amount) > 0:
         deleted = _delete_cc_payment_transactions_for_charge(db, user_id, cc_tx.id)
         for aid in deleted:
             reconcile_banking_account_balance(db, aid)
