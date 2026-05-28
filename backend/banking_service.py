@@ -1514,8 +1514,9 @@ def banking_provisions_pending_reversal_groups_payload(db: Session, user_id: int
         tid = tpl_by_cat.get(int(tx.category_id))
         return tid is not None and int(tid) == TEMPLATE_CAT_PROVISIONES
 
-    # Clave: cuenta + categoría + sub + monto (de la fila reversa); valores: descripciones exactas de reversas
-    rev_desc_by_key: dict[tuple[int, int, int, float], set[str]] = {}
+    # Clave: cuenta + categoría + sub + monto + descripción esperada.
+    # Una reversa antigua no debe "tapar" provisiones iguales creadas en meses posteriores.
+    revs_by_key: dict[tuple[int, int, int, float, str], list[BankingTransaction]] = {}
     for tx in txs:
         if not is_provision_reversal_row(tx):
             continue
@@ -1524,11 +1525,21 @@ def banking_provisions_pending_reversal_groups_payload(db: Session, user_id: int
             int(tx.category_id),
             int(tx.subcategory_id),
             round(float(tx.amount), 4),
+            (tx.description or "").strip(),
         )
-        rev_desc_by_key.setdefault(key, set()).add((tx.description or "").strip())
+        revs_by_key.setdefault(key, []).append(tx)
+
+    def tx_order_key(tx: BankingTransaction) -> tuple[date, datetime, int]:
+        created = getattr(tx, "created_at", None)
+        if not isinstance(created, datetime):
+            created = datetime.min
+        return (tx.fecha, created, int(tx.id))
+
+    for revs in revs_by_key.values():
+        revs.sort(key=tx_order_key)
 
     pending: list[BankingTransaction] = []
-    for tx in txs:
+    for tx in sorted(txs, key=tx_order_key):
         if is_provision_reversal_row(tx):
             continue
         if abs(float(tx.amount)) < 1e-12:
@@ -1539,10 +1550,15 @@ def banking_provisions_pending_reversal_groups_payload(db: Session, user_id: int
             int(tx.category_id),
             int(tx.subcategory_id),
             round(-float(tx.amount), 4),
+            expected,
         )
-        if expected in rev_desc_by_key.get(lookup_key, set()):
+        revs = revs_by_key.get(lookup_key, [])
+        rev_idx = next((i for i, rev in enumerate(revs) if tx_order_key(rev) >= tx_order_key(tx)), None)
+        if rev_idx is not None:
+            del revs[rev_idx]
             continue
         pending.append(tx)
+    pending.sort(key=tx_order_key, reverse=True)
 
     by_acc: dict[int, list[BankingTransaction]] = {}
     for tx in pending:

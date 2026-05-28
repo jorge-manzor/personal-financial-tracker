@@ -179,6 +179,81 @@ def _banking_transactions_scope_expr(
     return and_(BankingTransaction.fecha >= cutoff, BankingTransaction.fecha <= today)
 
 
+def _banking_transactions_column_filter_exprs(
+    *,
+    description: str | None,
+    amount_min: float | None,
+    amount_max: float | None,
+    tx_date_from: str | None,
+    tx_date_to: str | None,
+    category_ids: list[int] | None,
+    subcategory_ids: list[int] | None,
+    shared_scopes: list[str] | None,
+    liquidado_values: list[str] | None,
+    tc_paid_values: list[str] | None,
+    accounting_months: list[str] | None,
+):
+    exprs = []
+    desc = (description or "").strip().lower()
+    if desc:
+        exprs.append(func.lower(func.coalesce(BankingTransaction.description, "")).like(f"%{desc}%"))
+    if amount_min is not None:
+        exprs.append(BankingTransaction.amount >= amount_min)
+    if amount_max is not None:
+        exprs.append(BankingTransaction.amount <= amount_max)
+    if tx_date_from:
+        exprs.append(BankingTransaction.fecha >= _parse_iso_date_yyyy_mm_dd(tx_date_from))
+    if tx_date_to:
+        exprs.append(BankingTransaction.fecha <= _parse_iso_date_yyyy_mm_dd(tx_date_to))
+    if category_ids:
+        exprs.append(BankingTransaction.category_id.in_(list(dict.fromkeys(category_ids))))
+    if subcategory_ids:
+        exprs.append(BankingTransaction.subcategory_id.in_(list(dict.fromkeys(subcategory_ids))))
+
+    shared = set(shared_scopes or [])
+    unknown_shared = shared - {"personal", "shared_any"}
+    if unknown_shared:
+        raise HTTPException(status_code=400, detail="shared_scopes inválido.")
+    if shared and shared != {"personal", "shared_any"}:
+        exprs.append(BankingTransaction.is_shared.is_(True) if "shared_any" in shared else BankingTransaction.is_shared.is_(False))
+
+    liq = set(liquidado_values or [])
+    unknown_liq = liq - {"yes", "no", "na"}
+    if unknown_liq:
+        raise HTTPException(status_code=400, detail="liquidado_values inválido.")
+    liq_exprs = []
+    if "yes" in liq:
+        liq_exprs.append(and_(BankingTransaction.is_shared.is_(True), BankingTransaction.shared_expense_settled.is_(True)))
+    if "no" in liq:
+        liq_exprs.append(and_(BankingTransaction.is_shared.is_(True), BankingTransaction.shared_expense_settled.is_(False)))
+    if "na" in liq:
+        liq_exprs.append(BankingTransaction.is_shared.is_(False))
+    if liq_exprs:
+        exprs.append(or_(*liq_exprs))
+
+    tc = set(tc_paid_values or [])
+    unknown_tc = tc - {"paid", "unpaid", "na"}
+    if unknown_tc:
+        raise HTTPException(status_code=400, detail="tc_paid_values inválido.")
+    tc_exprs = []
+    if "paid" in tc:
+        tc_exprs.append(BankingTransaction.credit_card_charge_paid.is_(True))
+    if "unpaid" in tc:
+        tc_exprs.append(BankingTransaction.credit_card_charge_paid.is_(False))
+    if "na" in tc:
+        tc_exprs.append(BankingTransaction.credit_card_charge_paid.is_(None))
+    if tc_exprs:
+        exprs.append(or_(*tc_exprs))
+
+    month_exprs = []
+    for raw in accounting_months or []:
+        start = _parse_month_yyyy_mm(raw)
+        month_exprs.append(_accounting_month_span_expr(start, start))
+    if month_exprs:
+        exprs.append(or_(*month_exprs))
+    return exprs
+
+
 router = APIRouter()
 
 
@@ -662,6 +737,17 @@ def banking_list_transactions(
     date_to: str | None = Query(None, description="YYYY-MM-DD fin inclusive."),
     accounting_month_from: str | None = Query(None, description="Opcional avanzado: YYYY-MM (prioridad sobre date_from/date_to si ambos pares existen)."),
     accounting_month_to: str | None = Query(None, description="Opcional avanzado: YYYY-MM."),
+    description: str | None = Query(None, description="Filtro contiene texto en descripción."),
+    amount_min: float | None = Query(None),
+    amount_max: float | None = Query(None),
+    tx_date_from: str | None = Query(None, description="Filtro de columna Fecha: inicio inclusive."),
+    tx_date_to: str | None = Query(None, description="Filtro de columna Fecha: fin inclusive."),
+    category_ids: Annotated[list[int] | None, Query()] = None,
+    subcategory_ids: Annotated[list[int] | None, Query()] = None,
+    shared_scopes: Annotated[list[str] | None, Query()] = None,
+    liquidado_values: Annotated[list[str] | None, Query()] = None,
+    tc_paid_values: Annotated[list[str] | None, Query()] = None,
+    accounting_months: Annotated[list[str] | None, Query()] = None,
     db: Session = Depends(get_db),
 ) -> BankingTransactionListOut:
     ensure_default_categories(db, user.id)
@@ -706,6 +792,21 @@ def banking_list_transactions(
     if scope_expr is not None:
         q = q.filter(scope_expr)
         cq = cq.filter(scope_expr)
+    for expr in _banking_transactions_column_filter_exprs(
+        description=description,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        tx_date_from=tx_date_from,
+        tx_date_to=tx_date_to,
+        category_ids=category_ids,
+        subcategory_ids=subcategory_ids,
+        shared_scopes=shared_scopes,
+        liquidado_values=liquidado_values,
+        tc_paid_values=tc_paid_values,
+        accounting_months=accounting_months,
+    ):
+        q = q.filter(expr)
+        cq = cq.filter(expr)
     n = cq.scalar() or 0
     rows = (
         q.order_by(

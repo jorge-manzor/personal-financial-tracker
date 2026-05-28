@@ -125,12 +125,24 @@ function bankingTabCacheKey(
   filterAccountIds: number[],
   effectiveDateFrom: string,
   effectiveDateTo: string,
+  filters: BankingTxFilterSnapshot,
 ): string {
   return JSON.stringify({
     s: scope,
     a: [...filterAccountIds].sort((x, y) => x - y),
     df: effectiveDateFrom,
     dt: effectiveDateTo,
+    fd: filters.filterDateFrom,
+    ft: filters.filterDateTo,
+    q: filters.filterDescription.trim().toLowerCase(),
+    mn: filters.filterAmountMin.trim(),
+    mx: filters.filterAmountMax.trim(),
+    c: [...filters.filterCategoryIds].sort((x, y) => x - y),
+    sc: [...filters.filterSubcategoryIds].sort((x, y) => x - y),
+    sh: [...filters.filterSharedScopes].sort(),
+    liq: [...filters.filterLiquidadoValues].sort(),
+    tc: [...filters.filterTcPaidValues].sort(),
+    am: [...filters.filterAccountingMonthYms].sort(),
   });
 }
 
@@ -1436,7 +1448,7 @@ function BankingTxSubcategoryFilterBody() {
       </div>
       {ctx.filterSubcategoryDropdownRows.length === 0 ? (
         <p className="text-[12px] leading-snug text-slate-500">
-          No hay subcategorías en los movimientos cargados
+          No hay subcategorías disponibles
           {ctx.filterCategoryIds.length > 0 ? " para las categorías seleccionadas." : "."}
         </p>
       ) : filtered.length === 0 ? (
@@ -3146,6 +3158,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     filterAccountIds,
     effectiveBankingMovementDateRange.from,
     effectiveBankingMovementDateRange.to,
+    filterSnapshot,
   );
   const buildBankingTxQueryParams = useCallback(
     (page: number, tabScope: BankingMovementTabScope = movementTab) => {
@@ -3162,9 +3175,39 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       if (tabScope === "provisiones") params.set("scope", "provisiones");
       params.set("date_from", effectiveBankingMovementDateRange.from);
       params.set("date_to", effectiveBankingMovementDateRange.to);
+      if (filterDateFrom) params.set("tx_date_from", filterDateFrom);
+      if (filterDateTo) params.set("tx_date_to", filterDateTo);
+      const desc = filterDescription.trim();
+      if (desc) params.set("description", desc);
+      const amountMin = parseChileanAmountInput(filterAmountMin);
+      if (filterAmountMin.trim() && Number.isFinite(amountMin)) params.set("amount_min", String(amountMin));
+      const amountMax = parseChileanAmountInput(filterAmountMax);
+      if (filterAmountMax.trim() && Number.isFinite(amountMax)) params.set("amount_max", String(amountMax));
+      for (const id of filterCategoryIds) params.append("category_ids", String(id));
+      for (const id of filterSubcategoryIds) params.append("subcategory_ids", String(id));
+      for (const v of filterSharedScopes) params.append("shared_scopes", v);
+      for (const v of filterLiquidadoValues) params.append("liquidado_values", v);
+      for (const v of filterTcPaidValues) params.append("tc_paid_values", v);
+      for (const ym of filterAccountingMonthYms) params.append("accounting_months", ym);
       return params;
     },
-    [filterAccountIds, movementTab, effectiveBankingMovementDateRange.from, effectiveBankingMovementDateRange.to],
+    [
+      filterAccountIds,
+      movementTab,
+      effectiveBankingMovementDateRange.from,
+      effectiveBankingMovementDateRange.to,
+      filterDateFrom,
+      filterDateTo,
+      filterDescription,
+      filterAmountMin,
+      filterAmountMax,
+      filterCategoryIds,
+      filterSubcategoryIds,
+      filterSharedScopes,
+      filterLiquidadoValues,
+      filterTcPaidValues,
+      filterAccountingMonthYms,
+    ],
   );
 
   /** Respuesta cruda de lista (sin setState). */
@@ -3336,6 +3379,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       filterAccountIds,
       effectiveBankingMovementDateRange.from,
       effectiveBankingMovementDateRange.to,
+      filterSnapshot,
     );
     const cached = tabTxCacheRef.current.get(requestKey);
 
@@ -3380,6 +3424,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     filterAccountIds,
     effectiveBankingMovementDateRange.from,
     effectiveBankingMovementDateRange.to,
+    filterSnapshot,
     reloadBankingDataForScope,
   ]);
 
@@ -3400,6 +3445,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             filterAccountIds,
             effectiveBankingMovementDateRange.from,
             effectiveBankingMovementDateRange.to,
+            filterSnapshot,
           );
           if (tabTxCacheRef.current.has(key)) continue;
           try {
@@ -3432,6 +3478,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     filterAccountIds,
     effectiveBankingMovementDateRange.from,
     effectiveBankingMovementDateRange.to,
+    filterSnapshot,
     loadBankingTransactionsFromNetwork,
     fetchBankingMetaFromNetwork,
     loading,
@@ -3458,6 +3505,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         filterAccountIds,
         effectiveBankingMovementDateRange.from,
         effectiveBankingMovementDateRange.to,
+        filterSnapshot,
       );
       bankingTxPageFetchAbortRef.current?.abort();
       const ac = new AbortController();
@@ -3490,6 +3538,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       effectiveBankingMovementDateRange.to,
       bankingTxTotalPages,
       filterAccountIds,
+      filterSnapshot,
       loadBankingTransactionsFromNetwork,
       movementTab,
     ],
@@ -3759,24 +3808,21 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
   const filterSubcategoryDropdownRows = useMemo(() => {
     const rows: { id: number; label: string; categoryId: number; categoryColor: string }[] = [];
-    const usedSubIds = new Set(items.map((r) => r.subcategory_id));
     for (const c of categories) {
       for (const s of c.subcategories) {
-        if (usedSubIds.has(s.id)) {
-          rows.push({
-            id: s.id,
-            categoryId: c.id,
-            categoryColor: c.color,
-            label: `${c.name} › ${s.name}`,
-          });
-        }
+        rows.push({
+          id: s.id,
+          categoryId: c.id,
+          categoryColor: c.color,
+          label: `${c.name} › ${s.name}`,
+        });
       }
     }
     rows.sort((a, b) => a.label.localeCompare(b.label, "es"));
     if (filterCategoryIds.length === 0) return rows;
     const allow = new Set(filterCategoryIds);
     return rows.filter((r) => allow.has(r.categoryId));
-  }, [categories, items, filterCategoryIds]);
+  }, [categories, filterCategoryIds]);
 
   const filteredBankingTxItems = useMemo(() => {
     const parseAmt = (s: string) => {
@@ -4797,7 +4843,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 {tabRefreshing ? <span className="text-[11px] text-slate-500 banking-dark:text-zinc-500">Actualizando…</span> : null}
               </div>
             </div>
-            {items.length === 0 ? (
+            {items.length === 0 && !bankingTxFiltersActive ? (
               <p className="p-6 text-sm text-slate-400 banking-dark:text-zinc-500">
                 No hay movimientos en este período. Amplía el rango Desde / hasta.
               </p>
