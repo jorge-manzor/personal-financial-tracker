@@ -2812,12 +2812,20 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
   useEffect(() => {
     const usedCat = new Set(items.map((r) => r.category_id));
-    setFilterCategoryIds((prev) => prev.filter((id) => usedCat.has(id)));
+    setFilterCategoryIds((prev) => {
+      if (prev.length === 0) return prev;
+      const next = prev.filter((id) => usedCat.has(id));
+      return next.length === prev.length ? prev : next;
+    });
   }, [items]);
 
   useEffect(() => {
     const usedSub = new Set(items.map((r) => r.subcategory_id));
-    setFilterSubcategoryIds((prev) => prev.filter((id) => usedSub.has(id)));
+    setFilterSubcategoryIds((prev) => {
+      if (prev.length === 0) return prev;
+      const next = prev.filter((id) => usedSub.has(id));
+      return next.length === prev.length ? prev : next;
+    });
   }, [items]);
 
   useEffect(() => {
@@ -2827,7 +2835,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       const cat = categories.find((c) => c.id === cid);
       if (cat) for (const s of cat.subcategories) allowed.add(s.id);
     }
-    setFilterSubcategoryIds((prev) => prev.filter((id) => allowed.has(id)));
+    setFilterSubcategoryIds((prev) => {
+      if (prev.length === 0) return prev;
+      const next = prev.filter((id) => allowed.has(id));
+      return next.length === prev.length ? prev : next;
+    });
   }, [filterCategoryIds, categories]);
 
   useEffect(() => {
