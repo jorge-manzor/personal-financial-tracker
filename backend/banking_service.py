@@ -1444,13 +1444,9 @@ def banking_bulk_set_shared_expense_settled(db: Session, user_id: int, transacti
             detail=f"Estos movimientos no son compartidos: {sorted(not_shared)}",
         )
     n = 0
-    d_liquidacion = _banking_today_cl()
-    acct_liq = first_day_of_month_calendar(d_liquidacion)
     for t in txs:
         if not bool(getattr(t, "shared_expense_settled", False)):
             t.shared_expense_settled = True
-            t.fecha = d_liquidacion
-            t.accounting_month = acct_liq
             n += 1
     db.commit()
     return n
@@ -2460,9 +2456,6 @@ def patch_transaction_row(
     if not tx:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado")
 
-    old_shared_settled = bool(getattr(tx, "shared_expense_settled", False))
-    old_cc_paid = getattr(tx, "credit_card_charge_paid", None)
-
     if getattr(tx, "peer_transaction_id", None) and not _is_credit_card_payment_mirror(db, user_id, tx):
         raise HTTPException(
             status_code=400,
@@ -2568,27 +2561,6 @@ def patch_transaction_row(
         tx.accounting_month = first_day_of_month_calendar(new_fecha)
     elif getattr(tx, "accounting_month", None) is None:
         tx.accounting_month = first_day_of_month_calendar(tx.fecha)
-
-    # Sin fecha explícita en el PATCH: al liquidar compartido o marcar cargo TC pagado, usar el día actual (CL).
-    if fecha is None:
-        d_pay = _banking_today_cl()
-        am_pay = first_day_of_month_calendar(d_pay)
-        if (
-            shared_expense_settled is not None
-            and bool(tx.shared_expense_settled)
-            and not old_shared_settled
-            and bool(getattr(tx, "is_shared", False))
-        ):
-            tx.fecha = d_pay
-            tx.accounting_month = am_pay
-        elif (
-            credit_card_charge_paid is not None
-            and pt_final == "tarjeta_credito"
-            and bool(tx.credit_card_charge_paid)
-            and (old_cc_paid is None or old_cc_paid is False)
-        ):
-            tx.fecha = d_pay
-            tx.accounting_month = am_pay
 
     old_pt = getattr(old_acc, "product_type", None)
     if pt_final == "tarjeta_credito" or old_pt == "tarjeta_credito":

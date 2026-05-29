@@ -1382,7 +1382,7 @@ function BankingTxCategoryFilterBody() {
         })}
       </div>
       {ctx.filterCategoriesSorted.length === 0 ? (
-        <p className="text-[12px] leading-snug text-slate-500">No hay categorías en los movimientos cargados.</p>
+        <p className="text-[12px] leading-snug text-slate-500">No hay categorías disponibles.</p>
       ) : filtered.length === 0 ? (
         <p className="text-[12px] leading-snug text-slate-500">
           Ninguna categoría coincide con «{query.trim()}».
@@ -2811,24 +2811,6 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   }, [balancePrivacyStrict]);
 
   useEffect(() => {
-    const usedCat = new Set(items.map((r) => r.category_id));
-    setFilterCategoryIds((prev) => {
-      if (prev.length === 0) return prev;
-      const next = prev.filter((id) => usedCat.has(id));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [items]);
-
-  useEffect(() => {
-    const usedSub = new Set(items.map((r) => r.subcategory_id));
-    setFilterSubcategoryIds((prev) => {
-      if (prev.length === 0) return prev;
-      const next = prev.filter((id) => usedSub.has(id));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [items]);
-
-  useEffect(() => {
     if (filterCategoryIds.length === 0) return;
     const allowed = new Set<number>();
     for (const cid of filterCategoryIds) {
@@ -3812,11 +3794,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   }, []);
 
   const filterCategoriesSorted = useMemo(() => {
-    const usedCatIds = new Set(items.map((r) => r.category_id));
     return [...categories]
-      .filter((c) => usedCatIds.has(c.id))
       .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
-  }, [categories, items]);
+  }, [categories]);
 
   const filterSubcategoryDropdownRows = useMemo(() => {
     const rows: { id: number; label: string; categoryId: number; categoryColor: string }[] = [];
