@@ -1460,6 +1460,62 @@ function BankingTxSubcategoryFilterBody() {
   );
 }
 
+function BankingTxDescriptionFilterBody() {
+  const ctx = useBankingTxFilterUICtx();
+  const sel = bankingMainTxFilterInputClass;
+  const [draft, setDraft] = useState(ctx.filterDescription);
+
+  useEffect(() => {
+    setDraft(ctx.filterDescription);
+  }, [ctx.filterDescription]);
+
+  const apply = useCallback(() => {
+    ctx.setFilterDescription(draft.trim());
+  }, [ctx, draft]);
+
+  const clear = useCallback(() => {
+    setDraft("");
+    ctx.setFilterDescription("");
+  }, [ctx]);
+
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        apply();
+      }}
+    >
+      <label className="block">
+        <span className="text-xs text-slate-500">Contiene texto</span>
+        <input
+          type="search"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Buscar en la descripción…"
+          autoComplete="off"
+          className={`${sel} mt-1`}
+        />
+      </label>
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={clear}
+          className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-medium text-slate-600 transition hover:bg-slate-50"
+        >
+          Borrar
+        </button>
+        <button
+          type="submit"
+          className="rounded-lg border border-teal-300 bg-teal-50 px-3 py-1.5 text-[12px] font-semibold text-teal-800 transition hover:bg-teal-100"
+        >
+          Aplicar
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function BankingTxColumnHeader({ colKey }: { colKey: BankingTxColumnKey }) {
   const ctx = useBankingTxFilterUICtx();
   const label = BANKING_TX_COLUMN_LABELS[colKey];
@@ -1530,19 +1586,7 @@ function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColumnKey })
         </div>
       );
     case "descripcion":
-      return (
-        <label className="block">
-          <span className="text-xs text-slate-500">Contiene texto</span>
-          <input
-            type="search"
-            value={ctx.filterDescription}
-            onChange={(e) => ctx.setFilterDescription(e.target.value)}
-            placeholder="Buscar en la descripción…"
-            autoComplete="off"
-            className={`${sel} mt-1`}
-          />
-        </label>
-      );
+      return <BankingTxDescriptionFilterBody />;
     case "producto":
       return (
         <div className="space-y-2">
@@ -1901,6 +1945,7 @@ function BankingVirtualizedMainTxTableBody({
   removeRow: (row: BankingTransactionRow) => void;
 }) {
   const colCount = orderedVisibleBankingTxColumns.length + 1;
+  const rowIdsKey = useMemo(() => rows.map((r) => r.id).join(","), [rows]);
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollRef.current,
@@ -1914,6 +1959,12 @@ function BankingVirtualizedMainTxTableBody({
      */
     useFlushSync: false,
   });
+  useLayoutEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 });
+    virtualizer.scrollToOffset(0);
+    const rafId = requestAnimationFrame(() => virtualizer.measure());
+    return () => cancelAnimationFrame(rafId);
+  }, [rowIdsKey, scrollRef, virtualizer]);
   const vItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
   const padTop = vItems.length > 0 ? vItems[0].start : 0;
