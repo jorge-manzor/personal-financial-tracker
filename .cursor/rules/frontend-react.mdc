@@ -1,0 +1,14 @@
+---
+description: Convenciones React/TS del frontend
+globs: frontend/src/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Frontend React
+
+- Detalle: `frontend/AGENTS.md`.
+- API solo vía `api.ts` / `auth.ts`; base en `config.ts` (`API_BASE` sin trailing slash).
+- Rutas nuevas en `App.tsx` con gate `me.services.investments` / `banking`.
+- Copy UI en español; Tailwind existente; no nuevo design system sin pedido.
+- No reescribir `BankingTransactionsPage.tsx` ni otras páginas monstruo: cambios locales.
+- Verificar con `npm run lint` (y `npm run build` si tocaste tipos/rutas).

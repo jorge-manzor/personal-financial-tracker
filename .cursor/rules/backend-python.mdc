@@ -1,0 +1,14 @@
+---
+description: Convenciones Python backend FastAPI
+globs: backend/**/*.py
+alwaysApply: false
+---
+
+# Backend Python
+
+- Detalle: `backend/AGENTS.md`.
+- Banking → `BankingUser`; inversiones → `InvestmentsUser`; SSE → variante SSE + `access_token`.
+- Lógica en `*_service.py`; no hinchar `main.py` si ya hay módulo.
+- Schema nuevo → `schemas.py`. Modelo/columna → `models.py` + `multiuser_migration.py` idempotente (no Alembic).
+- No loguear secretos. Fintual: no sustituir cookie de usuario con `.env` en rutas por usuario.
+- Diffs quirúrgicos en `banking_service.py`, `main.py`, `fintual_sync.py`.

@@ -1,0 +1,13 @@
+---
+description: Migraciones SQLite idempotentes
+globs: backend/multiuser_migration.py
+alwaysApply: false
+---
+
+# multiuser_migration.py
+
+- Solo cambios **idempotentes**: inspeccionar tablas/columnas; crear/alterar solo si falta.
+- Usar `_migration_flags` / `_set_migration_flag` cuando el cambio no sea trivialmente detectable.
+- Coordinar con `models.py` y `schemas.py` en el mismo cambio.
+- No borrar datos de usuarios ni asumir DB vacía.
+- Tras editar: `python -c "import main"` desde `backend/`.

@@ -2,7 +2,9 @@
 
 Aplicación web **full-stack** para **inversiones** (Fintual, activos manuales, gráficos) y **cuentas / movimientos bancarios** en CLP, con **cuentas de usuario**, **JWT** y **servicios opt-in** por perfil.
 
-> Este README resume el contexto del repo para **desarrolladores** y para **nuevas conversaciones con asistentes de IA**: arquitectura, decisiones y cómo arrancar el proyecto.
+> Este README resume el contexto del repo para **desarrolladores**: arquitectura, decisiones y cómo arrancar el proyecto.
+>
+> **Agentes de IA**: empezar por [`AGENTS.md`](./AGENTS.md) (symlinks `CLAUDE.md` / `GEMINI.md`). Detalle en `backend/AGENTS.md`, `frontend/AGENTS.md` y `docs/`.
 
 ---
 
@@ -112,30 +114,42 @@ Build producción frontend: `npm run build` → `frontend/dist`.
 
 ```
 personal-financial-tracker/
+├── AGENTS.md                    # Instrucciones para agentes de IA (también CLAUDE.md / GEMINI.md)
+├── .cursor/rules/               # Reglas Cursor (apuntan a AGENTS/docs)
+├── scripts/verify.sh            # Smoke: import backend + lint frontend
 ├── backend/
+│   ├── AGENTS.md
 │   ├── main.py, database.py
 │   ├── auth.py
 │   ├── banking_routes.py, banking_service.py
+│   ├── banking_personal_order_routes.py
+│   ├── savings_calculator_routes.py
 │   ├── models.py, schemas.py
 │   ├── fintual_client.py, fintual_sync.py, market_data.py
 │   ├── history.py, portfolio_metrics.py, exchange_service.py
 │   ├── multiuser_migration.py
-│   ├── data/                    # ej. categorías y bancos Chile (JSON)
+│   ├── data/                    # categorías, bancos Chile, sectores (JSON)
 │   └── requirements.txt
 ├── frontend/
+│   ├── AGENTS.md
 │   ├── src/
 │   │   ├── App.tsx, Dashboard.tsx
 │   │   ├── BankingTransactionsPage.tsx, BankingSettingsPage.tsx
+│   │   ├── BankingPersonalOrderPage.tsx, SavingsCalculatorPage.tsx
 │   │   ├── Login.tsx, Profile.tsx, FintualConnectModal.tsx
 │   │   ├── AppSidebar.tsx, AppHeader.tsx, SyncOverlay.tsx
 │   │   ├── api.ts, auth.ts, types.ts, config.ts, format.ts
 │   │   └── ...
 │   └── package.json
 ├── docs/
+│   ├── architecture.md, invariants.md, adding-a-feature.md
+│   ├── domain-banking.md, domain-investments.md, api-cheat-sheet.md
 │   ├── deploy-render.md
 │   └── deploy-railway.md
 └── README.md
 ```
+
+Para asistentes de IA: empezar por **`AGENTS.md`**. Detalle de dominio y playbooks en `docs/`.
 
 ---
 

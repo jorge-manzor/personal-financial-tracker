@@ -1,0 +1,12 @@
+---
+description: Seguridad y lectura de AGENTS.md para todo el repo
+alwaysApply: true
+---
+
+# Core (Zendo Finance)
+
+- Lee `AGENTS.md` (y el `AGENTS.md` de `backend/` o `frontend/` según el cambio).
+- No leas, loguees ni commits de `backend/.env`, JWT, cookies Fintual ni API keys.
+- Respeta multiusuario (`user_id`) y guards de servicio (`BankingUser` / `InvestmentsUser`).
+- No reescribas archivos calientes enteros sin pedido explícito (ver `AGENTS.md`).
+- Invariantes: `docs/invariants.md`. Cambios mínimos al pedido.
