@@ -4,10 +4,20 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   backend-smoke:
+    name: backend-smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
@@ -26,11 +36,13 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
       - name: Import app
         run: python -c "import main; print(main.app.title)"
-      - name: Smoke tests
-        run: pytest -q tests/test_smoke.py
+      - name: Unit + smoke tests
+        run: pytest -q tests/
 
   frontend:
+    name: frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: frontend
@@ -45,5 +57,5 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
-      - name: Build
+      - name: Typecheck + build
         run: npm run build
