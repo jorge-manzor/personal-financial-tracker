@@ -39,7 +39,9 @@ jobs:
       - name: Import app
         run: python -c "import main; print(main.app.title)"
       - name: Unit + smoke tests
-        run: pytest -q tests/
+        run: python -m pytest -q tests/
+        env:
+          PYTHONPATH: .
 
   frontend:
     name: frontend

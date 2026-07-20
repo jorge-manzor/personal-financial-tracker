@@ -29,7 +29,7 @@ cd "$ROOT/backend"
 if [[ "${SKIP_SMOKE:-}" != "1" ]]; then
   if "$PY" -c "import pytest" >/dev/null 2>&1; then
     echo "== backend: smoke pytest =="
-    (cd "$ROOT/backend" && "$PY" -m pytest -q tests/)
+    (cd "$ROOT/backend" && PYTHONPATH=. "$PY" -m pytest -q tests/)
   else
     echo "== backend: smoke omitido (pip install -r requirements-dev.txt) =="
   fi
