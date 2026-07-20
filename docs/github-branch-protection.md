@@ -1,6 +1,8 @@
-# Proteger `main` en GitHub (branch protection)
+# Proteger `main` en GitHub (Rulesets)
 
 Instrucciones para que **solo entre código vía PR** y el **CI bloquee merges rotos**.
+
+> La UI actual de GitHub usa **Rulesets** (Settings → Rules → Rulesets). Las “classic branch protection rules” pueden no aparecer; usa Rulesets.
 
 ## 1. Comprobar que el workflow exista
 
@@ -10,59 +12,54 @@ Tras un push o PR, en **Actions** deben aparecer dos jobs:
 
 | Job (nombre a exigir) | Qué valida |
 |------------------------|------------|
-| `backend-smoke` | Import app + pytest smoke API |
+| `backend-smoke` | Import app + pytest (`tests/`) |
 | `frontend` | `npm run lint` + `npm run build` |
 
-En la UI de status checks a veces se ven como:
+En la UI a veces se ven como `CI / backend-smoke` y `CI / frontend`. Al configurar el ruleset, usa el **nombre del job** (`backend-smoke`, `frontend`).
 
-- `CI / backend-smoke`
-- `CI / frontend`
+## 2. Crear un branch ruleset
 
-Usa el nombre que muestre el desplegable de GitHub al configurar (suele ser el **nombre del job**).
+1. Repo → **Settings** → **Rules** → **Rulesets**  
+   (o **Settings** → **Branches**, si te redirige a Rulesets).
+2. **New ruleset** → **New branch ruleset**.
+3. Configura:
 
-## 2. Branch protection rules
+| Campo | Valor |
+|-------|--------|
+| Ruleset name | `Protect main` |
+| Enforcement status | **Active** (usa **Evaluate** solo si quieres probar sin bloquear) |
+| Target branches | **Include** → `main` (o Default branch) |
+| Bypass list | Vacío (recomendado) o solo tu usuario para emergencias |
 
-1. Abre el repo en GitHub → **Settings** → **Branches**.
-2. **Add branch protection rule** (o **Add classic branch protection rule**).
-3. **Branch name pattern:** `main`
-4. Activa:
+4. En **Rules** / branch protections, activa:
 
 ### Obligatorias
 
+- [x] **Restrict deletions**
+- [x] **Block force pushes**
 - [x] **Require a pull request before merging**
-  - [x] Require approvals: `0` está bien en repo personal (o `1` si quieres auto-revisión consciente)
-  - [ ] Dismiss stale PR approvals when new commits are pushed (opcional)
-- [x] **Require status checks to pass before merging**
-  - [x] **Require branches to be up to date before merging** (recomendado)
-  - Busca y marca:
+  - Required approvals: `0` (repo personal) o `1`
+- [x] **Require status checks to pass**
+  - Añade (con **+** / Add) exactamente:
     - `backend-smoke`
-    - `frontend`  
-    Si aún no aparecen en la lista: abre un PR de prueba, espera a que corra el CI una vez, y vuelve a esta pantalla.
-- [x] **Do not allow bypassing the above settings** (si está disponible y eres admin, actívalo para no saltarte la regla por error)
+    - `frontend`
+  - [x] **Require branches to be up to date before merging** (strict; recomendado)
 
-### Recomendadas
+Si los checks no aparecen en el autocomplete: mergea o abre un PR, espera a que Actions corra una vez, y vuelve a editar el ruleset.
 
-- [x] **Restrict force pushes** (o “Do not allow force pushes”)
-- [x] **Do not allow deletions** de `main`
-- [ ] Require conversation resolution before merging (útil si hay reviews)
+Si pide “source” / app del check: **Any source** o **GitHub Actions**.
 
-### Evitar (por ahora)
-
-- No hace falta “Require signed commits” ni “Require linear history” salvo que lo uses ya.
-
-5. **Save changes**.
+5. **Create** / **Save changes**.
 
 ## 3. Ajustes del repo (opcional pero útil)
 
 **Settings → General:**
 
 - Default branch: `main`
-- Preferir **Allow squash merging** (historial limpio)
-- Desactivar merge commit / rebase si quieres un solo estilo (opcional)
+- Preferir **Allow squash merging**
 
 **Settings → Actions → General:**
 
-- Actions permissions: Allow all actions (o las que uses)
 - Workflow permissions: **Read repository contents** basta para este CI
 
 ## 4. Flujo de trabajo diario
@@ -80,20 +77,20 @@ Reglas para agentes/devs: ver `AGENTS.md` (§ Pull requests).
 
 ## 5. Si el CI no aparece como required check
 
-1. Confirma que el último run en **Actions** terminó (éxito o fallo, da igual).
-2. El job debe haberse ejecutado en un **pull_request** (no solo push a otra rama sin PR).
-3. Vuelve a **Branches** → edita la regla → refresca la lista de status checks.
-4. Nombres exactos deben coincidir con los `jobs:` del YAML (`backend-smoke`, `frontend`).
+1. Confirma un run terminado en **Actions** (éxito o fallo).
+2. Preferible que haya corrido en un evento **pull_request**.
+3. Edita el ruleset → refresca / vuelve a escribir los nombres de job.
+4. Nombres deben coincidir con `jobs:` del YAML: `backend-smoke`, `frontend`.
 
 ## 6. Qué bloquea un merge (con esto activo)
 
 | Falla… | ¿Bloquea? |
 |--------|-----------|
-| Smoke API / import backend | Sí |
+| Smoke/unit API / import backend | Sí |
 | ESLint con **errors** | Sí |
 | `tsc` / Vite build | Sí |
-| Warnings ESLint | No (solo warnings) |
+| Warnings ESLint | No |
 | Bug de UI sin cobertura | No |
 | Fintual/SSE real | No |
 
-Ampliar cobertura: `backend/tests/` y el workflow en `.github/workflows/ci.yml`.
+Ampliar cobertura: `backend/tests/` y `.github/workflows/ci.yml`.
