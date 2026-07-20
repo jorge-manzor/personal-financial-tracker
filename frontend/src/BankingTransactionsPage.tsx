@@ -44,77 +44,19 @@ import type {
   BankingTransactionRow,
 } from "./types";
 import { BankingAuxRoundCheckbox } from "./BankingAuxRoundCheckbox";
-
-/** Plantilla seed: Transferencia → Entre cuentas propias */
-const BANKING_TEMPLATE_CAT_TRANSFERENCIA = 19;
-const BANKING_TEMPLATE_SUB_ENTRE_CUENTAS_PROPIAS = 1901;
-/** Plantilla seed: categoría Provisiones (reversa solo para estos movimientos). */
-const BANKING_TEMPLATE_CAT_PROVISIONES = 21;
-
-/** Bloquea editar filas con peer salvo el pago TC reflejado en cuenta corriente. */
-function bankingTxRowEditDisabled(row: BankingTransactionRow): boolean {
-  if (row.is_provision_reversal === true) return true;
-  if (row.peer_transaction_id == null) return false;
-  return row.cc_payment_mirror !== true;
-}
-
-function bankingTxRowEditTitle(row: BankingTransactionRow): string {
-  if (row.is_provision_reversal === true) return "Las reversas de provisión solo se pueden eliminar";
-  if (row.peer_transaction_id != null && row.cc_payment_mirror !== true) {
-    return "Las transferencias entre cuentas propias no se pueden editar aquí";
-  }
-  if (row.cc_payment_mirror === true) {
-    return "Editar: puedes ajustar el monto pagado desde cuenta corriente (p. ej. menos por devoluciones)";
-  }
-  return "Editar movimiento";
-}
-
-/** Movimientos por página (coincide con GET /banking/transactions `page_size`). */
-const BANKING_TX_PAGE_SIZE = 50;
-
-/** Alto estimado por fila en la tabla principal (virtualizada); debe ser ≥ alto real medio para evitar saltos. */
-const BANKING_TX_VIRTUAL_ROW_ESTIMATE_PX = 52;
-
-function normalizeBankingPickerSearch(raw: string): string {
-  const s = raw.trim().toLowerCase();
-  try {
-    return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  } catch {
-    return s;
-  }
-}
-
-/** Búsqueda tipo contains; vacío muestra todas. Compara sin distinguir mayúsculas ni tildes (p. ej. cafe → Café). */
-function bankingPickerSearchMatches(haystack: string, needle: string): boolean {
-  if (!needle.trim()) return true;
-  return normalizeBankingPickerSearch(haystack).includes(normalizeBankingPickerSearch(needle));
-}
-
-/** `YYYY-MM-DD` en fecha local del usuario (fecha del movimiento). */
-function isoDateLocal(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Desde el día 1 de hace dos meses hasta hoy (valor inicial del filtro servidor). */
-function bankingTxRangeForLastTwoMonths(): { from: string; to: string } {
-  const to = new Date();
-  const from = new Date(to.getFullYear(), to.getMonth() - 2, 1);
-  return { from: isoDateLocal(from), to: isoDateLocal(to) };
-}
-
-function normalizeBankingTxCustomRange(from: string, to: string): { from: string; to: string } {
-  let df = from;
-  let dt = to;
-  if (df && dt && df > dt) [df, dt] = [dt, df];
-  return { from: df, to: dt };
-}
-
-/** Fechas efectivas para la petición (si falta alguna, se usa «últimos 2 meses»). */
-function resolveBankingTxMovementDateRange(from: string, to: string): { from: string; to: string } {
-  const n = normalizeBankingTxCustomRange(from, to);
-  if (!n.from.trim() || !n.to.trim()) return bankingTxRangeForLastTwoMonths();
-  return n;
-}
+import {
+  BANKING_TEMPLATE_CAT_PROVISIONES,
+  BANKING_TEMPLATE_CAT_TRANSFERENCIA,
+  BANKING_TEMPLATE_SUB_ENTRE_CUENTAS_PROPIAS,
+  BANKING_TX_PAGE_SIZE,
+  BANKING_TX_VIRTUAL_ROW_ESTIMATE_PX,
+  bankingPickerSearchMatches,
+  bankingTxRangeForLastTwoMonths,
+  bankingTxRowEditDisabled,
+  bankingTxRowEditTitle,
+  maskBankingBalanceText,
+  resolveBankingTxMovementDateRange,
+} from "./bankingTxHelpers";
 
 /** Vista de movimientos (tabs); alinea con query `scope`. */
 type BankingMovementTabScope = "all" | "credit_card" | "shared" | "provisiones";
@@ -462,13 +404,7 @@ function readStoredBalanceStrictPrivacy(): boolean {
   }
 }
 
-/** Asteriscos tras `$` cuando el monto está oculto — mismo largo en todas las tarjetas (no revela magnitud). */
-const BANKING_BALANCE_MASK_STAR_COUNT = 4;
-
-/** Monto tapado: texto fijo; `_formatted` se ignora a propósito. */
-function maskBankingBalanceText(_formatted: string): string {
-  return `$${"*".repeat(BANKING_BALANCE_MASK_STAR_COUNT)}`;
-}
+/** Monto tapado: ver `maskBankingBalanceText` en bankingTxHelpers. */
 
 function IconEyeOutline({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -4171,7 +4107,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       onToast("El monto debe ser distinto de cero (positivo = ingreso, negativo = egreso)");
       return;
     }
-    let participants = parseInt(splitParticipants, 10);
+    const participants = parseInt(splitParticipants, 10);
     if (isShared) {
       if (Number.isNaN(participants) || participants < 1) {
         onToast("Indica cuántas personas participan (mínimo 1)");

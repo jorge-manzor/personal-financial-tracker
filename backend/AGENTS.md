@@ -6,7 +6,8 @@ Complementa el `AGENTS.md` raíz. Trabaja aquí al editar Python bajo `backend/`
 
 | Rol | Archivos |
 |-----|----------|
-| App + rutas inversiones/auth | `main.py` |
+| App + rutas inversiones | `main.py` |
+| Auth HTTP | `auth_routes.py` |
 | Auth JWT / services | `auth.py` |
 | ORM | `models.py` |
 | Pydantic I/O | `schemas.py` |
@@ -14,6 +15,7 @@ Complementa el `AGENTS.md` raíz. Trabaja aquí al editar Python bajo `backend/`
 | Migraciones SQLite al vuelo | `multiuser_migration.py` |
 | Banking HTTP | `banking_routes.py`, `banking_personal_order_routes.py`, `savings_calculator_routes.py` |
 | Banking lógica | `banking_service.py` |
+| Bancos Chile (SBIF) | `banking_banks.py` |
 | Fintual HTTP | `fintual_client.py` |
 | Sync portafolio | `fintual_sync.py` |
 | Histórico / métricas | `history.py`, `portfolio_metrics.py`, `activity_service.py` |
@@ -56,9 +58,12 @@ Routers banking se montan en `main.py` con `prefix="/banking"`.
 ```bash
 cd backend
 python -c "import main"
+pip install -r requirements-dev.txt   # una vez
+pytest -q tests/test_smoke.py
 # API arriba:
 curl -s http://127.0.0.1:8000/health
 # Explorar contratos: http://127.0.0.1:8000/docs
 ```
 
 `api_tests/` es exploratorio local (gitignored): no es la suite CI.
+Smoke oficial: `tests/test_smoke.py`.

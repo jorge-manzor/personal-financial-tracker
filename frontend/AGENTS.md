@@ -4,7 +4,8 @@ Complementa el `AGENTS.md` raíz. Trabaja aquí al editar `frontend/src/`.
 
 ## Entry y routing
 
-- Boot: `main.tsx` → `App.tsx` (`/auth/me`, `/dashboard-initial` si inversiones).
+- Utilidades banking: `bankingTxHelpers.ts` (preferir extender ahí antes de hinchar la página de movimientos).
+- Entry: `main.tsx` → `App.tsx` (`/auth/me`, `/dashboard-initial` si inversiones).
 - Rutas condicionadas por `me.services.investments` / `me.services.banking`.
 - Banking va lazy-loaded y envuelto en `BankingThemeProvider`.
 

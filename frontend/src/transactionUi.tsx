@@ -80,7 +80,7 @@ export function detailBadgeLabel(tx: TransactionRow): string {
   return badgeLabel(tx);
 }
 
-export const TICKER_LIKE = /^[A-Z][A-Z0-9.\-]{0,9}$/i;
+export const TICKER_LIKE = /^[A-Z][A-Z0-9.-]{0,9}$/i;
 
 const STOCK_USD_CATEGORIES = new Set(["Acciones", "División Acción"]);
 

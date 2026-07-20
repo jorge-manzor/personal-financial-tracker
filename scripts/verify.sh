@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Verificación mínima para agentes/devs. No requiere API en marcha.
 #
-# Por defecto: import backend (obligatorio) + lint frontend (informativo si hay deuda).
-# VERIFY_LINT=1  → falla si eslint no está limpio
-# VERIFY_BUILD=1 → ejecuta npm run build (falla si build falla)
+# Por defecto: import backend + lint frontend (falla si hay errores ESLint).
+# VERIFY_BUILD=1 → ejecuta npm run build
+# SKIP_LINT=1    → omite eslint
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -21,29 +21,31 @@ pick_python() {
 }
 
 PY="$(pick_python)"
-FAILED=0
 
 echo "== backend: import main ($PY) =="
 cd "$ROOT/backend"
 "$PY" -c "import main; print('ok', main.app.title)"
 
-echo "== frontend: lint =="
-cd "$ROOT/frontend"
-set +e
-npm run lint
-LINT_EC=$?
-set -e
-if [[ "$LINT_EC" -ne 0 ]]; then
-  if [[ "${VERIFY_LINT:-}" == "1" ]]; then
-    echo "lint: FAIL (VERIFY_LINT=1)" >&2
-    FAILED=1
+if [[ "${SKIP_SMOKE:-}" != "1" ]]; then
+  if "$PY" -c "import pytest" >/dev/null 2>&1; then
+    echo "== backend: smoke pytest =="
+    (cd "$ROOT/backend" && "$PY" -m pytest -q tests/test_smoke.py)
   else
-    echo "lint: hay avisos/errores previos; no bloquea (VERIFY_LINT=1 para exigir limpio)"
+    echo "== backend: smoke omitido (pip install -r requirements-dev.txt) =="
   fi
+fi
+
+if [[ "${SKIP_LINT:-}" != "1" ]]; then
+  echo "== frontend: lint =="
+  cd "$ROOT/frontend"
+  npm run lint
+else
+  echo "== frontend: lint omitido (SKIP_LINT=1) =="
 fi
 
 if [[ "${VERIFY_BUILD:-}" == "1" ]]; then
   echo "== frontend: build =="
+  cd "$ROOT/frontend"
   npm run build
 else
   echo "== frontend: build omitido (VERIFY_BUILD=1 para incluirlo) =="
@@ -55,8 +57,4 @@ else
   echo "== API /health: no disponible (arranca uvicorn para smoke HTTP) =="
 fi
 
-if [[ "$FAILED" -ne 0 ]]; then
-  echo "verify: FAILED" >&2
-  exit 1
-fi
 echo "verify: done"

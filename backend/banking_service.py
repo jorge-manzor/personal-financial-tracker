@@ -18,6 +18,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import Date, cast, false as sql_false, func, literal, or_, text
 from sqlalchemy.orm import Session
 
+from banking_banks import bank_name_for_sbif, is_valid_bank_sbif, load_bancos_chile
 from models import (
     BankingAccount,
     BankingCategory,
@@ -33,7 +34,6 @@ def _names_locked(cat: BankingCategory | None) -> bool:
 logger = logging.getLogger(__name__)
 
 _DEFAULT_CATEGORIES_PATH = Path(__file__).resolve().parent / "data" / "categorias_banking_default.json"
-_BANKS_CHILE_PATH = Path(__file__).resolve().parent / "data" / "bancos_chile.json"
 
 BANKING_PRODUCT_TYPES = frozenset(
     {"cuenta_corriente", "cuenta_vista", "cuenta_prepago", "tarjeta_credito"}
@@ -1267,28 +1267,6 @@ def get_account_for_user(db: Session, user_id: int, account_id: int) -> BankingA
         .filter(BankingAccount.user_id == user_id, BankingAccount.id == account_id)
         .first()
     )
-
-
-def load_bancos_chile() -> list[dict[str, Any]]:
-    if not _BANKS_CHILE_PATH.is_file():
-        return []
-    raw = json.loads(_BANKS_CHILE_PATH.read_text(encoding="utf-8"))
-    return raw if isinstance(raw, list) else []
-
-
-def bank_name_for_sbif(sbif: str | None) -> str | None:
-    if not sbif:
-        return None
-    s = str(sbif).strip()
-    for row in load_bancos_chile():
-        if str(row.get("sbif", "")).strip() == s:
-            out = str(row.get("name", "")).strip()
-            return out or None
-    return None
-
-
-def is_valid_bank_sbif(sbif: str) -> bool:
-    return bank_name_for_sbif(sbif) is not None
 
 
 def banking_transaction_counts_by_account(db: Session, user_id: int) -> dict[int, int]:

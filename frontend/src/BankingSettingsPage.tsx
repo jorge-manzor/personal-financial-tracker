@@ -264,7 +264,9 @@ function CategoryDragHandleButton({
   const raw = listeners ?? {};
   const onPointerDownDnd = raw.onPointerDown as React.PointerEventHandler<HTMLButtonElement> | undefined;
   const onKeyDownDnd = raw.onKeyDown as React.KeyboardEventHandler<HTMLButtonElement> | undefined;
-  const { onPointerDown: _omitPd, onKeyDown: _omitKd, ...restListeners } = raw;
+  const restListeners = { ...raw };
+  delete restListeners.onPointerDown;
+  delete restListeners.onKeyDown;
 
   return (
     <button

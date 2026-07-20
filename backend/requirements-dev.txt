@@ -1,0 +1,2 @@
+# Smoke / unit tests (pytest)
+pytest>=8.0.0

@@ -27,7 +27,7 @@ cd frontend && npm install && npm run dev
 | `cd frontend && npm run dev` | UI en `:5173` |
 | `cd frontend && npm run lint` | ESLint |
 | `cd frontend && npm run build` | `tsc -b` + Vite build |
-| `./scripts/verify.sh` | Smoke: import backend + lint informativo; `VERIFY_LINT=1` / `VERIFY_BUILD=1` para exigir limpio/build |
+| `./scripts/verify.sh` | Import backend + smoke pytest + lint; `VERIFY_BUILD=1` para build; `SKIP_LINT=1` / `SKIP_SMOKE=1` para omitir |
 
 API: `http://127.0.0.1:8000` · OpenAPI: `/docs` · UI: `http://localhost:5173`
 
@@ -37,12 +37,12 @@ Guías anidadas: `backend/AGENTS.md`, `frontend/AGENTS.md`.
 
 | Feature | Backend | Frontend |
 |---------|---------|----------|
-| Auth / perfil / servicios | `auth.py`, rutas en `main.py` (`/auth/*`) | `Login.tsx`, `Profile.tsx`, `auth.ts` |
+| Auth / perfil / servicios | `auth.py`, `auth_routes.py` (`/auth/*`) | `Login.tsx`, `Profile.tsx`, `auth.ts` |
 | Dashboard inversiones + sync SSE | `main.py`, `fintual_sync.py`, `history.py`, `portfolio_metrics.py` | `App.tsx`, `Dashboard.tsx`, `SyncOverlay.tsx` |
 | Transacciones inversión / manuales | `main.py`, `transaction_validation.py` | `TransactionModal.tsx`, `ManualModals.tsx`, Activity* |
 | Cliente Fintual | `fintual_client.py`, `fintual_auth_state.py` | `FintualConnectModal.tsx` |
 | FX USD/CLP | `exchange_service.py`, `fx_usd_clp.py` | vía dashboard / API |
-| Banking CRUD | `banking_routes.py`, `banking_service.py` | `BankingTransactionsPage.tsx`, `BankingSettingsPage.tsx` |
+| Banking CRUD | `banking_routes.py`, `banking_service.py`, `banking_banks.py` | `BankingTransactionsPage.tsx`, `bankingTxHelpers.ts`, `BankingSettingsPage.tsx` |
 | Orden personal / provisiones | `banking_personal_order_routes.py` | `BankingPersonalOrderPage.tsx` |
 | Calculadora ahorro | `savings_calculator_routes.py` | `SavingsCalculatorPage.tsx` |
 | Modelos / schemas | `models.py`, `schemas.py` | `types.ts` |
@@ -91,7 +91,8 @@ Ver `docs/adding-a-feature.md` y `backend/AGENTS.md`. Checklist: modelo → migr
 1. Backend importa: `cd backend && python -c "import main"`
 2. Frontend: `cd frontend && npm run lint` (y `npm run build` si tocaste tipos/rutas).
 3. Si API está arriba: `curl -s http://127.0.0.1:8000/health` y revisar `/docs`.
-4. Opcional: `./scripts/verify.sh` (estricto: `VERIFY_LINT=1 VERIFY_BUILD=1 ./scripts/verify.sh`)
+4. Opcional: `./scripts/verify.sh` (con build: `VERIFY_BUILD=1 ./scripts/verify.sh`)
+5. CI: `.github/workflows/ci.yml` (smoke API + lint/build frontend)
 
 ## Docs profundas
 

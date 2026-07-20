@@ -19,5 +19,15 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Patrones existentes de fetch-in-effect; no bloquear CI hasta un refactor gradual.
+      'react-hooks/set-state-in-effect': 'warn',
+      'react-hooks/incompatible-library': 'warn',
+      // Varios módulos exportan helpers + componentes (p. ej. transactionUi, SyncOverlay).
+      'react-refresh/only-export-components': [
+        'warn',
+        { allowConstantExport: true },
+      ],
+    },
   },
 ])

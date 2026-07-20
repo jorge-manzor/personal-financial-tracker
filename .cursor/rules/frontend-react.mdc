@@ -8,6 +8,7 @@ alwaysApply: false
 
 - Detalle: `frontend/AGENTS.md`.
 - API solo vía `api.ts` / `auth.ts`; base en `config.ts` (`API_BASE` sin trailing slash).
+- Utilidades banking puras: preferir `bankingTxHelpers.ts` antes de hinchar `BankingTransactionsPage.tsx`.
 - Rutas nuevas en `App.tsx` con gate `me.services.investments` / `banking`.
 - Copy UI en español; Tailwind existente; no nuevo design system sin pedido.
 - No reescribir `BankingTransactionsPage.tsx` ni otras páginas monstruo: cambios locales.

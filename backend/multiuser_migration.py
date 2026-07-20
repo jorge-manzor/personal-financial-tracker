@@ -68,18 +68,33 @@ def run_multiuser_migration(engine: Engine) -> None:
         if n_users == 0:
             now = datetime.now(timezone.utc).replace(tzinfo=None)
             pw = hash_password("changeme")
-            conn.execute(
-                text(
-                    "INSERT INTO users (id, email, password_hash, created_at, services_json) "
-                    "VALUES (1, :email, :ph, :ca, :sj)"
-                ),
-                {
-                    "email": "local@portfolio.local",
-                    "ph": pw,
-                    "ca": now,
-                    "sj": '{"investments": true}',
-                },
-            )
+            cols = _table_cols(engine, "users")
+            if "fintual_reconnect_required" in cols:
+                conn.execute(
+                    text(
+                        "INSERT INTO users (id, email, password_hash, created_at, services_json, fintual_reconnect_required) "
+                        "VALUES (1, :email, :ph, :ca, :sj, 0)"
+                    ),
+                    {
+                        "email": "local@portfolio.local",
+                        "ph": pw,
+                        "ca": now,
+                        "sj": '{"investments": true}',
+                    },
+                )
+            else:
+                conn.execute(
+                    text(
+                        "INSERT INTO users (id, email, password_hash, created_at, services_json) "
+                        "VALUES (1, :email, :ph, :ca, :sj)"
+                    ),
+                    {
+                        "email": "local@portfolio.local",
+                        "ph": pw,
+                        "ca": now,
+                        "sj": '{"investments": true}',
+                    },
+                )
             conn.commit()
             logger.warning(
                 "Usuario inicial: local@portfolio.local / changeme — cambiá la contraseña cuando puedas."

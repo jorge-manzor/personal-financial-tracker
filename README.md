@@ -120,21 +120,23 @@ personal-financial-tracker/
 ├── backend/
 │   ├── AGENTS.md
 │   ├── main.py, database.py
-│   ├── auth.py
-│   ├── banking_routes.py, banking_service.py
+│   ├── auth.py, auth_routes.py
+│   ├── banking_routes.py, banking_service.py, banking_banks.py
 │   ├── banking_personal_order_routes.py
 │   ├── savings_calculator_routes.py
 │   ├── models.py, schemas.py
 │   ├── fintual_client.py, fintual_sync.py, market_data.py
 │   ├── history.py, portfolio_metrics.py, exchange_service.py
 │   ├── multiuser_migration.py
+│   ├── tests/test_smoke.py
 │   ├── data/                    # categorías, bancos Chile, sectores (JSON)
-│   └── requirements.txt
+│   ├── requirements.txt
+│   └── requirements-dev.txt
 ├── frontend/
 │   ├── AGENTS.md
 │   ├── src/
 │   │   ├── App.tsx, Dashboard.tsx
-│   │   ├── BankingTransactionsPage.tsx, BankingSettingsPage.tsx
+│   │   ├── BankingTransactionsPage.tsx, bankingTxHelpers.ts, BankingSettingsPage.tsx
 │   │   ├── BankingPersonalOrderPage.tsx, SavingsCalculatorPage.tsx
 │   │   ├── Login.tsx, Profile.tsx, FintualConnectModal.tsx
 │   │   ├── AppSidebar.tsx, AppHeader.tsx, SyncOverlay.tsx
@@ -146,6 +148,7 @@ personal-financial-tracker/
 │   ├── domain-banking.md, domain-investments.md, api-cheat-sheet.md
 │   ├── deploy-render.md
 │   └── deploy-railway.md
+├── .github/workflows/ci.yml
 └── README.md
 ```
 
