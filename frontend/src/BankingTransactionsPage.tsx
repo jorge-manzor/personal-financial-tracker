@@ -1904,15 +1904,6 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     }
   }
 
-  const clearSharedSelectionForRows = useCallback((sectionRows: BankingTransactionRow[]) => {
-    const drop = new Set(sectionRows.map((r) => r.id));
-    setSelectedSharedIds((prev) => {
-      const next = new Set(prev);
-      for (const id of drop) next.delete(id);
-      return next;
-    });
-  }, []);
-
   async function handleBulkProvisionReverse() {
     if (selectedProvisionReverseIds.size === 0) return;
     try {
@@ -2258,7 +2249,6 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               onToggleSelectAll={() => toggleSharedSelectAll(g.items)}
               onBulkSettle={handleBulkSharedSettled}
               onMarkSettled={handleMarkSharedSettled}
-              onClearSectionSelection={() => clearSharedSelectionForRows(g.items)}
               openEdit={openEdit}
               removeRow={removeRow}
             />
