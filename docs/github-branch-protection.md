@@ -45,22 +45,24 @@ En la UI a veces se ven como `CI / backend-smoke` y `CI / frontend`. Al configur
     - `frontend`
   - [x] **Require branches to be up to date before merging** (strict; recomendado)
 
-Si los checks no aparecen en el autocomplete: mergea o abre un PR, espera a que Actions corra una vez, y vuelve a editar el ruleset.
+Si los checks no aparecen en el autocomplete: deja que Actions corra una vez (sección 3–5), y vuelve a editar el ruleset.
 
 Si pide “source” / app del check: **Any source** o **GitHub Actions**.
 
 5. **Create** / **Save changes**.
 
-## 3. Ajustes del repo (opcional pero útil)
-
-**Settings → General:**
-
-- Default branch: `main`
-- Preferir **Allow squash merging**
+## 3. Ajustes del repo (obligatorio para que corra el CI)
 
 **Settings → Actions → General:**
 
-- Workflow permissions: **Read repository contents** basta para este CI
+1. **Actions permissions:** elige **Allow all actions and reusable workflows** (o Allow GitHub Actions).
+2. Si aparece opción de **Disable actions**: no la uses; con Actions off **nunca** se triggeran tests.
+3. **Workflow permissions:** Read repository contents basta.
+4. Guarda.
+
+Sin este paso, el YAML puede existir y la pestaña **Actions** igual queda vacía (muy común en repos privados nuevos).
+
+Opcional en **Settings → General:** default branch `main`, preferir squash merge.
 
 ## 4. Flujo de trabajo diario
 
@@ -73,16 +75,23 @@ gh pr create --base main --title "…" --body "…"
 # Esperar CI verde → Merge (Squash and merge)
 ```
 
-Reglas para agentes/devs: ver `AGENTS.md` (§ Pull requests).
+Tras el push, en **Actions** debe aparecer un run **CI** (también en PRs a `main`).  
+El workflow incluye `workflow_dispatch`: **Actions → CI → Run workflow** para disparo manual.
 
-## 5. Si el CI no aparece como required check
+## 5. Si el CI no se triggera (Actions vacío)
 
-1. Confirma un run terminado en **Actions** (éxito o fallo).
-2. Preferible que haya corrido en un evento **pull_request**.
-3. Edita el ruleset → refresca / vuelve a escribir los nombres de job.
-4. Nombres deben coincidir con `jobs:` del YAML: `backend-smoke`, `frontend`.
+1. Revisa la sección 3 (Actions habilitados).
+2. **Actions** → ¿aparece el workflow **CI** a la izquierda? Si no, Actions está off o el YAML no está en `main`.
+3. **Actions → CI → Run workflow** (manual).
+4. Confirma billing/minutos de Actions en la cuenta si aplica.
 
-## 6. Qué bloquea un merge (con esto activo)
+## 6. Si el CI corre pero no aparece como required check
+
+1. Confirma un run terminado (éxito o fallo).
+2. Preferible un run en **pull_request** a `main`.
+3. Edita el ruleset y vuelve a añadir `backend-smoke` y `frontend`.
+
+## 7. Qué bloquea un merge (con ruleset + CI activos)
 
 | Falla… | ¿Bloquea? |
 |--------|-----------|

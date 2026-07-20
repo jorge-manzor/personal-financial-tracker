@@ -1,10 +1,12 @@
 name: CI
 
 on:
+  # Cualquier push (ramas de feature incluidas) para ver checks antes del merge.
   push:
-    branches: [main]
   pull_request:
     branches: [main]
+  # Permite re-ejecutar desde la pestaña Actions → Run workflow.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
