@@ -42,7 +42,7 @@ Guías anidadas: `backend/AGENTS.md`, `frontend/AGENTS.md`.
 | Transacciones inversión / manuales | `main.py`, `transaction_validation.py` | `TransactionModal.tsx`, `ManualModals.tsx`, Activity* |
 | Cliente Fintual | `fintual_client.py`, `fintual_auth_state.py` | `FintualConnectModal.tsx` |
 | FX USD/CLP | `exchange_service.py`, `fx_usd_clp.py` | vía dashboard / API |
-| Banking CRUD | `banking_routes.py`, `banking_service.py`, `banking_banks.py` | `BankingTransactionsPage.tsx`, `bankingTxHelpers.ts`, `BankingSettingsPage.tsx` |
+| Banking CRUD | `banking_routes.py`, `banking_service.py`, `banking_banks.py` | `BankingTransactionsPage.tsx` + `bankingTx*.ts(x)`, `BankingConfirmDialog.tsx`, `BankingSettingsPage.tsx` |
 | Orden personal / provisiones | `banking_personal_order_routes.py` | `BankingPersonalOrderPage.tsx` |
 | Calculadora ahorro | `savings_calculator_routes.py` | `SavingsCalculatorPage.tsx` |
 | Modelos / schemas | `models.py`, `schemas.py` | `types.ts` |

@@ -4,7 +4,6 @@ Complementa el `AGENTS.md` raíz. Trabaja aquí al editar `frontend/src/`.
 
 ## Entry y routing
 
-- Utilidades banking: `bankingTxHelpers.ts` (preferir extender ahí antes de hinchar la página de movimientos).
 - Entry: `main.tsx` → `App.tsx` (`/auth/me`, `/dashboard-initial` si inversiones).
 - Rutas condicionadas por `me.services.investments` / `me.services.banking`.
 - Banking va lazy-loaded y envuelto en `BankingThemeProvider`.
@@ -14,12 +13,29 @@ Complementa el `AGENTS.md` raíz. Trabaja aquí al editar `frontend/src/`.
 | `/` | `Dashboard.tsx` | investments |
 | `/transactions` | Activity / transacciones | investments |
 | `/profile` | `Profile.tsx` | auth |
-| `/banking/transactions` | `BankingTransactionsPage.tsx` | banking |
+| `/banking/transactions` | `BankingTransactionsPage.tsx` (orquestador) | banking |
 | `/banking/settings` | `BankingSettingsPage.tsx` | banking |
 | `/banking/personal-order` | `BankingPersonalOrderPage.tsx` | banking |
 | `/banking/savings-calculator` | `SavingsCalculatorPage.tsx` | banking |
 
 Navegación: `AppSidebar.tsx`, `AppHeader.tsx`.
+
+### Módulos de movimientos banking
+
+Preferir extender estos archivos antes de hinchar `BankingTransactionsPage.tsx`:
+
+| Archivo | Rol |
+|---------|-----|
+| `bankingTxHelpers.ts` | Utilidades puras (fechas, mask, search, templates) |
+| `bankingTxShared.ts` | Tipos, prefs de columnas, cache SWR, constantes CSS/shared |
+| `bankingTxIcons.tsx` | Iconos SVG |
+| `bankingBalanceCards.tsx` | Tarjetas de saldo / privacidad |
+| `bankingTxFilters.tsx` | Filtros de columna y picker |
+| `bankingTxMainTable.tsx` | Tabla principal virtualizada |
+| `bankingTxAuxTables.tsx` | Tablas TC / compartidos / provisiones |
+| `BankingConfirmDialog.tsx` | Confirmación (delete, etc.) |
+
+Tests: `src/**/*.test.ts` vía `npm test` (Vitest).
 
 ## API y auth
 
@@ -39,7 +55,7 @@ Navegación: `AppSidebar.tsx`, `AppHeader.tsx`.
 
 No reescribir de cero sin pedido explícito:
 
-- `BankingTransactionsPage.tsx` (~muy grande)
+- `BankingTransactionsPage.tsx` (orquestador + modal)
 - `BankingPersonalOrderPage.tsx`
 - `BankingSettingsPage.tsx`
 - `Dashboard.tsx`
@@ -60,5 +76,6 @@ Preferir diffs locales: handlers, columnas, filtros, llamadas API.
 ```bash
 cd frontend
 npm run lint
+npm test
 npm run build   # si cambiaste tipos, rutas o imports
 ```
