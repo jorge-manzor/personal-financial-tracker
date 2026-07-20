@@ -92,7 +92,15 @@ Ver `docs/adding-a-feature.md` y `backend/AGENTS.md`. Checklist: modelo → migr
 2. Frontend: `cd frontend && npm run lint` (y `npm run build` si tocaste tipos/rutas).
 3. Si API está arriba: `curl -s http://127.0.0.1:8000/health` y revisar `/docs`.
 4. Opcional: `./scripts/verify.sh` (con build: `VERIFY_BUILD=1 ./scripts/verify.sh`)
-5. CI: `.github/workflows/ci.yml` (smoke API + lint/build frontend)
+5. CI: `.github/workflows/ci.yml` (tests backend + lint/build frontend)
+6. Flujo PR: no pushear directo a `main` si la branch protection está activa — ver abajo.
+
+## Pull requests (proteger `main`)
+
+1. Trabajar en rama (`feat/…`, `fix/…`), nunca commits directos a `main` una vez activa la protection.
+2. Abrir PR a `main`; esperar checks **`backend-smoke`** y **`frontend`** verdes.
+3. Merge preferido: squash.
+4. Instrucciones de GitHub Settings: `docs/github-branch-protection.md`.
 
 ## Docs profundas
 
@@ -104,6 +112,7 @@ Ver `docs/adding-a-feature.md` y `backend/AGENTS.md`. Checklist: modelo → migr
 | `docs/domain-investments.md` | Dominio inversiones |
 | `docs/adding-a-feature.md` | Playbook completo |
 | `docs/api-cheat-sheet.md` | Endpoints críticos |
+| `docs/github-branch-protection.md` | Cómo proteger `main` + required checks |
 | `docs/deploy-render.md` / `docs/deploy-railway.md` | Deploy |
 
 ## Idioma

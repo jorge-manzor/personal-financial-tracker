@@ -59,11 +59,11 @@ Routers banking se montan en `main.py` con `prefix="/banking"`.
 cd backend
 python -c "import main"
 pip install -r requirements-dev.txt   # una vez
-pytest -q tests/test_smoke.py
+pytest -q tests/
 # API arriba:
 curl -s http://127.0.0.1:8000/health
 # Explorar contratos: http://127.0.0.1:8000/docs
 ```
 
 `api_tests/` es exploratorio local (gitignored): no es la suite CI.
-Smoke oficial: `tests/test_smoke.py`.
+Suite CI: `tests/` (`test_smoke.py`, `test_banking_banks.py`).

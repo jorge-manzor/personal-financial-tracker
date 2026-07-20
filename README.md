@@ -146,6 +146,7 @@ personal-financial-tracker/
 ├── docs/
 │   ├── architecture.md, invariants.md, adding-a-feature.md
 │   ├── domain-banking.md, domain-investments.md, api-cheat-sheet.md
+│   ├── github-branch-protection.md
 │   ├── deploy-render.md
 │   └── deploy-railway.md
 ├── .github/workflows/ci.yml
