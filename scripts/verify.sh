@@ -43,6 +43,14 @@ else
   echo "== frontend: lint omitido (SKIP_LINT=1) =="
 fi
 
+if [[ "${SKIP_FRONTEND_TEST:-}" != "1" ]]; then
+  echo "== frontend: unit tests =="
+  cd "$ROOT/frontend"
+  npm test
+else
+  echo "== frontend: unit tests omitidos (SKIP_FRONTEND_TEST=1) =="
+fi
+
 if [[ "${VERIFY_BUILD:-}" == "1" ]]; then
   echo "== frontend: build =="
   cd "$ROOT/frontend"

@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import path from 'node:path'
 import os from 'node:os'
 import tailwindcss from '@tailwindcss/vite'
@@ -11,4 +12,8 @@ export default defineConfig({
   cacheDir,
   plugins: [react(), tailwindcss()],
   server: { port: 5173 },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
+  },
 })
