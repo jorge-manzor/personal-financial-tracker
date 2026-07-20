@@ -1,10 +1,12 @@
 name: CI
 
 on:
+  # Cualquier push (ramas de feature incluidas) para ver checks antes del merge.
   push:
-    branches: [main]
   pull_request:
     branches: [main]
+  # Permite re-ejecutar desde la pestaña Actions → Run workflow.
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -37,7 +39,9 @@ jobs:
       - name: Import app
         run: python -c "import main; print(main.app.title)"
       - name: Unit + smoke tests
-        run: pytest -q tests/
+        run: python -m pytest -q tests/
+        env:
+          PYTHONPATH: .
 
   frontend:
     name: frontend
