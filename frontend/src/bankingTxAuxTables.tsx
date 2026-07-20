@@ -21,7 +21,6 @@ import {
   bankingAuxActionBtnClass,
   bankingAuxBulkBtnClass,
   bankingToolbarGhostBtnClass,
-  sharedPendingPerPersonClp,
   tcUnpaidNetContributionClp,
   txIconBtnAux,
   txIconBtnAuxDanger,
@@ -264,7 +263,6 @@ export function BankingSharedPendingChargesTable({
   onToggleSelectAll,
   onBulkSettle,
   onMarkSettled,
-  onClearSectionSelection,
   openEdit,
   removeRow,
 }: {
@@ -280,7 +278,6 @@ export function BankingSharedPendingChargesTable({
   onToggleSelectAll: () => void;
   onBulkSettle: () => void | Promise<void>;
   onMarkSettled: (row: BankingTransactionRow) => void | Promise<void>;
-  onClearSectionSelection: () => void;
   openEdit: (row: BankingTransactionRow) => void;
   removeRow: (row: BankingTransactionRow) => void;
 }) {
@@ -290,41 +287,11 @@ export function BankingSharedPendingChargesTable({
 
   const selectedInSection = useMemo(() => rowIds.filter((id) => selectedIds.has(id)).length, [rowIds, selectedIds]);
 
-  const selectedTotals = useMemo(() => {
-    let totalAbs = 0;
-    let sumPerPerson = 0;
-    for (const row of rows) {
-      if (!selectedIds.has(row.id)) continue;
-      totalAbs += Math.abs(row.amount);
-      sumPerPerson += sharedPendingPerPersonClp(row);
-    }
-    return { totalAbs, sumPerPerson };
-  }, [rows, selectedIds]);
-
   return (
     <section className="mb-6 space-y-2" aria-labelledby={`shared-pending-heading-${accountId}`}>
       <h3 id={`shared-pending-heading-${accountId}`} className={BANKING_AUX_SECTION_HEADING_CLASS}>
         Compartidos pendientes · {accountHeading}
       </h3>
-      {selectedInSection > 0 ? (
-        <div
-          className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs leading-snug ${BANKING_SELECTION_SUMMARY_TICKET_ACTIVE_CLASS}`}
-        >
-          <p className="min-w-0 flex-1 text-teal-950 banking-dark:text-amber-50">
-            <span className="text-teal-800/90 banking-dark:text-amber-200/80">Total gasto seleccionado (esta cuenta): </span>
-            <strong className="tabular-nums text-teal-950 banking-dark:text-amber-50">{formatClpDots(selectedTotals.totalAbs)}</strong>
-            <span className="text-teal-800/88 banking-dark:text-amber-200/78">
-              {" "}
-              · Suma de pago por persona (cuota de cada movimiento):{" "}
-            </span>
-            <strong className="tabular-nums text-teal-950 banking-dark:text-amber-50">{formatClpDots(selectedTotals.sumPerPerson)}</strong>
-            <span className="text-teal-700/88 banking-dark:text-amber-300/85"> · {selectedInSection} movimiento(s)</span>
-          </p>
-          <button type="button" onClick={onClearSectionSelection} className={bankingToolbarGhostBtnClass}>
-            Limpiar selección
-          </button>
-        </div>
-      ) : null}
       {someSelected ? (
         <div className="flex flex-wrap items-center gap-2">
           <button
