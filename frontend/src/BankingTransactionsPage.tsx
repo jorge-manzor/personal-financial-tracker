@@ -2424,7 +2424,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 Últimos 2 meses
               </button>
             </div>
-            {items.length === 0 && !bankingTxFiltersActive ? (
+            {loadError && items.length === 0 ? null : items.length === 0 && !bankingTxFiltersActive ? (
               <p className="p-6 text-sm text-slate-400 banking-dark:text-zinc-500">
                 No hay movimientos en este período. Amplía el rango Desde / hasta.
               </p>
