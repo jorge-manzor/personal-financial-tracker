@@ -1,0 +1,3 @@
+# Los scripts shell deben mantener LF siempre (se ejecutan en bash aunque el
+# checkout sea Windows con core.autocrlf=true).
+*.sh text eol=lf

@@ -28,7 +28,8 @@ Aplicación web **full-stack** para **inversiones** (Fintual, activos manuales, 
 | Auth | **bcrypt**, **python-jose** (JWT HS256) |
 | Tiempo real | **SSE** (`sse-starlette`) para sincronización del portafolio |
 | HTTP cliente | **httpx** (Fintual, CMF, etc.) |
-| Frontend | **React 19**, **Vite 8**, **TypeScript**, **Tailwind CSS 4**, **React Router 7**, **Recharts**, **@dnd-kit** (orden en tablas Banking) |
+| Frontend | **React 19**, **Vite 8**, **TypeScript**, **Tailwind CSS 4**, **React Router 7**, **Recharts**, **@dnd-kit** (orden en tablas Banking), **@tanstack/react-virtual** (tabla principal Banking) |
+| Testing frontend | **Vitest** (`npm test`), unidades sobre helpers puros (`bankingTxHelpers.test.ts`) |
 
 ---
 
@@ -50,8 +51,9 @@ Aplicación web **full-stack** para **inversiones** (Fintual, activos manuales, 
 
 ## Arquitectura frontend (conceptos clave)
 
-- **`src/App.tsx`**: Boot (`/auth/me`, `/dashboard-initial`), rutas, overlay de sync SSE, modal Fintual, navegación condicionada por `me.services.investments` / `banking`.
-- **`src/BankingTransactionsPage.tsx`** / **`BankingSettingsPage.tsx`**: UI del servicio bancario (tablas con filtros, tarjetas de saldo/deuda, columnas arrastrables, ajustes de categorías).
+- **`src/App.tsx`**: Boot (`/auth/me`, `/dashboard-initial`), rutas, overlay de sync SSE, modal Fintual, navegación condicionada por `me.services.investments` / `banking`. Banking va lazy-loaded.
+- **`src/BankingTransactionsPage.tsx`**: orquestador de la tabla de movimientos; la lógica vive repartida en módulos hermanos para no volver a un archivo monolítico: `bankingTxHelpers.ts` (utilidades puras), `bankingTxShared.ts` (tipos/constantes/cache), `bankingTxFilters.tsx`, `bankingTxMainTable.tsx` (tabla virtualizada), `bankingTxAuxTables.tsx` (TC / compartidos / provisiones), `bankingBalanceCards.tsx`, `bankingTxIcons.tsx` y `BankingConfirmDialog.tsx`.
+- **`src/BankingSettingsPage.tsx`**: ajustes de cuentas y categorías del servicio bancario.
 - **`src/api.ts` / `auth.ts`**: `fetch` con `Authorization: Bearer`, token en `localStorage`.
 - **`src/Profile.tsx`**: Activación de inversiones y de “Cuentas y movimientos”; estado y credenciales Fintual.
 - **`src/FintualConnectModal.tsx`**: Cookie/uid Fintual; cierre con X, **Esc** o clic fuera.
@@ -97,6 +99,8 @@ cd frontend && npm install && npm run dev
 - API: `http://127.0.0.1:8000`  
 - UI: `http://localhost:5173` (CORS apunta al dev frontend).
 
+Tests unitarios frontend (Vitest): `cd frontend && npm test`.
+
 Build producción frontend: `npm run build` → `frontend/dist`.
 
 ---
@@ -136,7 +140,8 @@ personal-financial-tracker/
 │   ├── AGENTS.md
 │   ├── src/
 │   │   ├── App.tsx, Dashboard.tsx
-│   │   ├── BankingTransactionsPage.tsx, bankingTxHelpers.ts, BankingSettingsPage.tsx
+│   │   ├── BankingTransactionsPage.tsx (orquestador) + bankingTx*.ts(x) (helpers, filtros, tablas)
+│   │   ├── BankingSettingsPage.tsx, BankingConfirmDialog.tsx
 │   │   ├── BankingPersonalOrderPage.tsx, SavingsCalculatorPage.tsx
 │   │   ├── Login.tsx, Profile.tsx, FintualConnectModal.tsx
 │   │   ├── AppSidebar.tsx, AppHeader.tsx, SyncOverlay.tsx
