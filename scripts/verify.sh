@@ -10,6 +10,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 pick_python() {
   if [[ -x "$ROOT/backend/.venv/bin/python" ]]; then
     echo "$ROOT/backend/.venv/bin/python"
+  elif [[ -x "$ROOT/backend/.venv/Scripts/python.exe" ]]; then
+    echo "$ROOT/backend/.venv/Scripts/python.exe"
   elif command -v python3 >/dev/null 2>&1; then
     command -v python3
   elif command -v python >/dev/null 2>&1; then

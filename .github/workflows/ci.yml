@@ -1,8 +1,8 @@
 name: CI
 
 on:
-  # Cualquier push (ramas de feature incluidas) para ver checks antes del merge.
-  push:
+  # pull_request ya dispara en cada push a una rama con PR abierto
+  # (opened/synchronize/reopened), sin necesidad de un trigger `push` aparte.
   pull_request:
     branches: [main]
   # Permite re-ejecutar desde la pestaña Actions → Run workflow.

@@ -17,6 +17,7 @@ Por defecto habla con la API en `http://localhost:8000` (`VITE_API_BASE` en buil
 |--------|-----|
 | `npm run dev` | Vite HMR |
 | `npm run lint` | ESLint |
+| `npm test` | Vitest (unidades, p. ej. `bankingTxHelpers.test.ts`) |
 | `npm run build` | Typecheck + build → `dist/` |
 | `npm run preview` | Preview del build |
 
@@ -26,4 +27,4 @@ Por defecto habla con la API en `http://localhost:8000` (`VITE_API_BASE` en buil
 - Raíz del repo: [`../AGENTS.md`](../AGENTS.md)
 - Arquitectura / dominio: [`../docs/`](../docs/)
 
-No uses este README como guía del template Vite; el producto real está en `src/` (`App.tsx`, banking, dashboard).
+No uses este README como guía del template Vite; el producto real está en `src/` (`App.tsx`, dashboard, y el módulo banking repartido en `BankingTransactionsPage.tsx` + `bankingTx*.ts(x)`).
