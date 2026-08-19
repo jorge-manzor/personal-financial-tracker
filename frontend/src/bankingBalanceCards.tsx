@@ -1,6 +1,6 @@
 /** Tarjetas de saldo y controles de privacidad (extraídos de BankingTransactionsPage). */
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSortable } from "@dnd-kit/sortable";
@@ -9,7 +9,7 @@ import { formatClpDots } from "./format";
 import { maskBankingBalanceText } from "./bankingTxHelpers";
 import type { BankingAccountRow } from "./types";
 import { bankingAccountAtBank, bankingProductBadgeLabel } from "./bankingTxShared";
-import { IconEyeOutline, IconEyeSlashOutline } from "./bankingTxIcons";
+import { IconEyeOutline, IconEyeSlashOutline, IconGripVertical } from "./bankingTxIcons";
 
 export const BANKING_BALANCE_SCOPE_HELP =
   "Al estar activo, los saldos incluyen los meses contables futuros. Si está desactivado, los saldos contemplan hasta el mes contable actual.";
@@ -111,72 +111,27 @@ export const bankingBalancePrivacyEyeTitleIconClass = "h-4 w-4 shrink-0";
 export const bankingBalancePrivacyEyeBtnClass =
   "inline-flex shrink-0 items-center justify-center self-start rounded p-0 pt-px text-slate-600 ring-offset-2 transition hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/45 active:opacity-85 banking-dark:text-zinc-400 banking-dark:hover:text-amber-200 banking-dark:focus-visible:ring-amber-500/35 banking-dark:ring-offset-zinc-950";
 
+/** Único control de privacidad: vive en la tarjeta Total y oculta/muestra los montos de todas las tarjetas a la vez. */
 export function BankingBalancePrivacyEye({
-  strictMode,
   amountsVisible,
-  onPeekStart,
-  onPeekEnd,
-  onToggleSelfHidden,
+  onToggle,
   iconClassName = bankingBalancePrivacyEyeTitleIconClass,
 }: {
-  strictMode: boolean;
   amountsVisible: boolean;
-  onPeekStart: () => void;
-  onPeekEnd: () => void;
-  onToggleSelfHidden: () => void;
+  onToggle: () => void;
   iconClassName?: string;
 }) {
   return (
     <button
       type="button"
-      className={`${bankingBalancePrivacyEyeBtnClass} ${strictMode ? "touch-none" : ""}`}
-      onPointerDown={(e) => {
-        e.stopPropagation();
-        if (!strictMode) return;
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {
-          /* ignore */
-        }
-        onPeekStart();
-      }}
-      onPointerUp={(e) => {
-        e.stopPropagation();
-        if (!strictMode) return;
-        try {
-          e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch {
-          /* ignore */
-        }
-        onPeekEnd();
-      }}
-      onPointerCancel={(e) => {
-        e.stopPropagation();
-        if (strictMode) onPeekEnd();
-      }}
-      onPointerLeave={(e) => {
-        e.stopPropagation();
-        if (strictMode) onPeekEnd();
-      }}
+      className={bankingBalancePrivacyEyeBtnClass}
       onClick={(e) => {
         e.stopPropagation();
-        if (!strictMode) onToggleSelfHidden();
+        onToggle();
       }}
-      title={
-        strictMode
-          ? "Mantén pulsado para ver los montos de esta tarjeta"
-          : amountsVisible
-            ? "Ocultar montos en esta tarjeta"
-            : "Mostrar montos en esta tarjeta"
-      }
-      aria-label={
-        strictMode
-          ? "Mantén pulsado para ver temporalmente los montos de esta tarjeta"
-          : amountsVisible
-            ? "Ocultar montos en esta tarjeta"
-            : "Mostrar montos en esta tarjeta"
-      }
-      aria-pressed={strictMode ? undefined : !amountsVisible}
+      title={amountsVisible ? "Ocultar montos en todas las tarjetas" : "Mostrar montos en todas las tarjetas"}
+      aria-label={amountsVisible ? "Ocultar montos en todas las tarjetas" : "Mostrar montos en todas las tarjetas"}
+      aria-pressed={!amountsVisible}
     >
       {amountsVisible ? (
         <IconEyeOutline className={iconClassName} />
@@ -205,26 +160,19 @@ export function BankingBalanceMaskedAmount({
   );
 }
 
-/** Tarjeta de saldo (estilo alineado con Fondos en inversiones). */
+/** Tarjeta de saldo — Saldo actual siempre visible; Deuda TC / Provisiones solo si son distintas de cero. */
 export function BankingAccountBalanceCard({
   account: a,
   creditCardUnpaidAllocatedClp = 0,
-  privacyKey,
-  strictPrivacy,
   amountsVisible,
-  onPeekStart,
-  onPeekEnd,
-  onToggleCardHidden,
+  dragHandle,
 }: {
   account: BankingAccountRow;
   /** Solo cuentas líquidas con TC asociadas: cargos TC no pagados enlazados a esta cuenta corriente. */
   creditCardUnpaidAllocatedClp?: number;
-  privacyKey: string;
-  strictPrivacy: boolean;
   amountsVisible: boolean;
-  onPeekStart: (key: string) => void;
-  onPeekEnd: () => void;
-  onToggleCardHidden: (key: string) => void;
+  /** Asa de arrastre opcional (solo ahí se activa el drag; el resto de la tarjeta permite seleccionar/copiar texto). */
+  dragHandle?: ReactNode;
 }) {
   const liquid = a.product_type !== "tarjeta_credito";
   const unpaidCut = liquid ? Math.max(0, creditCardUnpaidAllocatedClp) : 0;
@@ -232,21 +180,22 @@ export function BankingAccountBalanceCard({
 
   const inactive = Math.abs(a.balance) < 1e-9;
   const prov = a.provision_net_sum ?? 0;
-  const atBank =
-    a.balance_at_bank !== undefined ? a.balance_at_bank : a.balance - prov;
+  const atBank = a.balance_at_bank !== undefined ? a.balance_at_bank : a.balance - prov;
+  const showTcChip = unpaidCut > 0;
+  const showProvChip = Math.abs(prov) > 1e-9;
 
   return (
     <div
-      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-slate-300/95 bg-gradient-to-br from-slate-50/95 via-white to-sky-50/35 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-slate-300/50 banking-dark:border-zinc-600 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-zinc-950 banking-dark:shadow-[0_8px_32px_-14px_rgba(0,0,0,0.65)] banking-dark:ring-amber-900/35 ${
+      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md banking-dark:border-zinc-800 banking-dark:bg-zinc-900 banking-dark:hover:shadow-none ${
         inactive ? "opacity-[0.88]" : ""
       }`}
     >
-      <div className="flex items-start justify-between gap-1.5">
+      <div className="flex items-center justify-between gap-1.5">
         <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-200/95 ring-1 ring-slate-300/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-zinc-500/80 banking-dark:shadow-none"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 banking-dark:bg-zinc-800"
           aria-hidden
         >
-          <svg className="h-4 w-4 text-slate-700 banking-dark:text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-4 w-4 text-slate-600 banking-dark:text-zinc-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -254,66 +203,66 @@ export function BankingAccountBalanceCard({
             />
           </svg>
         </div>
-        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-slate-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide leading-none text-slate-700 ring-1 ring-slate-300/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-300 banking-dark:ring-amber-800/45">
-          {bankingProductBadgeLabel(a.product_type)}
-        </span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span className="max-w-full truncate rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-wide text-indigo-600 banking-dark:bg-indigo-500/15 banking-dark:text-indigo-300">
+            {bankingProductBadgeLabel(a.product_type)}
+          </span>
+          {dragHandle}
+        </div>
       </div>
 
-      <div className="mt-2 flex min-h-[2rem] items-start gap-2">
-        <p className="min-w-0 flex-1 line-clamp-2 text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-100">{a.name}</p>
-        <BankingBalancePrivacyEye
-          strictMode={strictPrivacy}
-          amountsVisible={amountsVisible}
-          onPeekStart={() => onPeekStart(privacyKey)}
-          onPeekEnd={onPeekEnd}
-          onToggleSelfHidden={() => onToggleCardHidden(privacyKey)}
-        />
+      <div className="mt-3 min-h-[1.5rem]">
+        <p className="min-w-0 truncate text-[13px] font-medium leading-snug text-slate-500 banking-dark:text-zinc-400">{a.name}</p>
       </div>
 
       <BankingBalanceMaskedAmount
         text={formatClpDots(saldoReal)}
         visible={amountsVisible}
-        className="mt-1.5 block text-lg font-semibold tabular-nums tracking-tight text-slate-800 banking-dark:text-zinc-50"
+        className="mt-1 block text-[22px] font-bold tabular-nums tracking-tight text-slate-900 banking-dark:text-white"
         title={
           liquid
             ? `Saldo real (libro): incluye provisiones en el saldo libro; menos cargos en TC no pagados asociados a esta cuenta (${formatClpDots(unpaidCut)}).`
             : "Saldo libro en la cuenta tarjeta (egresos no pagados siguen pendientes hasta marcarlos o pagar)."
         }
       />
-      <div className="mt-1 border-t border-slate-300 pt-1 banking-dark:border-zinc-600/90">
-        <div
-          className={`grid gap-x-2 gap-y-0 leading-none ${unpaidCut > 0 ? "grid-cols-3" : "grid-cols-2"}`}
-        >
-          <div className="min-w-0">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Saldo actual</p>
+      <div className={`mt-3 grid gap-2 ${showTcChip && showProvChip ? "grid-cols-3" : "grid-cols-2"}`}>
+        <div className="min-w-0 rounded-lg bg-slate-50 px-2.5 py-1.5 banking-dark:bg-zinc-800/60">
+          <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">
+            Saldo actual
+          </p>
+          <BankingBalanceMaskedAmount
+            text={formatClpDots(atBank)}
+            visible={amountsVisible}
+            className="mt-0.5 block truncate text-[11.5px] font-bold tabular-nums leading-tight text-slate-700 banking-dark:text-zinc-200"
+            title="Efectivo en cuenta (libro menos neto de Provisiones)."
+          />
+        </div>
+        {showTcChip ? (
+          <div className="min-w-0 rounded-lg bg-rose-50 px-2.5 py-1.5 banking-dark:bg-rose-500/10">
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-rose-500/80 banking-dark:text-rose-300/70">
+              Deuda TC
+            </p>
             <BankingBalanceMaskedAmount
-              text={formatClpDots(atBank)}
+              text={formatClpDots(unpaidCut)}
               visible={amountsVisible}
-              className="mt-0.5 block truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-600 banking-dark:text-zinc-100"
-              title="Efectivo en cuenta (libro menos neto de Provisiones)."
+              className="mt-0.5 block truncate text-[11.5px] font-bold tabular-nums leading-tight text-rose-600 banking-dark:text-rose-300"
+              title="Cargos en tarjeta(s) asociada(s) a esta cuenta marcados como no pagados."
             />
           </div>
-          {unpaidCut > 0 ? (
-            <div className="min-w-0 text-right">
-              <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Deuda TC</p>
-              <BankingBalanceMaskedAmount
-                text={formatClpDots(unpaidCut)}
-                visible={amountsVisible}
-                className="mt-0.5 block truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400"
-                title="Cargos en tarjeta(s) asociada(s) a esta cuenta marcados como no pagados."
-              />
-            </div>
-          ) : null}
-          <div className="min-w-0 text-right">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Provisiones</p>
+        ) : null}
+        {showProvChip ? (
+          <div className="min-w-0 rounded-lg bg-rose-50 px-2.5 py-1.5 banking-dark:bg-rose-500/10">
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-rose-500/80 banking-dark:text-rose-300/70">
+              Provisiones
+            </p>
             <BankingBalanceMaskedAmount
               text={formatClpDots(Math.abs(prov))}
               visible={amountsVisible}
-              className="mt-0.5 block truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400"
+              className="mt-0.5 block truncate text-[11.5px] font-bold tabular-nums leading-tight text-rose-600 banking-dark:text-rose-300"
               title="Monto neto en categoría Provisiones (reversas netean)."
             />
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );
@@ -327,21 +276,17 @@ export function BankingAccountBalanceCard({
 export function BankingNonCreditTotalBalanceCard({
   liquidAccounts,
   creditCardUnpaidLinkedTotalClp,
-  privacyKey,
-  strictPrivacy,
+  sharedUnsettledClp,
   amountsVisible,
-  onPeekStart,
-  onPeekEnd,
-  onToggleCardHidden,
+  onToggleAmountsVisible,
 }: {
   liquidAccounts: BankingAccountRow[];
   creditCardUnpaidLinkedTotalClp: number;
-  privacyKey: string;
-  strictPrivacy: boolean;
+  /** Deuda neta de gastos compartidos sin liquidar; se muestra como un stat más del hero. */
+  sharedUnsettledClp: number;
   amountsVisible: boolean;
-  onPeekStart: (key: string) => void;
-  onPeekEnd: () => void;
-  onToggleCardHidden: (key: string) => void;
+  /** Único control de privacidad: oculta/muestra los montos de todas las tarjetas de saldo. */
+  onToggleAmountsVisible: () => void;
 }) {
   const liquidBook = liquidAccounts.reduce((s, a) => s + a.balance, 0);
   const liquidAtBank = liquidAccounts.reduce((s, a) => s + bankingAccountAtBank(a), 0);
@@ -349,145 +294,86 @@ export function BankingNonCreditTotalBalanceCard({
   const totalReal = liquidBook - unpaidLinked;
   const totalAtBank = liquidAtBank;
   const provisionSumDisplay = liquidAccounts.reduce((s, a) => s + Math.abs(a.provision_net_sum ?? 0), 0);
+  const statCount = unpaidLinked > 0 ? 4 : 3;
   const inactive = Math.abs(totalReal) < 1e-9;
 
   return (
     <div
-      className={`flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-emerald-300/85 bg-gradient-to-br from-emerald-50/90 via-white to-teal-50/50 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-emerald-200/65 banking-dark:border-zinc-600 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-amber-950/[0.14] banking-dark:shadow-[0_8px_32px_-14px_rgba(0,0,0,0.65)] banking-dark:ring-amber-900/35 ${
+      className={`relative flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-2xl bg-[linear-gradient(135deg,#14162a_0%,#1c1e3d_55%,#23234f_100%)] p-4 shadow-[0_8px_32px_-14px_rgba(20,22,42,0.55)] ring-1 ring-white/[0.06] ${
         inactive ? "opacity-[0.88]" : ""
       }`}
     >
-      <div className="flex items-start justify-between gap-1.5">
-        <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-200/90 ring-1 ring-emerald-300/65 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-amber-800/45 banking-dark:shadow-none"
-          aria-hidden
-        >
-          <svg className="h-4 w-4 text-emerald-800/90 banking-dark:text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+      <div
+        className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(99,102,241,0.35),transparent_70%)]"
+        aria-hidden
+      />
+      <div className="relative flex items-center justify-between gap-1.5">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10" aria-hidden>
+            <svg className="h-4 w-4 text-indigo-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="min-w-0 truncate text-[13px] font-medium leading-snug text-indigo-200/80">Saldo real disponible</p>
         </div>
-        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-emerald-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide text-emerald-900/85 ring-1 ring-emerald-300/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-300 banking-dark:ring-amber-800/45">
-          Total
-        </span>
-      </div>
-
-      <div className="mt-2 flex min-h-[2rem] items-start gap-2">
-        <p className="min-w-0 flex-1 line-clamp-2 text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-100">Saldo real</p>
-        <BankingBalancePrivacyEye
-          strictMode={strictPrivacy}
-          amountsVisible={amountsVisible}
-          onPeekStart={() => onPeekStart(privacyKey)}
-          onPeekEnd={onPeekEnd}
-          onToggleSelfHidden={() => onToggleCardHidden(privacyKey)}
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="truncate rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-wide text-indigo-200">
+            Total
+          </span>
+          <BankingBalancePrivacyEye
+            amountsVisible={amountsVisible}
+            onToggle={onToggleAmountsVisible}
+            iconClassName="h-4 w-4 shrink-0 text-indigo-200/70"
+          />
+        </div>
       </div>
 
       <BankingBalanceMaskedAmount
         text={formatClpDots(totalReal)}
         visible={amountsVisible}
-        className="mt-1.5 block text-lg font-semibold tabular-nums tracking-tight text-slate-800 banking-dark:text-zinc-50"
+        className="relative mt-3 block text-[32px] font-bold tabular-nums tracking-tight text-white"
         title="Suma de saldos libro (provisiones incluidas) solo en cuentas líquidas marcadas «incluir en saldo total» en Configuración; menos cargos TC no pagados asociados a cuentas corrientes igualmente incluidas."
       />
-      <div className="mt-1 border-t border-emerald-400/75 pt-1 banking-dark:border-zinc-600/90">
-        <div
-          className={`grid gap-x-2 gap-y-0 leading-none ${unpaidLinked > 0 ? "grid-cols-3" : "grid-cols-2"}`}
-        >
-          <div className="min-w-0">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Saldo actual</p>
+      <div className={`relative mt-4 grid gap-2 ${statCount === 4 ? "grid-cols-4" : "grid-cols-3"}`}>
+        <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.07] px-3 py-2">
+          <p className="text-[9.5px] font-semibold uppercase tracking-wide text-indigo-300/70">Saldo actual</p>
+          <BankingBalanceMaskedAmount
+            text={formatClpDots(totalAtBank)}
+            visible={amountsVisible}
+            className="mt-1 block truncate text-[15px] font-bold tabular-nums leading-tight text-white"
+            title="Suma de saldos «en banco» solo en cuentas incluidas en el total (sin efecto neto de Provisiones)."
+          />
+        </div>
+        {unpaidLinked > 0 ? (
+          <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.07] px-3 py-2">
+            <p className="text-[9.5px] font-semibold uppercase tracking-wide text-indigo-300/70">Deuda TC</p>
             <BankingBalanceMaskedAmount
-              text={formatClpDots(totalAtBank)}
+              text={formatClpDots(unpaidLinked)}
               visible={amountsVisible}
-              className="mt-0.5 block truncate text-[12px] font-semibold tabular-nums leading-tight text-slate-700 banking-dark:text-zinc-100"
-              title="Suma de saldos «en banco» solo en cuentas incluidas en el total (sin efecto neto de Provisiones)."
+              className="mt-1 block truncate text-[15px] font-bold tabular-nums leading-tight text-rose-300"
+              title="Suma de cargos TC no pagados solo si la cuenta corriente de liquidación está incluida en el total (Configuración)."
             />
           </div>
-          {unpaidLinked > 0 ? (
-            <div className="min-w-0 text-right">
-              <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Deuda TC</p>
-              <BankingBalanceMaskedAmount
-                text={formatClpDots(unpaidLinked)}
-                visible={amountsVisible}
-                className="mt-0.5 block truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400"
-                title="Suma de cargos TC no pagados solo si la cuenta corriente de liquidación está incluida en el total (Configuración)."
-              />
-            </div>
-          ) : null}
-          <div className="min-w-0 text-right">
-            <p className="text-[9px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">Provisiones</p>
-            <BankingBalanceMaskedAmount
-              text={formatClpDots(provisionSumDisplay)}
-              visible={amountsVisible}
-              className="mt-0.5 block truncate text-[12px] font-semibold tabular-nums leading-tight text-rose-700/90 banking-dark:text-rose-400"
-              title="Suma del valor absoluto del neto en Provisiones solo en cuentas incluidas en el total."
-            />
-          </div>
+        ) : null}
+        <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.07] px-3 py-2">
+          <p className="text-[9.5px] font-semibold uppercase tracking-wide text-indigo-300/70">Provisiones</p>
+          <BankingBalanceMaskedAmount
+            text={formatClpDots(provisionSumDisplay)}
+            visible={amountsVisible}
+            className="mt-1 block truncate text-[15px] font-bold tabular-nums leading-tight text-rose-300"
+            title="Suma del valor absoluto del neto en Provisiones solo en cuentas incluidas en el total."
+          />
+        </div>
+        <div className="min-w-0 rounded-lg border border-white/10 bg-white/[0.07] px-3 py-2">
+          <p className="text-[9.5px] font-semibold uppercase tracking-wide text-indigo-300/70">Compartido</p>
+          <BankingBalanceMaskedAmount
+            text={formatClpDots(sharedUnsettledClp)}
+            visible={amountsVisible}
+            className="mt-1 block truncate text-[15px] font-bold tabular-nums leading-tight text-white"
+            title="Cuota neta por persona en gastos compartidos sin liquidar (las devoluciones compartidas reducen este total)."
+          />
         </div>
       </div>
-    </div>
-  );
-}
-
-/** Deuda pago compartido — gradiente violeta muy suave, alineado al resto de tarjetas de saldo. */
-export const BANKING_SHARED_DEBT_CARD_CLASS =
-  "flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-slate-300/95 bg-gradient-to-br from-slate-50/95 via-white to-violet-50/40 p-3.5 shadow-[0_6px_24px_-10px_rgba(15,23,42,0.07)] ring-1 ring-slate-300/50 backdrop-blur-sm banking-dark:border-zinc-600 banking-dark:bg-gradient-to-br banking-dark:from-zinc-950 banking-dark:via-zinc-900 banking-dark:to-amber-950/[0.1] banking-dark:shadow-[0_8px_32px_-14px_rgba(0,0,0,0.65)] banking-dark:ring-amber-900/35";
-
-/** Gastos compartidos sin liquidar: neto por persona (devoluciones positivas restan del total). */
-export function BankingSharedUnsettledDebtCard({
-  amountClp,
-  privacyKey,
-  strictPrivacy,
-  amountsVisible,
-  onPeekStart,
-  onPeekEnd,
-  onToggleCardHidden,
-}: {
-  amountClp: number;
-  privacyKey: string;
-  strictPrivacy: boolean;
-  amountsVisible: boolean;
-  onPeekStart: (key: string) => void;
-  onPeekEnd: () => void;
-  onToggleCardHidden: (key: string) => void;
-}) {
-  const inactive = Math.abs(amountClp) < 1e-9;
-  return (
-    <div className={`${BANKING_SHARED_DEBT_CARD_CLASS} ${inactive ? "opacity-[0.88]" : ""}`}>
-      <div className="flex items-start justify-between gap-1.5">
-        <div
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-200/90 ring-1 ring-violet-300/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] banking-dark:bg-zinc-800 banking-dark:ring-amber-800/45 banking-dark:shadow-none"
-          aria-hidden
-        >
-          <svg className="h-4 w-4 text-violet-900/80 banking-dark:text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"
-            />
-          </svg>
-        </div>
-        <span className="max-w-[58%] shrink-0 truncate rounded-full bg-violet-200/95 px-2 py-0.5 text-[9px] font-semibold uppercase leading-none tracking-wide text-violet-900/85 ring-1 ring-violet-300/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.4)] banking-dark:bg-zinc-800 banking-dark:text-amber-300 banking-dark:ring-amber-800/45">
-          Compartido
-        </span>
-      </div>
-      <div className="mt-2 flex min-h-[2rem] items-start gap-2">
-        <p className="min-w-0 flex-1 line-clamp-2 text-sm font-semibold leading-snug text-slate-700 banking-dark:text-zinc-100">Deuda Pago Compartido</p>
-        <BankingBalancePrivacyEye
-          strictMode={strictPrivacy}
-          amountsVisible={amountsVisible}
-          onPeekStart={() => onPeekStart(privacyKey)}
-          onPeekEnd={onPeekEnd}
-          onToggleSelfHidden={() => onToggleCardHidden(privacyKey)}
-        />
-      </div>
-      <BankingBalanceMaskedAmount
-        text={formatClpDots(amountClp)}
-        visible={amountsVisible}
-        className="mt-1.5 block text-lg font-semibold tabular-nums tracking-tight text-slate-800 banking-dark:text-zinc-50"
-        title="Neto en cuotas por persona: egresos suman, ingresos y devoluciones restan (mismo criterio que monto ÷ participantes con signo)."
-      />
-      <p className="mt-1 line-clamp-3 text-[11px] italic leading-snug text-slate-500 banking-dark:text-zinc-400">
-        Cuota neta por persona; las devoluciones compartidas reducen este total.
-      </p>
     </div>
   );
 }
@@ -495,23 +381,13 @@ export function BankingSharedUnsettledDebtCard({
 export function SortableBankingBalanceCard({
   account,
   creditCardUnpaidAllocatedClp = 0,
-  privacyKey,
-  strictPrivacy,
   amountsVisible,
-  onPeekStart,
-  onPeekEnd,
-  onToggleCardHidden,
 }: {
   account: BankingAccountRow;
   creditCardUnpaidAllocatedClp?: number;
-  privacyKey: string;
-  strictPrivacy: boolean;
   amountsVisible: boolean;
-  onPeekStart: (key: string) => void;
-  onPeekEnd: () => void;
-  onToggleCardHidden: (key: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: account.id,
     transition: { duration: 200, easing: "cubic-bezier(0.25, 0.1, 0.25, 1)" },
   });
@@ -521,23 +397,26 @@ export function SortableBankingBalanceCard({
     opacity: isDragging ? 0.72 : 1,
   };
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={`h-full min-h-0 touch-none select-none ${isDragging ? "relative z-20 cursor-grabbing" : "cursor-grab"}`}
-      {...attributes}
-      {...listeners}
-      title={`Arrastra para cambiar el orden · ${account.name}`}
-    >
+    <div ref={setNodeRef} style={style} className={`h-full min-h-0 ${isDragging ? "relative z-20" : ""}`}>
       <BankingAccountBalanceCard
         account={account}
         creditCardUnpaidAllocatedClp={creditCardUnpaidAllocatedClp}
-        privacyKey={privacyKey}
-        strictPrivacy={strictPrivacy}
         amountsVisible={amountsVisible}
-        onPeekStart={onPeekStart}
-        onPeekEnd={onPeekEnd}
-        onToggleCardHidden={onToggleCardHidden}
+        dragHandle={
+          <button
+            type="button"
+            ref={setActivatorNodeRef}
+            className={`inline-flex h-6 w-6 shrink-0 touch-none items-center justify-center rounded-md text-slate-400 outline-none transition hover:bg-slate-100 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-teal-400/40 banking-dark:text-zinc-500 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-300 ${
+              isDragging ? "cursor-grabbing" : "cursor-grab"
+            }`}
+            aria-label={`Arrastrar para cambiar el orden · ${account.name}`}
+            title="Arrastra para cambiar el orden"
+            {...attributes}
+            {...listeners}
+          >
+            <IconGripVertical className="h-4 w-4" />
+          </button>
+        }
       />
     </div>
   );

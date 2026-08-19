@@ -63,7 +63,7 @@ export function BankingBodyClassSync() {
   return null;
 }
 
-function IconSun({ className }: { className?: string }) {
+export function IconSun({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
       <circle cx="12" cy="12" r="4" />
@@ -72,41 +72,10 @@ function IconSun({ className }: { className?: string }) {
   );
 }
 
-function IconMoon({ className }: { className?: string }) {
+export function IconMoon({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
       <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-}
-
-/** Conmuta modo oscuro solo en vistas Banking (persistido en localStorage). */
-export function BankingThemeToggle({ className = "" }: { className?: string }) {
-  const { isDark, toggleDark } = useBankingTheme();
-
-  return (
-    <button
-      type="button"
-      onClick={toggleDark}
-      aria-pressed={isDark}
-      title={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-      className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold uppercase tracking-wide transition ${className} ${
-        isDark
-          ? "border-zinc-600 bg-zinc-900 text-amber-200/90 hover:border-amber-900/60 hover:bg-zinc-800"
-          : "border-slate-300 bg-white text-slate-700 shadow-sm hover:border-slate-400 hover:bg-slate-50"
-      }`}
-    >
-      {isDark ? (
-        <>
-          <IconSun className="h-4 w-4 shrink-0 text-amber-300/90" />
-          Claro
-        </>
-      ) : (
-        <>
-          <IconMoon className="h-4 w-4 shrink-0 text-slate-500" />
-          Oscuro
-        </>
-      )}
-    </button>
   );
 }

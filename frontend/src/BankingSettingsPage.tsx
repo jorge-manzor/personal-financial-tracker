@@ -16,7 +16,8 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { apiFetch, fetchJson, patchJson, postJson } from "./api";
-import { BankingThemeToggle, useBankingTheme } from "./BankingThemeContext";
+import { useBankingTheme } from "./BankingThemeContext";
+import { bankingSwitchThumbClass, bankingSwitchTrackClass } from "./bankingTxShared";
 import type {
   BankingAccountRow,
   BankingBankRow,
@@ -25,8 +26,8 @@ import type {
   BankingSubcategoryRow,
 } from "./types";
 
-/** Coincide con `backend` `_BANK_CAT_DEFAULT`: coral / rojizo para categorías nuevas. */
-const BANKING_DEFAULT_NEW_CATEGORY_COLOR = "#ff7b72";
+/** Coincide con `backend` `_BANK_CAT_DEFAULT`: indigo-600, acento del nuevo estilo, para categorías nuevas. */
+const BANKING_DEFAULT_NEW_CATEGORY_COLOR = "#4f46e5";
 
 function IconPencil({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -112,13 +113,9 @@ function BankingEnabledToggle({
         e.stopPropagation();
         if (!disabled) onChange(!enabled);
       }}
-      className={`inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border p-[3px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white banking-dark:focus-visible:ring-amber-500/40 banking-dark:focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 ${
-        enabled
-          ? "justify-end border-teal-400 bg-teal-500 shadow-sm banking-dark:border-amber-600 banking-dark:bg-amber-600"
-          : "justify-start border-slate-300 bg-slate-100 banking-dark:border-zinc-600 banking-dark:bg-zinc-800"
-      }`}
+      className={bankingSwitchTrackClass(enabled)}
     >
-      <span className="pointer-events-none block h-3.5 w-3.5 shrink-0 rounded-full bg-white shadow" />
+      <span className={bankingSwitchThumbClass(enabled)} />
     </button>
   );
 }
@@ -127,7 +124,7 @@ function BankingEnabledToggle({
 function CategoryDragPreview({ cat, expanded }: { cat: BankingCategoryRow; expanded: boolean }) {
   return (
     <div
-      className="pointer-events-none box-border w-full min-w-[min(100%,42rem)] max-w-full cursor-grabbing overflow-hidden rounded-xl border border-teal-200 bg-white shadow-2xl shadow-teal-900/15 ring-2 ring-teal-200/80 banking-dark:border-amber-700/40 banking-dark:bg-zinc-900 banking-dark:shadow-black/40 banking-dark:ring-amber-600/25"
+      className="pointer-events-none box-border w-full min-w-[min(100%,42rem)] max-w-full cursor-grabbing overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-2xl shadow-indigo-900/15 ring-2 ring-indigo-200/80 banking-dark:border-amber-700/40 banking-dark:bg-zinc-900 banking-dark:shadow-black/40 banking-dark:ring-amber-600/25"
       style={softCategorySurface(cat.color)}
     >
       <div className="flex items-center gap-2 px-4 py-2.5">
@@ -298,14 +295,14 @@ function CategoryDragHandleButton({
 }
 
 const btnGreenBanking =
-  "rounded-xl border border-teal-400/80 bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:from-teal-600 hover:to-emerald-600 disabled:opacity-50 banking-dark:border-amber-600/45 banking-dark:bg-gradient-to-r banking-dark:from-amber-600 banking-dark:to-amber-500 banking-dark:text-zinc-950 banking-dark:hover:from-amber-500 banking-dark:hover:to-amber-400 banking-dark:hover:border-amber-500/50";
+  "rounded-xl border border-indigo-800 bg-indigo-800 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50 banking-dark:border-amber-600/45 banking-dark:bg-gradient-to-r banking-dark:from-amber-600 banking-dark:to-amber-500 banking-dark:text-zinc-950 banking-dark:hover:from-amber-500 banking-dark:hover:to-amber-400 banking-dark:hover:border-amber-500/50";
 
 const iconBtn =
-  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-700 disabled:opacity-40 banking-dark:text-zinc-400 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200";
+  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-40 banking-dark:text-zinc-400 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200";
 const iconBtnDanger = `${iconBtn} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 banking-dark:hover:border-rose-900 banking-dark:hover:bg-rose-950/40 banking-dark:hover:text-rose-300`;
 
 const selectFieldClass =
-  "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
+  "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
 
 const bankingSettingsCardClass =
   "rounded-xl border border-slate-300 bg-white p-5 shadow-sm banking-dark:border-zinc-700 banking-dark:bg-zinc-950 banking-dark:shadow-none";
@@ -320,7 +317,7 @@ const settingsGhostBtnSm =
 
 /** Asa de arrastre / chevron en filas de categoría. */
 const categoryHandleHover =
-  "text-slate-500 hover:bg-teal-50 hover:text-teal-800 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200";
+  "text-slate-500 hover:bg-indigo-50 hover:text-indigo-800 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200";
 
 const PRODUCT_TYPE_OPTIONS: { value: BankingProductType; label: string }[] = [
   { value: "cuenta_corriente", label: "Cuenta Corriente" },
@@ -829,7 +826,6 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
           uso interno (siempre activas, sin interruptor).
         </p>
         </div>
-        <BankingThemeToggle />
       </div>
 
       <section className="space-y-4" aria-labelledby="banking-accounts-heading">
@@ -986,7 +982,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
 
         <div className={bankingSettingsCardClass}>
           {newCategoryForm ? (
-            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-dashed border-teal-200 bg-teal-50/50 p-4 banking-dark:border-teal-900/45 banking-dark:bg-teal-950/35 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/50 p-4 banking-dark:border-amber-900/45 banking-dark:bg-amber-950/35 sm:flex-row sm:flex-wrap sm:items-end">
               <label className="min-w-[12rem] flex-1 text-sm">
                 <span className={`text-xs ${settingsMuted}`}>Nombre</span>
                 <input
@@ -1086,7 +1082,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                       <>
                         <input
                           type="text"
-                          className="min-w-[10rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-900 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-100 banking-dark:focus:border-amber-600/55 banking-dark:focus:ring-amber-500/20"
+                          className="min-w-[10rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-900 shadow-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-100 banking-dark:focus:border-amber-600/55 banking-dark:focus:ring-amber-500/20"
                           value={categoryFullEdit.name}
                           onChange={(e) =>
                             setCategoryFullEdit({ ...categoryFullEdit, name: e.target.value })
@@ -1330,7 +1326,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                     {bankingSubcategoryAllowsRename(cat, s) && subNameEdit?.id === s.id ? (
                                       <input
                                         type="text"
-                                        className="min-w-0 flex-1 rounded border border-teal-300 bg-white px-1.5 py-1 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-teal-400/35 banking-dark:border-amber-600/45 banking-dark:bg-zinc-900 banking-dark:text-zinc-100 banking-dark:focus:ring-amber-500/25"
+                                        className="min-w-0 flex-1 rounded border border-indigo-300 bg-white px-1.5 py-1 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400/35 banking-dark:border-amber-600/45 banking-dark:bg-zinc-900 banking-dark:text-zinc-100 banking-dark:focus:ring-amber-500/25"
                                         value={subNameEdit.name}
                                         onChange={(e) =>
                                           setSubNameEdit({ ...subNameEdit, name: e.target.value })
@@ -1364,7 +1360,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                         <button
                                           type="button"
                                           disabled={busyKey !== null}
-                                          className="rounded-md bg-teal-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-teal-700 disabled:opacity-40"
+                                          className="rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             void saveSubNameEdit();
@@ -1420,7 +1416,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                         <input
                           type="text"
                           placeholder="Nueva subcategoría…"
-                          className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-600/50 banking-dark:focus:ring-amber-500/15"
+                          className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-600/50 banking-dark:focus:ring-amber-500/15"
                           value={newSubDraft[cat.id] ?? ""}
                           onChange={(e) =>
                             setNewSubDraft((d) => ({ ...d, [cat.id]: e.target.value }))
@@ -1630,7 +1626,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
       <p className={`text-center text-xs ${settingsMuted}`}>
         <Link
           to="/banking/transactions"
-          className="font-medium text-teal-700 hover:text-teal-900 hover:underline banking-dark:text-amber-400 banking-dark:hover:text-amber-300"
+          className="font-medium text-indigo-700 hover:text-indigo-900 hover:underline banking-dark:text-amber-400 banking-dark:hover:text-amber-300"
         >
           Ir a movimientos
         </Link>
@@ -1643,7 +1639,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
           aria-modal="true"
           aria-labelledby="banking-product-modal-title"
         >
-          <div className="w-full max-w-lg rounded-xl border border-slate-300 bg-white p-6 shadow-2xl shadow-teal-900/10 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:shadow-black/40">
+          <div className="w-full max-w-lg rounded-xl border border-slate-300 bg-white p-6 shadow-2xl shadow-indigo-900/10 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:shadow-black/40">
             <h3
               id="banking-product-modal-title"
               className="text-base font-semibold text-slate-900 banking-dark:text-zinc-100"

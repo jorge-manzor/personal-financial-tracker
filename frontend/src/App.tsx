@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { apiFetch, fetchJson } from "./api";
 import { getToken, logoutSession } from "./auth";
 import { Login } from "./Login";
@@ -349,6 +349,10 @@ export default function App() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  const { pathname } = useLocation();
+  /** Banking tiene su propio encabezado dentro de la página; el header global (marca + USD/CLP) es solo para inversiones. */
+  const onBankingRoute = pathname.startsWith("/banking");
+
   if (!authed) {
     return <Login onSuccess={() => setAuthed(true)} />;
   }
@@ -363,7 +367,9 @@ export default function App() {
     (fintualModalFromProfile || (needsFintualConnection && !fintualSetupSkipped));
 
   return (
-    <div className="min-h-full bg-[#0d1117]">
+    <BankingThemeProvider>
+      <BankingBodyClassSync />
+      <div className="min-h-full bg-[#0d1117]">
       <AppSidebar
         onLogout={() => {
           logoutSession();
@@ -372,14 +378,16 @@ export default function App() {
         investmentsEnabled={investmentsOn}
         bankingEnabled={bankingOn}
       />
-      <AppHeader
-        onRefreshPrices={() => beginSync(true, false)}
-        headerSyncing={headerSync}
-        headerSyncStartedAt={headerSync ? headerSyncStartedAt : null}
-        syncDisabled={syncBusy || needsFintualConnection}
-        fxRefreshNonce={fxRefreshNonce}
-        investmentsEnabled={investmentsOn}
-      />
+      {!onBankingRoute && (
+        <AppHeader
+          onRefreshPrices={() => beginSync(true, false)}
+          headerSyncing={headerSync}
+          headerSyncStartedAt={headerSync ? headerSyncStartedAt : null}
+          syncDisabled={syncBusy || needsFintualConnection}
+          fxRefreshNonce={fxRefreshNonce}
+          investmentsEnabled={investmentsOn}
+        />
+      )}
 
       {syncStatus && overlay && (
         <SyncOverlay
@@ -391,11 +399,9 @@ export default function App() {
         />
       )}
 
-      <main className="pt-14 pl-16">
+      <main className={onBankingRoute ? "pl-16" : "pt-14 pl-16"}>
         {showMain ? (
           <Suspense fallback={<RoutePageFallback />}>
-            <BankingThemeProvider>
-              <BankingBodyClassSync />
             <Routes>
               <Route
                 path="/profile"
@@ -510,7 +516,6 @@ export default function App() {
                 }
               />
             </Routes>
-            </BankingThemeProvider>
           </Suspense>
         ) : initError ? (
           <div className="flex min-h-[50vh] flex-col items-center justify-center gap-5 px-6 text-center">
@@ -561,7 +566,8 @@ export default function App() {
           reconnectMode={!!me?.fintual_reconnect_required}
         />
       )}
-    </div>
+      </div>
+    </BankingThemeProvider>
   );
 }
 

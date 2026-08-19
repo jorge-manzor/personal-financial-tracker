@@ -279,3 +279,32 @@ def run_multiuser_migration(engine: Engine) -> None:
                     _set_migration_flag(conn, "wallet_movements_user_scoped")
                     conn.commit()
                     logger.info("Rebuilt wallet_movements (user_id + external_key unique)")
+
+    # Re-paleta única (una vez): categorías con color de la paleta antigua (github-dark) pasan a la
+    # nueva paleta índigo. Solo toca filas cuyo color coincide exacto con un valor de la paleta vieja,
+    # así no pisa colores que el usuario haya elegido manualmente a mano.
+    if "banking_categories" in inspect(engine).get_table_names():
+        with engine.connect() as conn:
+            if not _migration_flag(conn, "banking_category_colors_repalette_v1"):
+                old_to_new = {
+                    "#58a6ff": "#4f46e5",
+                    "#a371f7": "#7c3aed",
+                    "#f0883e": "#2563eb",
+                    "#3fb950": "#0891b2",
+                    "#d2a8ff": "#059669",
+                    "#79c0ff": "#0d9488",
+                    "#ff7b72": "#d97706",
+                    "#56d364": "#e11d48",
+                    "#e3b341": "#c026d3",
+                    "#22d3ee": "#0284c7",
+                    "#8b5cf6": "#9333ea",
+                    "#fb7185": "#475569",
+                }
+                for old_hex, new_hex in old_to_new.items():
+                    conn.execute(
+                        text("UPDATE banking_categories SET color = :new_hex WHERE color = :old_hex"),
+                        {"new_hex": new_hex, "old_hex": old_hex},
+                    )
+                _set_migration_flag(conn, "banking_category_colors_repalette_v1")
+                conn.commit()
+                logger.info("Re-paleteadas categorías banking a la nueva paleta índigo")

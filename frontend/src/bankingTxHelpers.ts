@@ -11,8 +11,8 @@ export const BANKING_TEMPLATE_CAT_PROVISIONES = 21;
 /** Movimientos por página (coincide con GET /banking/transactions `page_size`). */
 export const BANKING_TX_PAGE_SIZE = 50;
 
-/** Alto estimado por fila en la tabla principal (virtualizada). */
-export const BANKING_TX_VIRTUAL_ROW_ESTIMATE_PX = 52;
+/** Alto estimado por fila en la lista de movimientos (virtualizada, estilo tarjeta). */
+export const BANKING_TX_LIST_ROW_ESTIMATE_PX = 64;
 
 /** Bloquea editar filas con peer salvo el pago TC reflejado en cuenta corriente. */
 export function bankingTxRowEditDisabled(row: BankingTransactionRow): boolean {

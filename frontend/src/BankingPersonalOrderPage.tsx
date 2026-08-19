@@ -22,8 +22,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { apiFetch, fetchJson, patchJson, postJson } from "./api";
 import { BankingAuxRoundCheckbox } from "./BankingAuxRoundCheckbox";
 import { localYearMonthString } from "./localDate";
-import { BankingThemeToggle, useBankingTheme } from "./BankingThemeContext";
+import { useBankingTheme } from "./BankingThemeContext";
 import { formatBankingClpSigned, formatClpDots, parseChileanAmountInput } from "./format";
+import { BANKING_MAIN_TX_CARD_CLASS, BANKING_MAIN_TX_ROW_CLASS } from "./bankingTxShared";
 
 function savingsGoalProgressPercent(balance: number, target: number | null | undefined): number | null {
   if (target == null || !(target > 0)) return null;
@@ -95,10 +96,10 @@ const cardClass =
 const labelClass =
   "block text-[10px] font-semibold uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400";
 const inputClass =
-  "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-teal-400/0 transition focus:border-teal-400 focus:ring-2 focus:ring-teal-400/35 banking-dark:border-zinc-600 banking-dark:bg-zinc-950 banking-dark:text-zinc-100 banking-dark:focus:border-amber-500 banking-dark:focus:ring-amber-500/35";
+  "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-indigo-400/0 transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/35 banking-dark:border-zinc-600 banking-dark:bg-zinc-950 banking-dark:text-zinc-100 banking-dark:focus:border-amber-500 banking-dark:focus:ring-amber-500/35";
 /** Filtros popover provisiones — alineado con tabla movimientos bancarios. */
 const bankingProvFilterInputClass =
-  "mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:placeholder:text-zinc-500 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
+  "mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:placeholder:text-zinc-500 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
 
 const PROVISION_LABEL_NONE = "__none__";
 
@@ -178,7 +179,8 @@ function provisionColumnFilterActive(colKey: ProvisionFilterColKey, f: Provision
   }
 }
 
-function ProvisionColumnHeader({
+/** Chip de filtro por columna — reemplaza el antiguo encabezado de tabla; misma lógica, look de píldora moderna. */
+function ProvisionColumnFilterChip({
   colKey,
   active,
   open,
@@ -188,35 +190,33 @@ function ProvisionColumnHeader({
   colKey: ProvisionFilterColKey;
   active: boolean;
   open: boolean;
-  registerRef: (el: HTMLTableCellElement | null) => void;
+  registerRef: (el: HTMLButtonElement | null) => void;
   toggle: () => void;
 }) {
   const label = PROVISION_FILTER_LABELS[colKey];
   return (
-    <th ref={registerRef} scope="col" className="align-bottom p-0">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        className={`w-full px-2 py-2.5 text-center transition sm:px-2.5 ${
-          open
-            ? "bg-slate-100 ring-1 ring-inset ring-slate-300 banking-dark:bg-zinc-900 banking-dark:ring-zinc-600"
-            : "hover:bg-slate-50 banking-dark:hover:bg-zinc-900/80"
+    <button
+      ref={registerRef}
+      type="button"
+      onClick={toggle}
+      aria-expanded={open}
+      aria-haspopup="dialog"
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+        active
+          ? "border-indigo-300 bg-indigo-50 text-indigo-800 banking-dark:border-amber-700/55 banking-dark:bg-amber-950/40 banking-dark:text-amber-200"
+          : open
+            ? "border-slate-300 bg-slate-100 text-slate-800 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-100"
+            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:border-zinc-600"
+      }`}
+    >
+      {label}
+      <span
+        className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+          active ? "bg-indigo-500 banking-dark:bg-amber-400" : "bg-slate-300 banking-dark:bg-zinc-600"
         }`}
-      >
-        <span className="block text-[12px] font-semibold uppercase tracking-wide text-slate-700 banking-dark:text-zinc-200">
-          {label}
-        </span>
-        <span
-          className={`mt-0.5 block text-[9px] font-medium normal-case tracking-normal ${
-            active ? "text-slate-600 banking-dark:text-zinc-400" : "text-slate-400 banking-dark:text-zinc-500"
-          }`}
-        >
-          {active ? "Filtro activo" : "Filtrar"}
-        </span>
-      </button>
-    </th>
+        aria-hidden
+      />
+    </button>
   );
 }
 
@@ -262,7 +262,7 @@ function ProvisionLabelFilterBody({
         <button
           type="button"
           onClick={() => setFilterLabelTokens([])}
-          className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-teal-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:bg-zinc-800"
+          className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-indigo-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:bg-zinc-800"
         >
           Borrar selección
         </button>
@@ -285,9 +285,9 @@ function ProvisionLabelFilterBody({
             onClick={() =>
               setFilterLabelTokens((prev) => toggleStrSorted(prev, PROVISION_LABEL_NONE))
             }
-            className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium transition hover:bg-teal-50 banking-dark:hover:bg-zinc-800 ${
+            className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium transition hover:bg-indigo-50 banking-dark:hover:bg-zinc-800 ${
               filterLabelTokens.includes(PROVISION_LABEL_NONE)
-                ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
+                ? "border-indigo-400 bg-indigo-50 ring-1 ring-indigo-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
                 : "border border-slate-300 bg-white banking-dark:border-zinc-600 banking-dark:bg-zinc-950"
             }`}
           >
@@ -301,9 +301,9 @@ function ProvisionLabelFilterBody({
               key={lab}
               type="button"
               onClick={() => setFilterLabelTokens((prev) => toggleStrSorted(prev, lab))}
-              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-teal-50 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-800 ${
+              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-indigo-50 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-800 ${
                 picked
-                  ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
+                  ? "border-indigo-400 bg-indigo-50 ring-1 ring-indigo-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
                   : "border border-slate-300 bg-white banking-dark:border-zinc-600 banking-dark:bg-zinc-950"
               }`}
             >
@@ -382,9 +382,9 @@ function ProvisionHeaderFilterFields({
             <button
               type="button"
               onClick={() => setFilterPaidScopes((prev) => toggleEnumInList(prev, "unpaid"))}
-              className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 banking-dark:hover:bg-zinc-800 ${
+              className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-indigo-50 banking-dark:hover:bg-zinc-800 ${
                 filterPaidScopes.includes("unpaid")
-                  ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
+                  ? "border-indigo-400 bg-indigo-50 ring-1 ring-indigo-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
                   : "border-slate-300 bg-white banking-dark:border-zinc-600 banking-dark:bg-zinc-950"
               }`}
             >
@@ -393,9 +393,9 @@ function ProvisionHeaderFilterFields({
             <button
               type="button"
               onClick={() => setFilterPaidScopes((prev) => toggleEnumInList(prev, "paid"))}
-              className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 banking-dark:hover:bg-zinc-800 ${
+              className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-indigo-50 banking-dark:hover:bg-zinc-800 ${
                 filterPaidScopes.includes("paid")
-                  ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
+                  ? "border-indigo-400 bg-indigo-50 ring-1 ring-indigo-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
                   : "border-slate-300 bg-white banking-dark:border-zinc-600 banking-dark:bg-zinc-950"
               }`}
             >
@@ -467,7 +467,7 @@ function ProvisionHeaderFilterFields({
                 setFilterAccountIds([]);
                 setFilterAccountNull(false);
               }}
-              className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-teal-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:bg-zinc-800"
+              className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-[11px] font-medium text-slate-600 transition hover:bg-indigo-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:bg-zinc-800"
             >
               Borrar selección
             </button>
@@ -476,13 +476,13 @@ function ProvisionHeaderFilterFields({
             <button
               type="button"
               onClick={() => setFilterAccountNull((prev) => !prev)}
-              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 banking-dark:hover:bg-zinc-800 ${
+              className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-indigo-50 banking-dark:hover:bg-zinc-800 ${
                 filterAccountNull
-                  ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
+                  ? "border-indigo-400 bg-indigo-50 ring-1 ring-indigo-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
                   : "border border-slate-300 bg-white banking-dark:border-zinc-600 banking-dark:bg-zinc-950"
               }`}
             >
-              <span className={filterAccountNull ? "font-semibold text-teal-900 banking-dark:text-amber-100" : "text-slate-800 banking-dark:text-zinc-100"}>
+              <span className={filterAccountNull ? "font-semibold text-indigo-900 banking-dark:text-amber-100" : "text-slate-800 banking-dark:text-zinc-100"}>
                 Sin cuenta
               </span>
             </button>
@@ -493,13 +493,13 @@ function ProvisionHeaderFilterFields({
                   key={a.id}
                   type="button"
                   onClick={() => setFilterAccountIds((prev) => toggleNumInSortedList(prev, a.id))}
-                  className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 banking-dark:hover:bg-zinc-800 ${
+                  className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-indigo-50 banking-dark:hover:bg-zinc-800 ${
                     picked
-                      ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
+                      ? "border-indigo-400 bg-indigo-50 ring-1 ring-indigo-300 banking-dark:border-amber-600 banking-dark:bg-zinc-900 banking-dark:ring-amber-700/40"
                       : "border border-slate-300 bg-white banking-dark:border-zinc-600 banking-dark:bg-zinc-950"
                   }`}
                 >
-                  <span className={picked ? "font-semibold text-teal-900 banking-dark:text-amber-100" : "text-slate-800 banking-dark:text-zinc-100"}>
+                  <span className={picked ? "font-semibold text-indigo-900 banking-dark:text-amber-100" : "text-slate-800 banking-dark:text-zinc-100"}>
                     {a.name}
                   </span>
                 </button>
@@ -515,7 +515,7 @@ function ProvisionHeaderFilterFields({
 }
 
 const btnPrimary =
-  "rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-teal-700 disabled:opacity-50 banking-dark:bg-amber-500 banking-dark:text-zinc-950 banking-dark:shadow-md banking-dark:hover:bg-amber-400 banking-dark:disabled:opacity-45";
+  "rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50 banking-dark:bg-amber-500 banking-dark:text-zinc-950 banking-dark:shadow-md banking-dark:hover:bg-amber-400 banking-dark:disabled:opacity-45";
 const btnSecondary =
   "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm hover:bg-slate-50 banking-dark:border-zinc-500 banking-dark:bg-zinc-900 banking-dark:text-zinc-100 banking-dark:shadow-sm banking-dark:hover:border-zinc-400 banking-dark:hover:bg-zinc-800";
 /** Íconos de fila — patrón movimientos bancarios; mejor contraste del trazo en modo oscuro. */
@@ -527,10 +527,6 @@ const modalBackdropClass =
   "fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/45 p-4 backdrop-blur-[1px] banking-dark:bg-black/55";
 const modalPanelClass =
   "relative z-[1] w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-xl banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:shadow-black/40";
-
-/** Misma jerarquía tipográfica que las filas de la tabla principal de movimientos bancarios (`BankingTxTd`). */
-const provisionTableTdBase =
-  "align-middle px-2 py-3 text-[12px] leading-snug sm:px-2.5";
 
 function GripIcon({ className }: { className?: string }) {
   return (
@@ -594,14 +590,126 @@ function PaidToggleButton({
       aria-pressed={paid}
       title={paid ? "Clic para marcar como no pagado" : "Clic para marcar como pagado"}
       onClick={onToggle}
-      className={`inline-flex min-w-[7.5rem] items-center justify-center rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-colors ${
+      className={`inline-flex shrink-0 items-center justify-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide transition-colors ${
         paid
           ? "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 banking-dark:bg-emerald-600 banking-dark:hover:bg-emerald-500"
-          : "bg-neutral-950 text-white shadow-sm hover:bg-neutral-900 banking-dark:border banking-dark:border-zinc-500 banking-dark:bg-zinc-800 banking-dark:text-white banking-dark:hover:bg-zinc-700"
+          : "border border-indigo-800 bg-indigo-800 text-white shadow-sm hover:border-indigo-700 hover:bg-indigo-700 banking-dark:border-amber-600/70 banking-dark:bg-amber-700/90 banking-dark:hover:border-amber-500 banking-dark:hover:bg-amber-600"
       }`}
     >
       {paid ? "PAGADO" : "NO PAGADO"}
     </button>
+  );
+}
+
+/** Selector de cuenta modernizado: mismo `inputClass` que el resto del formulario + flecha propia (reemplaza la flecha nativa del navegador). */
+function AccountSelect({
+  value,
+  onChange,
+  accounts,
+  placeholder,
+}: {
+  value: number | "";
+  onChange: (v: number | "") => void;
+  accounts: BankingAccountRow[];
+  placeholder: string;
+}) {
+  return (
+    <div className="relative mt-1">
+      <select
+        className={`${inputClass} mt-0 appearance-none pr-9`}
+        value={value === "" ? "" : String(value)}
+        onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
+      >
+        <option value="">{placeholder}</option>
+        {accounts.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.name}
+          </option>
+        ))}
+      </select>
+      <svg
+        className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 banking-dark:text-amber-200/70"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        aria-hidden
+      >
+        <path
+          fillRule="evenodd"
+          d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.24 4.496a.75.75 0 01-1.08 0l-4.24-4.497a.75.75 0 01.02-1.06z"
+          clipRule="evenodd"
+        />
+      </svg>
+    </div>
+  );
+}
+
+/** Contenido compartido de la fila (card): descripción/etiqueta/cuenta, monto, pagado, acciones. */
+function ProvisionRowInner({
+  row,
+  onTogglePaid,
+  onEdit,
+  onRemove,
+}: {
+  row: PersonalProvisionItem;
+  onTogglePaid: (r: PersonalProvisionItem) => void;
+  onEdit: (r: PersonalProvisionItem) => void;
+  onRemove: (id: number) => void;
+}) {
+  const initial = row.description.trim().charAt(0).toUpperCase() || "?";
+  return (
+    <>
+      <div
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-[13px] font-bold text-indigo-600 banking-dark:bg-amber-500/15 banking-dark:text-amber-300"
+        aria-hidden
+      >
+        {initial}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p
+          className={`line-clamp-2 break-words text-[13px] font-semibold leading-snug [overflow-wrap:anywhere] ${
+            row.paid
+              ? "text-slate-400 line-through banking-dark:text-zinc-500"
+              : "text-slate-800 banking-dark:text-zinc-100"
+          }`}
+        >
+          {row.description}
+        </p>
+        <p className="mt-0.5 truncate text-[11.5px] text-slate-400 banking-dark:text-zinc-500">
+          {row.category_label?.trim() ? row.category_label : "Sin etiqueta"}
+          {row.account_name ? ` · ${row.account_name}` : ""}
+        </p>
+      </div>
+      <div className="w-28 shrink-0 text-right">
+        {row.amount_clp != null ? (
+          <span className="text-[13px] font-bold tabular-nums text-slate-800 banking-dark:text-amber-200/90">
+            {formatClpDots(row.amount_clp)}
+          </span>
+        ) : (
+          <span className="text-[13px] text-slate-400 banking-dark:text-zinc-600">—</span>
+        )}
+      </div>
+      <PaidToggleButton paid={row.paid} onToggle={() => onTogglePaid(row)} />
+      <div className="flex shrink-0 items-center gap-0.5">
+        <button
+          type="button"
+          title="Editar recordatorio"
+          aria-label="Editar recordatorio"
+          onClick={() => onEdit(row)}
+          className={poIconBtn}
+        >
+          <IconPencil />
+        </button>
+        <button
+          type="button"
+          title="Eliminar recordatorio"
+          aria-label="Eliminar recordatorio"
+          onClick={() => void onRemove(row.id)}
+          className={poIconBtnDanger}
+        >
+          <IconTrash />
+        </button>
+      </div>
+    </>
   );
 }
 
@@ -630,87 +738,26 @@ function SortableProvisionRow({
   };
 
   return (
-    <tr
-      ref={setNodeRef}
-      style={style}
-      className="bg-white transition-colors hover:bg-slate-50/90 banking-dark:bg-zinc-950/40 banking-dark:hover:bg-zinc-900/50"
-    >
-      <td className={`${provisionTableTdBase} w-10 px-1 sm:px-1`}>
-        <div className="flex justify-center">
-          <button
-            type="button"
-            className="flex cursor-grab touch-none items-center justify-center rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 active:cursor-grabbing banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-100"
-            aria-label="Arrastrar para reordenar"
-            {...attributes}
-            {...listeners}
-          >
-            <GripIcon className="h-4 w-4" />
-          </button>
-        </div>
-      </td>
-      <td className={`${provisionTableTdBase} w-9 px-1`}>
-        <div className="flex justify-center" onPointerDown={(e) => e.stopPropagation()}>
-          <BankingAuxRoundCheckbox
-            checked={selected}
-            onChange={() => onSelectChange(!selected)}
-            aria-label={`Seleccionar provisión: ${row.description.slice(0, 80)}`}
-          />
-        </div>
-      </td>
-      <td className={provisionTableTdBase}>
-        <div className="flex justify-center">
-          <PaidToggleButton paid={row.paid} onToggle={() => onTogglePaid(row)} />
-        </div>
-      </td>
-      <td className={`${provisionTableTdBase} max-w-[240px] text-slate-600 banking-dark:text-zinc-300`}>
-        <span
-          className={`block font-medium leading-snug ${
-            row.paid
-              ? "text-slate-500 line-through banking-dark:text-zinc-500"
-              : "text-slate-700 banking-dark:text-zinc-200"
-          }`}
-        >
-          {row.description}
-        </span>
-      </td>
-      <td className={`${provisionTableTdBase} max-w-[140px] text-slate-700 banking-dark:text-zinc-300`}>
-        {row.category_label?.trim() ? row.category_label : (
-          <span className="text-slate-400 banking-dark:text-zinc-600">—</span>
-        )}
-      </td>
-      <td className={`${provisionTableTdBase} whitespace-nowrap tabular-nums`}>
-        {row.amount_clp != null ? (
-          <span className="font-semibold text-slate-800 banking-dark:text-amber-200/90">{formatClpDots(row.amount_clp)}</span>
-        ) : (
-          <span className="text-slate-400 banking-dark:text-zinc-600">—</span>
-        )}
-      </td>
-      <td className={`${provisionTableTdBase} text-slate-700 banking-dark:text-zinc-400`}>
-        {row.account_name ?? "—"}
-      </td>
-      <td className={`${provisionTableTdBase} whitespace-nowrap`}>
-        <div className="flex items-center justify-center gap-0.5">
-          <button
-            type="button"
-            title="Editar recordatorio"
-            aria-label="Editar recordatorio"
-            onClick={() => onEdit(row)}
-            className={poIconBtn}
-          >
-            <IconPencil />
-          </button>
-          <button
-            type="button"
-            title="Eliminar recordatorio"
-            aria-label="Eliminar recordatorio"
-            onClick={() => void onRemove(row.id)}
-            className={poIconBtnDanger}
-          >
-            <IconTrash />
-          </button>
-        </div>
-      </td>
-    </tr>
+    <div ref={setNodeRef} style={style} className={BANKING_MAIN_TX_ROW_CLASS}>
+      <button
+        type="button"
+        className="flex shrink-0 cursor-grab touch-none items-center justify-center rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 active:cursor-grabbing banking-dark:text-zinc-500 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-200"
+        aria-label="Arrastrar para reordenar"
+        {...attributes}
+        {...listeners}
+      >
+        <GripIcon className="h-4 w-4" />
+      </button>
+      <div onPointerDown={(e) => e.stopPropagation()}>
+        <BankingAuxRoundCheckbox
+          checked={selected}
+          onChange={() => onSelectChange(!selected)}
+          color="indigo"
+          aria-label={`Seleccionar provisión: ${row.description.slice(0, 80)}`}
+        />
+      </div>
+      <ProvisionRowInner row={row} onTogglePaid={onTogglePaid} onEdit={onEdit} onRemove={onRemove} />
+    </div>
   );
 }
 
@@ -730,73 +777,16 @@ function StaticProvisionRow({
   onRemove: (id: number) => void;
 }) {
   return (
-    <tr className="bg-white transition-colors hover:bg-slate-50/90 banking-dark:bg-zinc-950/40 banking-dark:hover:bg-zinc-900/50">
-      <td className={`${provisionTableTdBase} w-10 px-1 text-center text-slate-400 banking-dark:text-zinc-600 sm:px-1`}>
-        —
-      </td>
-      <td className={`${provisionTableTdBase} w-9 px-1`}>
-        <div className="flex justify-center">
-          <BankingAuxRoundCheckbox
-            checked={selected}
-            onChange={() => onSelectChange(!selected)}
-            aria-label={`Seleccionar provisión: ${row.description.slice(0, 80)}`}
-          />
-        </div>
-      </td>
-      <td className={provisionTableTdBase}>
-        <div className="flex justify-center">
-          <PaidToggleButton paid={row.paid} onToggle={() => onTogglePaid(row)} />
-        </div>
-      </td>
-      <td className={`${provisionTableTdBase} max-w-[240px] text-slate-600 banking-dark:text-zinc-300`}>
-        <span
-          className={`block font-medium leading-snug ${
-            row.paid
-              ? "text-slate-500 line-through banking-dark:text-zinc-500"
-              : "text-slate-700 banking-dark:text-zinc-200"
-          }`}
-        >
-          {row.description}
-        </span>
-      </td>
-      <td className={`${provisionTableTdBase} max-w-[140px] text-slate-700 banking-dark:text-zinc-300`}>
-        {row.category_label?.trim() ? row.category_label : (
-          <span className="text-slate-400 banking-dark:text-zinc-600">—</span>
-        )}
-      </td>
-      <td className={`${provisionTableTdBase} whitespace-nowrap tabular-nums`}>
-        {row.amount_clp != null ? (
-          <span className="font-semibold text-slate-800 banking-dark:text-amber-200/90">{formatClpDots(row.amount_clp)}</span>
-        ) : (
-          <span className="text-slate-400 banking-dark:text-zinc-600">—</span>
-        )}
-      </td>
-      <td className={`${provisionTableTdBase} text-slate-700 banking-dark:text-zinc-400`}>
-        {row.account_name ?? "—"}
-      </td>
-      <td className={`${provisionTableTdBase} whitespace-nowrap`}>
-        <div className="flex items-center justify-center gap-0.5">
-          <button
-            type="button"
-            title="Editar recordatorio"
-            aria-label="Editar recordatorio"
-            onClick={() => onEdit(row)}
-            className={poIconBtn}
-          >
-            <IconPencil />
-          </button>
-          <button
-            type="button"
-            title="Eliminar recordatorio"
-            aria-label="Eliminar recordatorio"
-            onClick={() => void onRemove(row.id)}
-            className={poIconBtnDanger}
-          >
-            <IconTrash />
-          </button>
-        </div>
-      </td>
-    </tr>
+    <div className={BANKING_MAIN_TX_ROW_CLASS}>
+      <div className="w-7 shrink-0" aria-hidden />
+      <BankingAuxRoundCheckbox
+        checked={selected}
+        onChange={() => onSelectChange(!selected)}
+        color="indigo"
+        aria-label={`Seleccionar provisión: ${row.description.slice(0, 80)}`}
+      />
+      <ProvisionRowInner row={row} onTogglePaid={onTogglePaid} onEdit={onEdit} onRemove={onRemove} />
+    </div>
   );
 }
 
@@ -827,10 +817,10 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
     left: number;
     width: number;
   } | null>(null);
-  const headerFilterCellRefs = useRef<Partial<Record<ProvisionFilterColKey, HTMLTableCellElement | null>>>({});
+  const headerFilterCellRefs = useRef<Partial<Record<ProvisionFilterColKey, HTMLButtonElement | null>>>({});
   const filterPopoverPanelRef = useRef<HTMLDivElement | null>(null);
 
-  const registerProvisionHeaderRef = useCallback((k: ProvisionFilterColKey, el: HTMLTableCellElement | null) => {
+  const registerProvisionHeaderRef = useCallback((k: ProvisionFilterColKey, el: HTMLButtonElement | null) => {
     headerFilterCellRefs.current[k] = el;
   }, []);
 
@@ -1608,7 +1598,6 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
               servidor asociado a tu usuario: al iniciar sesión de nuevo verás la misma lista, orden y estado de pago.
             </p>
           </div>
-          <BankingThemeToggle />
         </header>
 
         <section className={cardClass} aria-labelledby="prov-heading">
@@ -1619,7 +1608,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
             >
               <button
                 type="button"
-                className="flex w-full items-start gap-3 rounded-xl border border-transparent px-1 py-0.5 text-left outline-none ring-teal-400/0 transition hover:border-slate-200 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-400/35 banking-dark:hover:border-zinc-700 banking-dark:hover:bg-zinc-900/60 banking-dark:focus-visible:ring-amber-500/35"
+                className="flex w-full items-start gap-3 rounded-xl border border-transparent px-1 py-0.5 text-left outline-none ring-indigo-400/0 transition hover:border-slate-200 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-indigo-400/35 banking-dark:hover:border-zinc-700 banking-dark:hover:bg-zinc-900/60 banking-dark:focus-visible:ring-amber-500/35"
                 onClick={toggleProvisionsSection}
                 aria-expanded={provisionsExpanded}
                 aria-controls="prov-panel"
@@ -1682,20 +1671,20 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                 <>
                   {provisionSelectionStats.sel > 0 ? (
                     <div
-                      className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-teal-200/90 bg-teal-50/90 px-3 py-2.5 text-sm banking-dark:border-amber-900/60 banking-dark:bg-amber-950/35"
+                      className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-indigo-200/90 bg-indigo-50/90 px-3 py-2.5 text-sm banking-dark:border-amber-900/60 banking-dark:bg-amber-950/35"
                       role="status"
                       aria-live="polite"
                     >
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-teal-900 banking-dark:text-amber-100">
+                        <p className="font-semibold text-indigo-900 banking-dark:text-amber-100">
                           Selección:{" "}
                           <strong>{provisionSelectionStats.sel}</strong>{" "}
                           {provisionSelectionStats.sel === 1 ? "ítem visible" : "ítems visibles"}
                         </p>
-                        <p className="mt-0.5 tabular-nums text-teal-800 banking-dark:text-amber-200/95">
+                        <p className="mt-0.5 tabular-nums text-indigo-800 banking-dark:text-amber-200/95">
                           Suma montos ref.: <strong>{formatClpDots(provisionSelectionStats.sum)}</strong>
                           {provisionSelectionStats.selWithoutAmount > 0 ? (
-                            <span className="ml-2 font-normal text-teal-700/90 banking-dark:text-zinc-400">
+                            <span className="ml-2 font-normal text-indigo-700/90 banking-dark:text-zinc-400">
                               · {provisionSelectionStats.selWithoutAmount}{" "}
                               {provisionSelectionStats.selWithoutAmount === 1 ? "ítem sin" : "ítems sin"} monto ref.
                             </span>
@@ -1721,7 +1710,58 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                       </div>
                     </div>
                   ) : null}
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 banking-dark:border-zinc-700">
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1 pl-1.5 pr-2.5 shadow-sm banking-dark:border-zinc-700 banking-dark:bg-zinc-900">
+                      <BankingAuxRoundCheckbox
+                        checked={allVisibleProvisionsSelected}
+                        indeterminate={provisionSelectionStats.sel > 0 && !allVisibleProvisionsSelected}
+                        onChange={toggleSelectAllVisibleProvisions}
+                        color="indigo"
+                        title={allVisibleProvisionsSelected ? "Desmarcar todas las visibles" : "Seleccionar todas las visibles"}
+                        aria-label={
+                          columnFiltersActive
+                            ? "Seleccionar todas las provisiones que ves con el filtro actual"
+                            : "Seleccionar todas las provisiones de la lista"
+                        }
+                      />
+                      <span className="text-[11px] font-semibold text-slate-500 banking-dark:text-zinc-400">Todos</span>
+                    </div>
+                    <ProvisionColumnFilterChip
+                      colKey="paid"
+                      active={provisionColumnFilterActive("paid", filterSnapshot)}
+                      open={headerFilterOpen === "paid"}
+                      registerRef={(el) => registerProvisionHeaderRef("paid", el)}
+                      toggle={() => toggleProvisionHeaderFilter("paid")}
+                    />
+                    <ProvisionColumnFilterChip
+                      colKey="descripcion"
+                      active={provisionColumnFilterActive("descripcion", filterSnapshot)}
+                      open={headerFilterOpen === "descripcion"}
+                      registerRef={(el) => registerProvisionHeaderRef("descripcion", el)}
+                      toggle={() => toggleProvisionHeaderFilter("descripcion")}
+                    />
+                    <ProvisionColumnFilterChip
+                      colKey="etiqueta"
+                      active={provisionColumnFilterActive("etiqueta", filterSnapshot)}
+                      open={headerFilterOpen === "etiqueta"}
+                      registerRef={(el) => registerProvisionHeaderRef("etiqueta", el)}
+                      toggle={() => toggleProvisionHeaderFilter("etiqueta")}
+                    />
+                    <ProvisionColumnFilterChip
+                      colKey="monto"
+                      active={provisionColumnFilterActive("monto", filterSnapshot)}
+                      open={headerFilterOpen === "monto"}
+                      registerRef={(el) => registerProvisionHeaderRef("monto", el)}
+                      toggle={() => toggleProvisionHeaderFilter("monto")}
+                    />
+                    <ProvisionColumnFilterChip
+                      colKey="cuenta"
+                      active={provisionColumnFilterActive("cuenta", filterSnapshot)}
+                      open={headerFilterOpen === "cuenta"}
+                      registerRef={(el) => registerProvisionHeaderRef("cuenta", el)}
+                      toggle={() => toggleProvisionHeaderFilter("cuenta")}
+                    />
+                  </div>
                   <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -1729,86 +1769,23 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                       if (!columnFiltersActive) void handleProvisionDragEnd(e);
                     }}
                   >
-                    <table className="w-full min-w-[908px] border-collapse text-center text-[12px] leading-snug">
-                      <thead className="sticky top-0 z-10">
-                        <tr className="border-b border-slate-200 bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900/80">
-                          <th
-                            scope="col"
-                            className="w-10 border-b border-slate-200 bg-slate-50 px-1 py-2.5 text-center text-[12px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:border-zinc-700 banking-dark:bg-zinc-900/80 banking-dark:text-zinc-500"
-                            aria-label="Orden"
-                          >
-                            ⋮⋮
-                          </th>
-                          <th
-                            scope="col"
-                            className="w-9 border-b border-slate-200 bg-slate-50 px-1 py-2 banking-dark:border-zinc-700 banking-dark:bg-zinc-900/80"
-                          >
-                            <div className="flex justify-center">
-                              <BankingAuxRoundCheckbox
-                                checked={allVisibleProvisionsSelected}
-                                indeterminate={
-                                  provisionSelectionStats.sel > 0 && !allVisibleProvisionsSelected
-                                }
-                                onChange={toggleSelectAllVisibleProvisions}
-                                title={
-                                  allVisibleProvisionsSelected
-                                    ? "Desmarcar todas las visibles"
-                                    : "Seleccionar todas las visibles"
-                                }
-                                aria-label={
-                                  columnFiltersActive
-                                    ? "Seleccionar todas las provisiones que ves con el filtro actual"
-                                    : "Seleccionar todas las provisiones de la lista"
-                                }
-                              />
-                            </div>
-                          </th>
-                          <ProvisionColumnHeader
-                            colKey="paid"
-                            active={provisionColumnFilterActive("paid", filterSnapshot)}
-                            open={headerFilterOpen === "paid"}
-                            registerRef={(el) => registerProvisionHeaderRef("paid", el)}
-                            toggle={() => toggleProvisionHeaderFilter("paid")}
-                          />
-                          <ProvisionColumnHeader
-                            colKey="descripcion"
-                            active={provisionColumnFilterActive("descripcion", filterSnapshot)}
-                            open={headerFilterOpen === "descripcion"}
-                            registerRef={(el) => registerProvisionHeaderRef("descripcion", el)}
-                            toggle={() => toggleProvisionHeaderFilter("descripcion")}
-                          />
-                          <ProvisionColumnHeader
-                            colKey="etiqueta"
-                            active={provisionColumnFilterActive("etiqueta", filterSnapshot)}
-                            open={headerFilterOpen === "etiqueta"}
-                            registerRef={(el) => registerProvisionHeaderRef("etiqueta", el)}
-                            toggle={() => toggleProvisionHeaderFilter("etiqueta")}
-                          />
-                          <ProvisionColumnHeader
-                            colKey="monto"
-                            active={provisionColumnFilterActive("monto", filterSnapshot)}
-                            open={headerFilterOpen === "monto"}
-                            registerRef={(el) => registerProvisionHeaderRef("monto", el)}
-                            toggle={() => toggleProvisionHeaderFilter("monto")}
-                          />
-                          <ProvisionColumnHeader
-                            colKey="cuenta"
-                            active={provisionColumnFilterActive("cuenta", filterSnapshot)}
-                            open={headerFilterOpen === "cuenta"}
-                            registerRef={(el) => registerProvisionHeaderRef("cuenta", el)}
-                            toggle={() => toggleProvisionHeaderFilter("cuenta")}
-                          />
-                          <th
-                            scope="col"
-                            className="border-b border-slate-200 bg-slate-50 px-3 py-2.5 text-center text-[12px] font-semibold uppercase tracking-wide text-slate-600 banking-dark:border-zinc-700 banking-dark:bg-zinc-900/80 banking-dark:text-zinc-300"
-                            aria-label="Acciones"
-                          />
-                        </tr>
-                      </thead>
+                    <div className={BANKING_MAIN_TX_CARD_CLASS}>
                       {columnFiltersActive ? (
-                        <tbody className="divide-y divide-slate-100 banking-dark:divide-zinc-800">
-                          {filteredProvisionItems.map((row) => (
-                            <StaticProvisionRow
+                        filteredProvisionItems.map((row) => (
+                          <StaticProvisionRow
+                            key={row.id}
+                            row={row}
+                            selected={selectedProvisionIds.has(row.id)}
+                            onSelectChange={(checked) => toggleProvisionSelected(row.id, checked)}
+                            onTogglePaid={togglePaid}
+                            onEdit={openProvisionEdit}
+                            onRemove={removeProvision}
+                          />
+                        ))
+                      ) : (
+                        <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+                          {sortedProvisionItems.map((row) => (
+                            <SortableProvisionRow
                               key={row.id}
                               row={row}
                               selected={selectedProvisionIds.has(row.id)}
@@ -1818,25 +1795,9 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                               onRemove={removeProvision}
                             />
                           ))}
-                        </tbody>
-                      ) : (
-                        <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-                          <tbody className="divide-y divide-slate-100 banking-dark:divide-zinc-800">
-                            {sortedProvisionItems.map((row) => (
-                              <SortableProvisionRow
-                                key={row.id}
-                                row={row}
-                                selected={selectedProvisionIds.has(row.id)}
-                                onSelectChange={(checked) => toggleProvisionSelected(row.id, checked)}
-                                onTogglePaid={togglePaid}
-                                onEdit={openProvisionEdit}
-                                onRemove={removeProvision}
-                              />
-                            ))}
-                          </tbody>
                         </SortableContext>
                       )}
-                    </table>
+                    </div>
                   </DndContext>
                   {headerFilterOpen && headerFilterPopoverPos
                     ? createPortal(
@@ -1882,7 +1843,6 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                         document.body,
                       )
                     : null}
-                  </div>
                 </>
               )}
             </div>
@@ -1897,7 +1857,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
             >
               <button
                 type="button"
-                className="flex w-full items-start gap-3 rounded-xl border border-transparent px-1 py-0.5 text-left outline-none ring-teal-400/0 transition hover:border-slate-200 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-teal-400/35 banking-dark:hover:border-zinc-700 banking-dark:hover:bg-zinc-900/60 banking-dark:focus-visible:ring-amber-500/35"
+                className="flex w-full items-start gap-3 rounded-xl border border-transparent px-1 py-0.5 text-left outline-none ring-indigo-400/0 transition hover:border-slate-200 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-indigo-400/35 banking-dark:hover:border-zinc-700 banking-dark:hover:bg-zinc-900/60 banking-dark:focus-visible:ring-amber-500/35"
                 onClick={toggleSavingsSection}
                 aria-expanded={savingsExpanded}
                 aria-controls="sav-panel"
@@ -1960,7 +1920,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                         <p className="text-xs uppercase tracking-wide text-slate-500 banking-dark:text-zinc-500">
                           Saldo seguido
                         </p>
-                        <p className="text-base font-bold tabular-nums text-teal-800 sm:text-lg banking-dark:text-amber-200">
+                        <p className="text-base font-bold tabular-nums text-indigo-800 sm:text-lg banking-dark:text-amber-200">
                           {formatBankingClpSigned(g.balance_clp)}
                         </p>
                       </div>
@@ -1992,13 +1952,13 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                         <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500 banking-dark:text-zinc-500">
                           Avance al objetivo
                         </span>
-                        <span className="text-sm font-bold tabular-nums text-teal-900 banking-dark:text-amber-200">
+                        <span className="text-sm font-bold tabular-nums text-indigo-900 banking-dark:text-amber-200">
                           {pct}%
                         </span>
                       </div>
                       <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-slate-200/90 banking-dark:bg-zinc-800">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-teal-500 to-teal-600 banking-dark:from-amber-600 banking-dark:to-amber-500"
+                          className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 banking-dark:from-amber-600 banking-dark:to-amber-500"
                           style={{ width: `${barPct}%` }}
                           role="progressbar"
                           aria-valuenow={pct}
@@ -2071,7 +2031,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                                   <td
                                     className={`px-2 py-1.5 text-right font-medium tabular-nums ${
                                       row.amount >= 0
-                                        ? "text-teal-800 banking-dark:text-teal-400"
+                                        ? "text-indigo-800 banking-dark:text-indigo-400"
                                         : "text-rose-700 banking-dark:text-rose-400"
                                     }`}
                                   >
@@ -2165,18 +2125,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                 </div>
                 <div>
                   <label className={labelClass}>Cuenta asociada (opcional)</label>
-                  <select
-                    className={inputClass}
-                    value={epAccountId === "" ? "" : String(epAccountId)}
-                    onChange={(e) => setEpAccountId(e.target.value === "" ? "" : Number(e.target.value))}
-                  >
-                    <option value="">—</option>
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
+                  <AccountSelect value={epAccountId} onChange={setEpAccountId} accounts={accounts} placeholder="—" />
                 </div>
               </div>
               <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -2220,18 +2169,7 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                 </div>
                 <div>
                   <label className={labelClass}>Cuenta en la que ahorras</label>
-                  <select
-                    className={inputClass}
-                    value={svAccountId === "" ? "" : String(svAccountId)}
-                    onChange={(e) => setSvAccountId(e.target.value === "" ? "" : Number(e.target.value))}
-                  >
-                    <option value="">Selecciona…</option>
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
+                  <AccountSelect value={svAccountId} onChange={setSvAccountId} accounts={accounts} placeholder="Selecciona…" />
                 </div>
                 <div>
                   <label className={labelClass}>Monto objetivo (CLP, opcional)</label>
@@ -2425,18 +2363,12 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                 </div>
                 <div>
                   <label className={labelClass}>Cuenta asociada (opcional)</label>
-                  <select
-                    className={inputClass}
-                    value={newProvAccountId === "" ? "" : String(newProvAccountId)}
-                    onChange={(e) => setNewProvAccountId(e.target.value === "" ? "" : Number(e.target.value))}
-                  >
-                    <option value="">—</option>
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
+                  <AccountSelect
+                    value={newProvAccountId}
+                    onChange={setNewProvAccountId}
+                    accounts={accounts}
+                    placeholder="—"
+                  />
                 </div>
               </div>
               <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -2483,18 +2415,12 @@ export function BankingPersonalOrderPage({ onToast }: { onToast: (msg: string | 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className={labelClass}>Cuenta en la que ahorras</label>
-                    <select
-                      className={inputClass}
-                      value={newSavAccountId === "" ? "" : String(newSavAccountId)}
-                      onChange={(e) => setNewSavAccountId(e.target.value === "" ? "" : Number(e.target.value))}
-                    >
-                      <option value="">Selecciona…</option>
-                      {accounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name}
-                        </option>
-                      ))}
-                    </select>
+                    <AccountSelect
+                      value={newSavAccountId}
+                      onChange={setNewSavAccountId}
+                      accounts={accounts}
+                      placeholder="Selecciona…"
+                    />
                   </div>
                   <div>
                     <label className={labelClass}>Saldo inicial (CLP)</label>
