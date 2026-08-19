@@ -95,6 +95,15 @@ body {
   background: var(--bk-scrollbar-thumb-hover);
 }
 
+/* Fila corrediza de tarjetas de cuentas: mismo scroll horizontal, sin barra visible (queda solo el degradé/flecha «hay más»). */
+.banking-scroll-hidden {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.banking-scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /* Modo oscuro Banking (`body.banking-dark` + `.banking-theme` en la vista) */
 .banking-dark .banking-theme {
   --bk-scrollbar-thumb: rgb(82 82 91 / 0.5);

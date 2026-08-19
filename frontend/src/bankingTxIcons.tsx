@@ -71,10 +71,78 @@ export function IconEyeSlashOutline({ className = "h-4 w-4" }: { className?: str
 }
 
 
+export function IconFilter({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 5h16M7 12h10M11 19h2" />
+    </svg>
+  );
+}
+
+export function IconDotsHorizontal({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M6 10a2 2 0 110 4 2 2 0 010-4zM12 10a2 2 0 110 4 2 2 0 010-4zM18 10a2 2 0 110 4 2 2 0 010-4z" />
+    </svg>
+  );
+}
+
 export function IconGripVertical({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
       <path d="M8 6a2 2 0 11-4 0 2 2 0 014 0zM8 12a2 2 0 11-4 0 2 2 0 014 0zM8 18a2 2 0 11-4 0 2 2 0 014 0zM20 6a2 2 0 11-4 0 2 2 0 014 0zM20 12a2 2 0 11-4 0 2 2 0 014 0zM20 18a2 2 0 11-4 0 2 2 0 014 0z" />
+    </svg>
+  );
+}
+
+export function IconChevronLeft({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+    </svg>
+  );
+}
+
+export function IconChevronRight({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+export function IconCreditCard({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <rect x="2.75" y="5.5" width="18.5" height="13" rx="2" />
+      <path strokeLinecap="round" d="M2.75 9.75h18.5" />
+      <path strokeLinecap="round" d="M6 14.75h4" />
+    </svg>
+  );
+}
+
+export function IconCheck({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 8.25L6.75 11.25L12.25 4.75" />
+    </svg>
+  );
+}
+
+export function IconX({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+/** Flecha en U hacia la izquierda — metáfora clásica de «revertir / deshacer». */
+export function IconUndo({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 14l-4-4 4-4" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M5 10h9a5 5 0 015 5v0a5 5 0 01-5 5h-4" />
     </svg>
   );
 }

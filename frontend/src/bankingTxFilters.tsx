@@ -1,13 +1,16 @@
 /** Filtros de columnas y picker de visibilidad (extraídos de BankingTransactionsPage). */
 
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { BankingAccountRow, BankingCategoryRow } from "./types";
 import {
+  BANKING_TX_COLUMN_KEYS,
   BANKING_TX_COLUMN_LABELS,
   bankingMainTxFilterInputClass,
+  bankingSwitchThumbClass,
+  bankingSwitchTrackClass,
   bankingTxSortableColumnId,
   bankingTxThBaseClass,
   toggleEnumInList,
@@ -17,7 +20,7 @@ import {
   type BankingTxSharedScopeOption,
   type BankingTxTcPaidOption,
 } from "./bankingTxShared";
-import { IconGripVertical } from "./bankingTxIcons";
+import { IconFilter, IconGripVertical } from "./bankingTxIcons";
 
 export function BankingTxColumnVisibilityToggle({
   on,
@@ -42,13 +45,9 @@ export function BankingTxColumnVisibilityToggle({
         e.stopPropagation();
         if (!disabled) onToggle();
       }}
-      className={`inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full border p-[3px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white banking-dark:focus-visible:ring-amber-500/40 banking-dark:focus-visible:ring-offset-zinc-950 disabled:cursor-not-allowed disabled:opacity-50 ${
-        on
-          ? "justify-end border-teal-400 bg-teal-400 shadow-inner banking-dark:border-amber-700 banking-dark:bg-amber-600/92"
-          : "justify-start border-slate-300 bg-slate-200 banking-dark:border-zinc-600 banking-dark:bg-zinc-800"
-      }`}
+      className={bankingSwitchTrackClass(on)}
     >
-      <span className="pointer-events-none block h-3.5 w-3.5 shrink-0 rounded-full bg-white shadow" />
+      <span className={bankingSwitchThumbClass(on)} />
     </button>
   );
 }
@@ -95,10 +94,19 @@ export function useBankingTxFilterUICtx(): BankingTxFilterUICtxValue {
   return v;
 }
 
+/** Chip de selección (tipo/liquidado/cargo TC): píldora en vez de fila rectangular. */
+function bankingTxFilterChipClass(selected: boolean): string {
+  return `rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition ${
+    selected
+      ? "border-indigo-300 bg-indigo-50 text-indigo-700 banking-dark:border-indigo-500/40 banking-dark:bg-indigo-500/15 banking-dark:text-indigo-300"
+      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:bg-zinc-800"
+  }`;
+}
+
 const bankingTxFilterClearBtnClass =
-  "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-medium text-slate-600 transition hover:bg-slate-50";
+  "rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:bg-zinc-800";
 const bankingTxFilterApplyBtnClass =
-  "rounded-lg border border-teal-300 bg-teal-50 px-3 py-1.5 text-[12px] font-semibold text-teal-800 transition hover:bg-teal-100";
+  "rounded-full bg-slate-900 px-4 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:bg-slate-800 banking-dark:bg-amber-600 banking-dark:text-zinc-950 banking-dark:hover:bg-amber-500";
 
 /** Pie común: Borrar (limpia y aplica) + Aplicar. */
 function BankingTxFilterApplyBar({
@@ -112,7 +120,7 @@ function BankingTxFilterApplyBar({
   onApply?: () => void;
 }) {
   return (
-    <div className="flex items-center justify-end gap-2">
+    <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3 banking-dark:border-zinc-800">
       <button type="button" onClick={onClear} className={bankingTxFilterClearBtnClass}>
         Borrar
       </button>
@@ -151,9 +159,9 @@ export function BankingTxCategoryFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-xs text-slate-500">Categorías (varias)</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Categorías (varias)</span>
         <label className="block">
-          <span className="text-xs text-slate-500">Buscar categoría</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Buscar categoría</span>
           <input
             type="search"
             value={query}
@@ -171,8 +179,8 @@ export function BankingTxCategoryFilterBody() {
                 key={c.id}
                 type="button"
                 onClick={() => setDraftIds((prev) => toggleNumInSortedList(prev, c.id))}
-                className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-teal-50 ${
-                  picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-300 bg-white"
+                className={`flex w-full items-center rounded-xl border px-3 py-2 text-left text-sm font-medium text-slate-800 transition banking-dark:text-zinc-100 ${
+                  picked ? "border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200 banking-dark:border-indigo-500/40 banking-dark:bg-indigo-500/15 banking-dark:ring-indigo-500/25" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:hover:bg-zinc-800"
                 }`}
               >
                 {c.name}
@@ -216,9 +224,9 @@ export function BankingTxSubcategoryFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-xs text-slate-500">Subcategorías (varias)</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Subcategorías (varias)</span>
         <label className="block">
-          <span className="text-xs text-slate-500">Buscar subcategoría</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Buscar subcategoría</span>
           <input
             type="search"
             value={query}
@@ -238,8 +246,8 @@ export function BankingTxSubcategoryFilterBody() {
                 key={r.id}
                 type="button"
                 onClick={() => setDraftIds((prev) => toggleNumInSortedList(prev, r.id))}
-                className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm font-medium text-slate-800 transition hover:bg-teal-50 ${
-                  picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-300 bg-white"
+                className={`flex w-full items-center rounded-xl border px-3 py-2 text-left text-sm font-medium text-slate-800 transition banking-dark:text-zinc-100 ${
+                  picked ? "border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200 banking-dark:border-indigo-500/40 banking-dark:bg-indigo-500/15 banking-dark:ring-indigo-500/25" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:hover:bg-zinc-800"
                 }`}
               >
                 {shortLabel}
@@ -288,7 +296,7 @@ export function BankingTxDescriptionFilterBody() {
       }}
     >
       <label className="block">
-        <span className="text-xs text-slate-500">Contiene texto</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Contiene texto</span>
         <input
           type="search"
           value={draft}
@@ -330,7 +338,7 @@ export function BankingTxDateFilterBody() {
       }}
     >
       <label className="block">
-        <span className="text-xs text-slate-500">Fecha desde</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Fecha desde</span>
         <input
           type="date"
           value={draftFrom}
@@ -339,7 +347,7 @@ export function BankingTxDateFilterBody() {
         />
       </label>
       <label className="block">
-        <span className="text-xs text-slate-500">Fecha hasta</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Fecha hasta</span>
         <input
           type="date"
           value={draftTo}
@@ -383,7 +391,7 @@ export function BankingTxAmountFilterBody() {
       }}
     >
       <label className="block">
-        <span className="text-xs text-slate-500">Monto mínimo</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Monto mínimo</span>
         <input
           inputMode="decimal"
           value={draftMin}
@@ -393,7 +401,7 @@ export function BankingTxAmountFilterBody() {
         />
       </label>
       <label className="block">
-        <span className="text-xs text-slate-500">Monto máximo</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Monto máximo</span>
         <input
           inputMode="decimal"
           value={draftMax}
@@ -423,7 +431,7 @@ export function BankingTxProductFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-xs text-slate-500">Productos (varios)</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Productos (varios)</span>
         <div className="mt-1 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-0.5 tx-scroll">
           {ctx.filterAccountsSorted.map((a) => {
             const picked = draftIds.includes(a.id);
@@ -432,11 +440,11 @@ export function BankingTxProductFilterBody() {
                 key={a.id}
                 type="button"
                 onClick={() => setDraftIds((prev) => toggleNumInSortedList(prev, a.id))}
-                className={`flex w-full items-center rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
-                  picked ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300" : "border border-slate-300 bg-white"
+                className={`flex w-full items-center rounded-xl border px-3 py-2 text-left text-sm transition banking-dark:text-zinc-100 ${
+                  picked ? "border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200 banking-dark:border-indigo-500/40 banking-dark:bg-indigo-500/15 banking-dark:ring-indigo-500/25" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:hover:bg-zinc-800"
                 }`}
               >
-                <span className={picked ? "font-semibold text-teal-900" : "text-slate-800"}>{a.name}</span>
+                <span className={picked ? "font-semibold text-indigo-700 banking-dark:text-indigo-300" : "text-slate-800 banking-dark:text-zinc-100"}>{a.name}</span>
               </button>
             );
           })}
@@ -463,32 +471,24 @@ export function BankingTxSharedScopeFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-xs text-slate-500">Tipo (varios)</span>
-        <div className="mt-1 flex flex-col gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Tipo (varios)</span>
+        <div className="mt-1 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setDraft((prev) => toggleEnumInList(prev, "personal"))}
-            className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
-              draft.includes("personal")
-                ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
-                : "border-slate-300 bg-white"
-            }`}
+            className={bankingTxFilterChipClass(draft.includes("personal"))}
           >
             Solo personal
           </button>
           <button
             type="button"
             onClick={() => setDraft((prev) => toggleEnumInList(prev, "shared_any"))}
-            className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
-              draft.includes("shared_any")
-                ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
-                : "border-slate-300 bg-white"
-            }`}
+            className={bankingTxFilterChipClass(draft.includes("shared_any"))}
           >
             Solo compartido
           </button>
         </div>
-        <p className="text-[11px] text-slate-500">Sin selección = mostrar todos. Varios = unión (cualquiera).</p>
+        <p className="text-[11px] text-slate-400 banking-dark:text-zinc-500">Sin selección = mostrar todos. Varios = unión (cualquiera).</p>
       </div>
       <BankingTxFilterApplyBar onClear={clear} onApply={apply} />
     </div>
@@ -511,8 +511,8 @@ export function BankingTxLiquidadoFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-xs text-slate-500">Valor en tabla (varios)</span>
-        <div className="mt-1 flex flex-col gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Valor en tabla (varios)</span>
+        <div className="mt-1 flex flex-wrap gap-2">
           {(
             [
               ["yes", "Sí"],
@@ -524,17 +524,13 @@ export function BankingTxLiquidadoFilterBody() {
               key={val}
               type="button"
               onClick={() => setDraft((prev) => toggleEnumInList(prev, val))}
-              className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
-                draft.includes(val)
-                  ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
-                  : "border-slate-300 bg-white"
-              }`}
+              className={bankingTxFilterChipClass(draft.includes(val))}
             >
               {label}
             </button>
           ))}
         </div>
-        <p className="text-[11px] text-slate-500">Sin selección = todos. Varios = unión.</p>
+        <p className="text-[11px] text-slate-400 banking-dark:text-zinc-500">Sin selección = todos. Varios = unión.</p>
       </div>
       <BankingTxFilterApplyBar onClear={clear} onApply={apply} />
     </div>
@@ -557,8 +553,8 @@ export function BankingTxTcPaidFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-xs text-slate-500">Valor en tabla (varios)</span>
-        <div className="mt-1 flex flex-col gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Valor en tabla (varios)</span>
+        <div className="mt-1 flex flex-wrap gap-2">
           {(
             [
               ["paid", "Sí"],
@@ -570,17 +566,13 @@ export function BankingTxTcPaidFilterBody() {
               key={val}
               type="button"
               onClick={() => setDraft((prev) => toggleEnumInList(prev, val))}
-              className={`rounded-lg border px-2 py-2 text-left text-sm transition hover:bg-teal-50 ${
-                draft.includes(val)
-                  ? "border-teal-400 bg-teal-50 ring-1 ring-teal-300"
-                  : "border-slate-300 bg-white"
-              }`}
+              className={bankingTxFilterChipClass(draft.includes(val))}
             >
               {label}
             </button>
           ))}
         </div>
-        <p className="text-[11px] text-slate-500">Sin selección = todos. Varios = unión.</p>
+        <p className="text-[11px] text-slate-400 banking-dark:text-zinc-500">Sin selección = todos. Varios = unión.</p>
       </div>
       <BankingTxFilterApplyBar onClear={clear} onApply={apply} />
     </div>
@@ -653,25 +645,114 @@ export function BankingTxHeaderFilterFields({ colKey }: { colKey: BankingTxColum
   }
 }
 
+/** Botón «Filtros» + panel único con todos los filtros apilados (reemplaza el filtro por columna de la tabla). */
+export function BankingTxFiltersPanelButton() {
+  const ctx = useBankingTxFilterUICtx();
+  const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState<BankingTxColumnKey | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const activeCount = useMemo(
+    () => BANKING_TX_COLUMN_KEYS.filter((k) => ctx.isColumnFilterActive(k)).length,
+    [ctx],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    function handleDown(e: MouseEvent) {
+      if (wrapRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", handleDown);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleDown);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-controls="banking-tx-filters-panel"
+        onClick={() => setOpen((o) => !o)}
+        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800"
+      >
+        <IconFilter className="h-4 w-4 text-slate-400 banking-dark:text-zinc-500" />
+        Filtros
+        {activeCount > 0 ? (
+          <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-slate-900 px-1 text-[10px] font-bold leading-none text-white banking-dark:bg-amber-500 banking-dark:text-zinc-950">
+            {activeCount}
+          </span>
+        ) : null}
+      </button>
+      {open ? (
+        <div
+          id="banking-tx-filters-panel"
+          role="dialog"
+          aria-label="Filtros de movimientos"
+          className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(calc(100vw-2rem),22rem)] max-h-[min(75vh,32rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-300/30 tx-scroll banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:shadow-black/40"
+        >
+          <ul className="space-y-1">
+            {BANKING_TX_COLUMN_KEYS.map((k) => {
+              const active = ctx.isColumnFilterActive(k);
+              const isOpen = expanded === k;
+              return (
+                <li key={k} className="list-none">
+                  <button
+                    type="button"
+                    onClick={() => setExpanded((prev) => (prev === k ? null : k))}
+                    aria-expanded={isOpen}
+                    className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium transition ${
+                      isOpen
+                        ? "bg-slate-100 text-slate-900 banking-dark:bg-zinc-800 banking-dark:text-zinc-100"
+                        : "text-slate-700 hover:bg-slate-50 banking-dark:text-zinc-300 banking-dark:hover:bg-zinc-900/70"
+                    }`}
+                  >
+                    <span>{BANKING_TX_COLUMN_LABELS[k]}</span>
+                    {active ? (
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500 banking-dark:bg-indigo-400" aria-hidden />
+                    ) : null}
+                  </button>
+                  {isOpen ? (
+                    <div className="px-2.5 pb-2 pt-2">
+                      <BankingTxHeaderFilterFields colKey={k} />
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** Píldora Sí / No / — para columnas Compartido liquidado y Cargo TC. */
 export function BankingTxSiNoDashBadge({ text }: { text: string }) {
   if (text === "—") {
     return (
-      <span className="inline-flex min-w-[2rem] justify-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[12px] font-semibold tabular-nums text-slate-500 ring-1 ring-slate-300 banking-dark:bg-zinc-800 banking-dark:text-zinc-400 banking-dark:ring-zinc-600">
+      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold tabular-nums text-slate-400 banking-dark:bg-zinc-800 banking-dark:text-zinc-500">
         —
       </span>
     );
   }
   if (text === "Sí") {
     return (
-      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-emerald-100 px-2 py-0.5 text-[12px] font-semibold text-emerald-800 ring-1 ring-emerald-200 banking-dark:bg-emerald-950/55 banking-dark:text-emerald-300 banking-dark:ring-emerald-800/60">
+      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-600 banking-dark:bg-emerald-500/15 banking-dark:text-emerald-300">
         Sí
       </span>
     );
   }
   if (text === "No") {
     return (
-      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-rose-100 px-2 py-0.5 text-[12px] font-semibold text-rose-800 ring-1 ring-rose-200 banking-dark:bg-rose-950/50 banking-dark:text-rose-300 banking-dark:ring-rose-900/55">
+      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-600 banking-dark:bg-rose-500/15 banking-dark:text-rose-300">
         No
       </span>
     );

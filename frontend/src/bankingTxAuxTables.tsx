@@ -1,33 +1,116 @@
 /** Tablas auxiliares TC / compartidos / provisiones (extraídas de BankingTransactionsPage). */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { formatClpDots } from "./format";
-import {
-  bankingTxRowEditDisabled,
-  bankingTxRowEditTitle,
-} from "./bankingTxHelpers";
+import { formatBankingClpSigned, formatClpDots } from "./format";
 import { BankingAuxRoundCheckbox } from "./BankingAuxRoundCheckbox";
 import type { BankingTransactionRow } from "./types";
 import {
   BANKING_AUX_SECTION_HEADING_CLASS,
-  BANKING_AUX_TX_CARD_CLASS,
-  BANKING_AUX_TX_TH_TEXT_CLASS,
-  BANKING_AUX_TX_THEAD_CLASS,
-  BANKING_AUX_TX_TR_CLASS,
-  BANKING_SELECTION_SUMMARY_TICKET_ACTIVE_CLASS,
+  BANKING_MAIN_TX_CARD_CLASS,
+  BANKING_MAIN_TX_ROW_CLASS,
   BANKING_SELECTION_SUMMARY_TICKET_IDLE_CLASS,
-  BANKING_TX_COL_WIDTH,
-  BANKING_TX_COLUMN_LABELS,
-  bankingAuxActionBtnClass,
-  bankingAuxBulkBtnClass,
+  BANKING_SELECTION_TICKET_ACCENT_CLASS,
+  bankingAuxIndigoBulkBtnClass,
+  bankingAuxIndigoPillBtnClass,
   bankingToolbarGhostBtnClass,
   tcUnpaidNetContributionClp,
-  txIconBtnAux,
-  txIconBtnAuxDanger,
   type BankingTxColumnKey,
 } from "./bankingTxShared";
-import { BankingTxTd } from "./bankingTxMainTable";
-import { IconPencil, IconTrash } from "./bankingTxIcons";
+import { BankingTxRowActionsMenu, hexToRgba } from "./bankingTxMainTable";
+import { IconCheck, IconUndo } from "./bankingTxIcons";
+
+/** Chip «Todos»: checkbox de seleccionar-todo + etiqueta, en su propia píldora — cabecera de cada ticket de selección. */
+function AuxSelectAllChip({
+  allSelected,
+  someSelected,
+  onToggle,
+  title,
+  ariaLabel,
+}: {
+  allSelected: boolean;
+  someSelected: boolean;
+  onToggle: () => void;
+  title?: string;
+  ariaLabel: string;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1 pl-1.5 pr-2.5 shadow-sm banking-dark:border-zinc-700 banking-dark:bg-zinc-900">
+      <BankingAuxRoundCheckbox
+        checked={allSelected}
+        indeterminate={someSelected && !allSelected}
+        onChange={onToggle}
+        color="indigo"
+        title={title}
+        aria-label={ariaLabel}
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        className="text-[11px] font-semibold text-slate-500 transition hover:text-slate-800 banking-dark:text-zinc-400 banking-dark:hover:text-zinc-100"
+      >
+        Todos
+      </button>
+    </div>
+  );
+}
+
+/** Avatar circular con la inicial de la categoría — mismo lenguaje visual en las tres tablas auxiliares. */
+function AuxRowAvatar({ row }: { row: BankingTransactionRow }) {
+  const initial = (row.category_name || "?").trim().charAt(0).toUpperCase();
+  return (
+    <div
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[13px] font-bold"
+      style={{ backgroundColor: hexToRgba(row.category_color, 0.14), color: row.category_color }}
+      aria-hidden
+    >
+      {initial}
+    </div>
+  );
+}
+
+/** Título + fecha/producto — mismo lenguaje visual en las tres tablas auxiliares. */
+function AuxRowTitleBlock({ row, showProducto }: { row: BankingTransactionRow; showProducto: boolean }) {
+  const title = row.description?.trim() || row.category_name;
+  return (
+    <div className="min-w-0 flex-1">
+      <p className="line-clamp-2 break-words text-[13px] font-semibold leading-snug text-slate-800 [overflow-wrap:anywhere] banking-dark:text-zinc-100">
+        {title}
+      </p>
+      <p className="mt-0.5 truncate text-[11.5px] text-slate-400 banking-dark:text-zinc-500">
+        {row.fecha.slice(0, 10)}
+        {showProducto ? ` · ${row.account_name}` : ""}
+      </p>
+    </div>
+  );
+}
+
+/** Categoría/subcategoría — mismo lenguaje visual en las tres tablas auxiliares. */
+function AuxRowCategoryBlock({ row }: { row: BankingTransactionRow }) {
+  return (
+    <div className="hidden w-40 min-w-0 shrink-0 text-right sm:block">
+      <p className="line-clamp-2 break-words text-[12px] font-medium leading-snug text-slate-600 [overflow-wrap:anywhere] banking-dark:text-zinc-300">
+        {row.category_name}
+      </p>
+      <p className="line-clamp-2 break-words text-[11px] leading-snug text-slate-400 [overflow-wrap:anywhere] banking-dark:text-zinc-500">
+        {row.subcategory_name}
+      </p>
+    </div>
+  );
+}
+
+/** Monto con signo — mismo lenguaje visual en las tres tablas auxiliares. */
+function AuxRowAmount({ row }: { row: BankingTransactionRow }) {
+  const income = row.amount >= 0;
+  const signClass = income
+    ? "text-emerald-600 banking-dark:text-emerald-400"
+    : "text-slate-900 banking-dark:text-zinc-100";
+  const amountText = `${income ? "+" : "-"}${formatBankingClpSigned(row.amount)}`;
+  return (
+    <div className="w-24 shrink-0 text-right">
+      <span className={`text-[13px] font-bold tabular-nums ${signClass}`}>{amountText}</span>
+    </div>
+  );
+}
 
 /** Tabla de cargos TC pendientes de pagar (mismas columnas visibles que la tabla principal + Pagado). */
 export function BankingCcPendingChargesTable({
@@ -35,7 +118,6 @@ export function BankingCcPendingChargesTable({
   accountHeading,
   rows,
   orderedVisibleBankingTxColumns,
-  tableMinWidthPx,
   markingPaidId,
   onMarkPaid,
   openEdit,
@@ -45,7 +127,6 @@ export function BankingCcPendingChargesTable({
   accountHeading: string;
   rows: BankingTransactionRow[];
   orderedVisibleBankingTxColumns: BankingTxColumnKey[];
-  tableMinWidthPx: number;
   markingPaidId: number | null;
   onMarkPaid: (row: BankingTransactionRow) => void | Promise<void>;
   openEdit: (row: BankingTransactionRow) => void;
@@ -94,34 +175,45 @@ export function BankingCcPendingChargesTable({
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
+  const visibleCols = useMemo(() => new Set(orderedVisibleBankingTxColumns), [orderedVisibleBankingTxColumns]);
+
   return (
     <section className="mb-6 space-y-2" aria-labelledby={`cc-pending-heading-${accountId}`}>
       <h3 id={`cc-pending-heading-${accountId}`} className={BANKING_AUX_SECTION_HEADING_CLASS}>
-        Pendientes sin marcar pagado · {accountHeading}
+        {accountHeading} · Movimientos por pagar
       </h3>
       <div
-        className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs leading-snug ${
-          selectedIds.size > 0 ? BANKING_SELECTION_SUMMARY_TICKET_ACTIVE_CLASS : BANKING_SELECTION_SUMMARY_TICKET_IDLE_CLASS
+        className={`flex flex-wrap items-center justify-between gap-2.5 rounded-xl px-2.5 py-2 text-xs leading-snug ${
+          selectedIds.size > 0 ? BANKING_SELECTION_TICKET_ACCENT_CLASS : BANKING_SELECTION_SUMMARY_TICKET_IDLE_CLASS
         }`}
       >
-        <p className="min-w-0 flex-1">
-          {selectedIds.size > 0 ? (
-            <>
-              <span className="text-teal-800/90 banking-dark:text-amber-200/80">
-                Suma seleccionada (cuadrar con pago al banco):{" "}
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <AuxSelectAllChip
+            allSelected={allSelected}
+            someSelected={someSelected}
+            onToggle={toggleSelectAll}
+            title={allSelected ? "Desmarcar todos" : "Seleccionar todos en esta tarjeta"}
+            ariaLabel="Seleccionar todos los cargos pendientes de esta tarjeta"
+          />
+          <p className="min-w-0 flex-1">
+            {selectedIds.size > 0 ? (
+              <>
+                <span className="text-slate-500 banking-dark:text-zinc-400">
+                  Suma seleccionada (cuadrar con pago al banco):{" "}
+                </span>
+                <strong className="tabular-nums text-indigo-800 banking-dark:text-indigo-300">{formatClpDots(selectedSumClp)}</strong>
+                <span className="text-slate-500 banking-dark:text-zinc-400">
+                  {" "}
+                  · {selectedIds.size} movimiento(s)
+                </span>
+              </>
+            ) : (
+              <span className="text-slate-400 banking-dark:text-zinc-500">
+                Marca movimientos para ver la suma neta (devoluciones restan) y alinearla con lo que liquidarás desde la cuenta corriente asociada.
               </span>
-              <strong className="tabular-nums text-teal-950 banking-dark:text-amber-50">{formatClpDots(selectedSumClp)}</strong>
-              <span className="text-teal-700/88 banking-dark:text-amber-300/85">
-                {" "}
-                · {selectedIds.size} movimiento(s)
-              </span>
-            </>
-          ) : (
-            <span className="text-slate-400 banking-dark:text-zinc-500">
-              Marca movimientos para ver la suma neta (devoluciones restan) y alinearla con lo que liquidarás desde la cuenta corriente asociada.
-            </span>
-          )}
-        </p>
+            )}
+          </p>
+        </div>
         {selectedIds.size > 0 ? (
           <button
             type="button"
@@ -132,130 +224,86 @@ export function BankingCcPendingChargesTable({
           </button>
         ) : null}
       </div>
-      <div className={BANKING_AUX_TX_CARD_CLASS}>
-        <table className="w-full table-fixed border-collapse text-[12px]" style={{ minWidth: tableMinWidthPx }}>
-          <colgroup>
-            <col style={{ width: "2.75rem" }} />
-            {orderedVisibleBankingTxColumns.map((colKey) => (
-              <col key={colKey} style={{ width: BANKING_TX_COL_WIDTH[colKey] }} />
-            ))}
-            <col style={{ width: "5.25rem" }} />
-            <col style={{ width: "5rem" }} />
-          </colgroup>
-          <thead className={BANKING_AUX_TX_THEAD_CLASS}>
-            <tr>
-              <th scope="col" className="px-1 py-2.5 text-center sm:px-1.5">
-                <BankingAuxRoundCheckbox
-                  checked={allSelected}
-                  indeterminate={someSelected && !allSelected}
-                  onChange={toggleSelectAll}
-                  title={allSelected ? "Desmarcar todos" : "Seleccionar todos en esta tarjeta"}
-                  aria-label="Seleccionar todos los cargos pendientes de esta tarjeta"
-                />
-              </th>
-              {orderedVisibleBankingTxColumns.map((colKey) => (
-                <th
-                  key={colKey}
-                  scope="col"
-                  className={`px-2 py-2.5 text-center sm:px-2.5 ${BANKING_AUX_TX_TH_TEXT_CLASS}`}
-                >
-                  {BANKING_TX_COLUMN_LABELS[colKey]}
-                </th>
-              ))}
-              <th
-                scope="col"
-                className={`px-1.5 py-2.5 text-center sm:px-2 ${BANKING_AUX_TX_TH_TEXT_CLASS}`}
-              >
-                Pagado
-              </th>
-              <th className={`px-1.5 py-2.5 text-center sm:px-2 ${BANKING_AUX_TX_TH_TEXT_CLASS}`} aria-label="Acciones" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const income = row.amount >= 0;
-              const sharedSettledLabel = row.is_shared
-                ? row.shared_expense_settled
-                  ? "Sí"
-                  : "No"
-                : "—";
-              const ccPaidLabel =
-                row.credit_card_charge_paid === null || row.credit_card_charge_paid === undefined
-                  ? "—"
-                  : row.credit_card_charge_paid
-                    ? "Sí"
-                    : "No";
-              const checked = selectedIds.has(row.id);
-              return (
-                <tr key={row.id} className={BANKING_AUX_TX_TR_CLASS}>
-                  <td className="align-middle px-1 py-3 text-center sm:px-1.5">
-                    <BankingAuxRoundCheckbox
-                      checked={checked}
-                      onChange={() => toggleRow(row.id)}
-                      aria-label={`Seleccionar cargo ${row.description ?? row.id}`}
-                    />
-                  </td>
-                  {orderedVisibleBankingTxColumns.map((colKey) => (
-                    <BankingTxTd
-                      key={colKey}
-                      colKey={colKey}
-                      row={row}
-                      income={income}
-                      sharedSettledLabel={sharedSettledLabel}
-                      ccPaidLabel={ccPaidLabel}
-                      montoAlign="center"
-                    />
-                  ))}
-                  <td className="align-middle px-1.5 py-3 text-center sm:px-2">
-                    <button
-                      type="button"
-                      disabled={markingPaidId === row.id}
-                      onClick={() => void onMarkPaid(row)}
-                      className={bankingAuxActionBtnClass}
-                    >
-                      {markingPaidId === row.id ? "…" : "Marcar Pagado"}
-                    </button>
-                  </td>
-                  <td className="align-middle px-1.5 py-3 sm:px-2">
-                    <div className="flex items-center justify-center gap-0.5">
-                      <button
-                        type="button"
-                        disabled={bankingTxRowEditDisabled(row)}
-                        title={bankingTxRowEditTitle(row)}
-                        aria-label="Editar movimiento"
-                        onClick={() => openEdit(row)}
-                        className={`${txIconBtnAux} disabled:pointer-events-none disabled:opacity-30`}
-                      >
-                        <IconPencil />
-                      </button>
-                      <button
-                        type="button"
-                        title="Eliminar movimiento"
-                        aria-label="Eliminar movimiento"
-                        onClick={() => void removeRow(row)}
-                        className={txIconBtnAuxDanger}
-                      >
-                        <IconTrash />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className={BANKING_MAIN_TX_CARD_CLASS}>
+        {rows.map((row) => (
+          <BankingCcPendingChargeRow
+            key={row.id}
+            row={row}
+            visibleCols={visibleCols}
+            checked={selectedIds.has(row.id)}
+            markingPaid={markingPaidId === row.id}
+            onToggle={() => toggleRow(row.id)}
+            onMarkPaid={onMarkPaid}
+            openEdit={openEdit}
+            removeRow={removeRow}
+          />
+        ))}
       </div>
     </section>
   );
 }
 
-/** Pendientes compartidos: mismas columnas auxiliares que TC + selección y liquidación grupal. */
+/** Fila (estilo card, no tabla) de un cargo TC pendiente: checkbox + resumen + acción «Marcar Pagado» + editar/borrar. */
+function BankingCcPendingChargeRow({
+  row,
+  visibleCols,
+  checked,
+  markingPaid,
+  onToggle,
+  onMarkPaid,
+  openEdit,
+  removeRow,
+}: {
+  row: BankingTransactionRow;
+  visibleCols: Set<BankingTxColumnKey>;
+  checked: boolean;
+  markingPaid: boolean;
+  onToggle: () => void;
+  onMarkPaid: (row: BankingTransactionRow) => void | Promise<void>;
+  openEdit: (row: BankingTransactionRow) => void;
+  removeRow: (row: BankingTransactionRow) => void;
+}) {
+  const showProducto = visibleCols.has("producto");
+  const showCategoria = visibleCols.has("categoria") || visibleCols.has("subcategoria");
+
+  return (
+    <div className={BANKING_MAIN_TX_ROW_CLASS}>
+      <BankingAuxRoundCheckbox
+        checked={checked}
+        onChange={onToggle}
+        color="indigo"
+        aria-label={`Seleccionar cargo ${row.description ?? row.id}`}
+      />
+      <AuxRowAvatar row={row} />
+      <AuxRowTitleBlock row={row} showProducto={showProducto} />
+      {showCategoria ? <AuxRowCategoryBlock row={row} /> : null}
+      <AuxRowAmount row={row} />
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          disabled={markingPaid}
+          onClick={() => void onMarkPaid(row)}
+          className={bankingAuxIndigoPillBtnClass}
+        >
+          {markingPaid ? "…" : (
+            <>
+              <IconCheck className="h-3 w-3" />
+              Pagado
+            </>
+          )}
+        </button>
+        <BankingTxRowActionsMenu row={row} openEdit={openEdit} removeRow={removeRow} />
+      </div>
+    </div>
+  );
+}
+
+/** Pendientes compartidos: mismo estilo de card-list que la tabla TC + selección y liquidación grupal (cross-cuenta). */
 export function BankingSharedPendingChargesTable({
   accountId,
   accountHeading,
   rows,
   orderedVisibleBankingTxColumns,
-  tableMinWidthPx,
   markingSettledId,
   bulkSettling,
   selectedIds,
@@ -270,7 +318,6 @@ export function BankingSharedPendingChargesTable({
   accountHeading: string;
   rows: BankingTransactionRow[];
   orderedVisibleBankingTxColumns: BankingTxColumnKey[];
-  tableMinWidthPx: number;
   markingSettledId: number | null;
   bulkSettling: boolean;
   selectedIds: Set<number>;
@@ -284,147 +331,133 @@ export function BankingSharedPendingChargesTable({
   const rowIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const allSelected = rowIds.length > 0 && rowIds.every((id) => selectedIds.has(id));
   const someSelected = rowIds.some((id) => selectedIds.has(id));
-
   const selectedInSection = useMemo(() => rowIds.filter((id) => selectedIds.has(id)).length, [rowIds, selectedIds]);
+  const visibleCols = useMemo(() => new Set(orderedVisibleBankingTxColumns), [orderedVisibleBankingTxColumns]);
 
   return (
     <section className="mb-6 space-y-2" aria-labelledby={`shared-pending-heading-${accountId}`}>
       <h3 id={`shared-pending-heading-${accountId}`} className={BANKING_AUX_SECTION_HEADING_CLASS}>
-        Compartidos pendientes · {accountHeading}
+        {/* El backend agrupa todo lo compartido sin liquidar en un único bucket sintético
+            (account_name ya es una frase descriptiva, no el nombre de una cuenta real). */}
+        {accountHeading}
       </h3>
-      {someSelected ? (
-        <div className="flex flex-wrap items-center gap-2">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2.5 rounded-xl px-2.5 py-2 text-xs leading-snug ${
+          someSelected ? BANKING_SELECTION_TICKET_ACCENT_CLASS : BANKING_SELECTION_SUMMARY_TICKET_IDLE_CLASS
+        }`}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <AuxSelectAllChip
+            allSelected={allSelected}
+            someSelected={someSelected}
+            onToggle={onToggleSelectAll}
+            title={allSelected ? "Desmarcar todos" : "Seleccionar todos en esta tabla"}
+            ariaLabel="Seleccionar todos los movimientos pendientes"
+          />
+          <p className="min-w-0 flex-1">
+            {someSelected ? (
+              <span className="text-slate-500 banking-dark:text-zinc-400">
+                {selectedInSection} movimiento(s) seleccionado(s)
+              </span>
+            ) : (
+              <span className="text-slate-400 banking-dark:text-zinc-500">
+                Marca movimientos para liquidarlos en lote con «Marcar como pagados».
+              </span>
+            )}
+          </p>
+        </div>
+        {someSelected ? (
           <button
             type="button"
             disabled={bulkSettling || selectedInSection === 0}
             onClick={() => void onBulkSettle()}
-            className={bankingAuxBulkBtnClass}
+            className={bankingAuxIndigoBulkBtnClass}
           >
+            <IconCheck className="h-3.5 w-3.5" />
             {bulkSettling ? "Marcando…" : `Marcar como pagados (${selectedInSection})`}
           </button>
-        </div>
-      ) : null}
-      <div className={BANKING_AUX_TX_CARD_CLASS}>
-        <table className="w-full table-fixed border-collapse text-[12px]" style={{ minWidth: tableMinWidthPx }}>
-          <colgroup>
-            <col style={{ width: "2.75rem" }} />
-            {orderedVisibleBankingTxColumns.map((colKey) => (
-              <col key={colKey} style={{ width: BANKING_TX_COL_WIDTH[colKey] }} />
-            ))}
-            <col style={{ width: "5.25rem" }} />
-            <col style={{ width: "5rem" }} />
-          </colgroup>
-          <thead className={BANKING_AUX_TX_THEAD_CLASS}>
-            <tr>
-              <th scope="col" className="px-1 py-2.5 text-center sm:px-1.5">
-                <BankingAuxRoundCheckbox
-                  checked={allSelected}
-                  indeterminate={someSelected && !allSelected}
-                  onChange={onToggleSelectAll}
-                  title={allSelected ? "Desmarcar todos" : "Seleccionar todos en esta tabla"}
-                  aria-label="Seleccionar todos los movimientos pendientes"
-                />
-              </th>
-              {orderedVisibleBankingTxColumns.map((colKey) => (
-                <th
-                  key={colKey}
-                  scope="col"
-                  className={`px-2 py-2.5 text-center sm:px-2.5 ${BANKING_AUX_TX_TH_TEXT_CLASS}`}
-                >
-                  {BANKING_TX_COLUMN_LABELS[colKey]}
-                </th>
-              ))}
-              <th scope="col" className={`px-1.5 py-2.5 text-center sm:px-2 ${BANKING_AUX_TX_TH_TEXT_CLASS}`}>
-                Liquidado
-              </th>
-              <th className={`px-1.5 py-2.5 text-center sm:px-2 ${BANKING_AUX_TX_TH_TEXT_CLASS}`} aria-label="Acciones" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const income = row.amount >= 0;
-              const sharedSettledLabel = row.is_shared
-                ? row.shared_expense_settled
-                  ? "Sí"
-                  : "No"
-                : "—";
-              const ccPaidLabel =
-                row.credit_card_charge_paid === null || row.credit_card_charge_paid === undefined
-                  ? "—"
-                  : row.credit_card_charge_paid
-                    ? "Sí"
-                    : "No";
-              const checked = selectedIds.has(row.id);
-              return (
-                <tr key={row.id} className={BANKING_AUX_TX_TR_CLASS}>
-                  <td className="align-middle px-1 py-3 text-center sm:px-1.5">
-                    <BankingAuxRoundCheckbox
-                      checked={checked}
-                      onChange={() => onToggleRow(row.id)}
-                      aria-label={`Seleccionar movimiento ${row.description ?? row.id}`}
-                    />
-                  </td>
-                  {orderedVisibleBankingTxColumns.map((colKey) => (
-                    <BankingTxTd
-                      key={colKey}
-                      colKey={colKey}
-                      row={row}
-                      income={income}
-                      sharedSettledLabel={sharedSettledLabel}
-                      ccPaidLabel={ccPaidLabel}
-                      montoAlign="center"
-                    />
-                  ))}
-                  <td className="align-middle px-1.5 py-3 text-center sm:px-2">
-                    <button
-                      type="button"
-                      disabled={markingSettledId === row.id}
-                      onClick={() => void onMarkSettled(row)}
-                      className={bankingAuxActionBtnClass}
-                    >
-                      {markingSettledId === row.id ? "…" : "Marcar Pagado"}
-                    </button>
-                  </td>
-                  <td className="align-middle px-1.5 py-3 sm:px-2">
-                    <div className="flex items-center justify-center gap-0.5">
-                      <button
-                        type="button"
-                        disabled={bankingTxRowEditDisabled(row)}
-                        title={bankingTxRowEditTitle(row)}
-                        aria-label="Editar movimiento"
-                        onClick={() => openEdit(row)}
-                        className={`${txIconBtnAux} disabled:pointer-events-none disabled:opacity-30`}
-                      >
-                        <IconPencil />
-                      </button>
-                      <button
-                        type="button"
-                        title="Eliminar movimiento"
-                        aria-label="Eliminar movimiento"
-                        onClick={() => void removeRow(row)}
-                        className={txIconBtnAuxDanger}
-                      >
-                        <IconTrash />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        ) : null}
+      </div>
+      <div className={BANKING_MAIN_TX_CARD_CLASS}>
+        {rows.map((row) => (
+          <BankingSharedPendingRow
+            key={row.id}
+            row={row}
+            visibleCols={visibleCols}
+            checked={selectedIds.has(row.id)}
+            markingSettled={markingSettledId === row.id}
+            onToggle={() => onToggleRow(row.id)}
+            onMarkSettled={onMarkSettled}
+            openEdit={openEdit}
+            removeRow={removeRow}
+          />
+        ))}
       </div>
     </section>
   );
 }
 
+/** Fila (estilo card) de un movimiento compartido pendiente de liquidar. */
+function BankingSharedPendingRow({
+  row,
+  visibleCols,
+  checked,
+  markingSettled,
+  onToggle,
+  onMarkSettled,
+  openEdit,
+  removeRow,
+}: {
+  row: BankingTransactionRow;
+  visibleCols: Set<BankingTxColumnKey>;
+  checked: boolean;
+  markingSettled: boolean;
+  onToggle: () => void;
+  onMarkSettled: (row: BankingTransactionRow) => void | Promise<void>;
+  openEdit: (row: BankingTransactionRow) => void;
+  removeRow: (row: BankingTransactionRow) => void;
+}) {
+  const showProducto = visibleCols.has("producto");
+  const showCategoria = visibleCols.has("categoria") || visibleCols.has("subcategoria");
 
+  return (
+    <div className={BANKING_MAIN_TX_ROW_CLASS}>
+      <BankingAuxRoundCheckbox
+        checked={checked}
+        onChange={onToggle}
+        color="indigo"
+        aria-label={`Seleccionar movimiento ${row.description ?? row.id}`}
+      />
+      <AuxRowAvatar row={row} />
+      <AuxRowTitleBlock row={row} showProducto={showProducto} />
+      {showCategoria ? <AuxRowCategoryBlock row={row} /> : null}
+      <AuxRowAmount row={row} />
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          disabled={markingSettled}
+          onClick={() => void onMarkSettled(row)}
+          className={bankingAuxIndigoPillBtnClass}
+        >
+          {markingSettled ? "…" : (
+            <>
+              <IconCheck className="h-3 w-3" />
+              Pagado
+            </>
+          )}
+        </button>
+        <BankingTxRowActionsMenu row={row} openEdit={openEdit} removeRow={removeRow} />
+      </div>
+    </div>
+  );
+}
+
+/** Provisiones pendientes de reversar: mismo estilo de card-list que TC/Compartidos + reversa individual o en lote. */
 export function BankingProvisionPendingTable({
   accountId,
   accountHeading,
   rows,
   orderedVisibleBankingTxColumns,
-  tableMinWidthPx,
   bulkReversing,
   reversingId,
   selectedIds,
@@ -439,7 +472,6 @@ export function BankingProvisionPendingTable({
   accountHeading: string;
   rows: BankingTransactionRow[];
   orderedVisibleBankingTxColumns: BankingTxColumnKey[];
-  tableMinWidthPx: number;
   bulkReversing: boolean;
   reversingId: number | null;
   selectedIds: Set<number>;
@@ -454,131 +486,120 @@ export function BankingProvisionPendingTable({
   const allSelected = rowIds.length > 0 && rowIds.every((id) => selectedIds.has(id));
   const someSelected = rowIds.some((id) => selectedIds.has(id));
   const selectedInSection = useMemo(() => rowIds.filter((id) => selectedIds.has(id)).length, [rowIds, selectedIds]);
+  const visibleCols = useMemo(() => new Set(orderedVisibleBankingTxColumns), [orderedVisibleBankingTxColumns]);
 
   return (
     <section className="mb-6 space-y-2" aria-labelledby={`provision-pending-heading-${accountId}`}>
       <h3 id={`provision-pending-heading-${accountId}`} className={BANKING_AUX_SECTION_HEADING_CLASS}>
-        Provisiones pendientes de reversar · {accountHeading}
+        {accountHeading} · Provisiones por reversar
       </h3>
-      {someSelected ? (
-        <div className="flex flex-wrap items-center gap-2">
+      <div
+        className={`flex flex-wrap items-center justify-between gap-2.5 rounded-xl px-2.5 py-2 text-xs leading-snug ${
+          someSelected ? BANKING_SELECTION_TICKET_ACCENT_CLASS : BANKING_SELECTION_SUMMARY_TICKET_IDLE_CLASS
+        }`}
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <AuxSelectAllChip
+            allSelected={allSelected}
+            someSelected={someSelected}
+            onToggle={onToggleSelectAll}
+            title={allSelected ? "Desmarcar todos" : "Seleccionar todas"}
+            ariaLabel="Seleccionar todas las provisiones pendientes en esta cuenta"
+          />
+          <p className="min-w-0 flex-1">
+            {someSelected ? (
+              <span className="text-slate-500 banking-dark:text-zinc-400">
+                {selectedInSection} provisión(es) seleccionada(s)
+              </span>
+            ) : (
+              <span className="text-slate-400 banking-dark:text-zinc-500">
+                Marca provisiones para crear sus reversas contables en lote.
+              </span>
+            )}
+          </p>
+        </div>
+        {someSelected ? (
           <button
             type="button"
             disabled={bulkReversing || selectedInSection === 0}
             onClick={() => void onBulkReverse()}
-            className={bankingAuxBulkBtnClass}
+            className={bankingAuxIndigoBulkBtnClass}
           >
+            <IconUndo className="h-3.5 w-3.5" />
             {bulkReversing ? "Creando reversas…" : `Crear reversas (${selectedInSection})`}
           </button>
-        </div>
-      ) : null}
-      <div className={BANKING_AUX_TX_CARD_CLASS}>
-        <table className="w-full table-fixed border-collapse text-[12px]" style={{ minWidth: tableMinWidthPx }}>
-          <colgroup>
-            <col style={{ width: "2.75rem" }} />
-            {orderedVisibleBankingTxColumns.map((colKey) => (
-              <col key={colKey} style={{ width: BANKING_TX_COL_WIDTH[colKey] }} />
-            ))}
-            <col style={{ width: "6rem" }} />
-            <col style={{ width: "5rem" }} />
-          </colgroup>
-          <thead className={BANKING_AUX_TX_THEAD_CLASS}>
-            <tr>
-              <th scope="col" className="px-1 py-2.5 text-center sm:px-1.5">
-                <BankingAuxRoundCheckbox
-                  checked={allSelected}
-                  indeterminate={someSelected && !allSelected}
-                  onChange={onToggleSelectAll}
-                  title={allSelected ? "Desmarcar todos" : "Seleccionar todos"}
-                  aria-label="Seleccionar todas las provisiones pendientes en esta cuenta"
-                />
-              </th>
-              {orderedVisibleBankingTxColumns.map((colKey) => (
-                <th
-                  key={colKey}
-                  scope="col"
-                  className={`px-2 py-2.5 text-center sm:px-2.5 ${BANKING_AUX_TX_TH_TEXT_CLASS}`}
-                >
-                  {BANKING_TX_COLUMN_LABELS[colKey]}
-                </th>
-              ))}
-              <th scope="col" className={`px-1.5 py-2.5 text-center sm:px-2 ${BANKING_AUX_TX_TH_TEXT_CLASS}`}>
-                Reversa
-              </th>
-              <th className={`px-1.5 py-2.5 text-center sm:px-2 ${BANKING_AUX_TX_TH_TEXT_CLASS}`} aria-label="Acciones" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const income = row.amount >= 0;
-              const sharedSettledLabel = row.is_shared ? (row.shared_expense_settled ? "Sí" : "No") : "—";
-              const ccPaidLabel =
-                row.credit_card_charge_paid === null || row.credit_card_charge_paid === undefined
-                  ? "—"
-                  : row.credit_card_charge_paid
-                    ? "Sí"
-                    : "No";
-              const checked = selectedIds.has(row.id);
-              return (
-                <tr key={row.id} className={BANKING_AUX_TX_TR_CLASS}>
-                  <td className="align-middle px-1 py-3 text-center sm:px-1.5">
-                    <BankingAuxRoundCheckbox
-                      checked={checked}
-                      onChange={() => onToggleRow(row.id)}
-                      aria-label={`Seleccionar provisión ${row.description ?? row.id}`}
-                    />
-                  </td>
-                  {orderedVisibleBankingTxColumns.map((colKey) => (
-                    <BankingTxTd
-                      key={colKey}
-                      colKey={colKey}
-                      row={row}
-                      income={income}
-                      sharedSettledLabel={sharedSettledLabel}
-                      ccPaidLabel={ccPaidLabel}
-                      montoAlign="center"
-                    />
-                  ))}
-                  <td className="align-middle px-1.5 py-3 text-center sm:px-2">
-                    <button
-                      type="button"
-                      disabled={reversingId === row.id}
-                      onClick={() => void onReverseOne(row)}
-                      className={bankingAuxActionBtnClass}
-                    >
-                      {reversingId === row.id ? "…" : "Reversar"}
-                    </button>
-                  </td>
-                  <td className="align-middle px-1.5 py-3 sm:px-2">
-                    <div className="flex items-center justify-center gap-0.5">
-                      <button
-                        type="button"
-                        disabled={bankingTxRowEditDisabled(row)}
-                        title={bankingTxRowEditTitle(row)}
-                        aria-label="Editar movimiento"
-                        onClick={() => openEdit(row)}
-                        className={`${txIconBtnAux} disabled:pointer-events-none disabled:opacity-30`}
-                      >
-                        <IconPencil />
-                      </button>
-                      <button
-                        type="button"
-                        title="Eliminar movimiento"
-                        aria-label="Eliminar movimiento"
-                        onClick={() => void removeRow(row)}
-                        className={txIconBtnAuxDanger}
-                      >
-                        <IconTrash />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        ) : null}
+      </div>
+      <div className={BANKING_MAIN_TX_CARD_CLASS}>
+        {rows.map((row) => (
+          <BankingProvisionPendingRow
+            key={row.id}
+            row={row}
+            visibleCols={visibleCols}
+            checked={selectedIds.has(row.id)}
+            reversing={reversingId === row.id}
+            onToggle={() => onToggleRow(row.id)}
+            onReverseOne={onReverseOne}
+            openEdit={openEdit}
+            removeRow={removeRow}
+          />
+        ))}
       </div>
     </section>
   );
 }
 
+/** Fila (estilo card) de una provisión pendiente de reversar. */
+function BankingProvisionPendingRow({
+  row,
+  visibleCols,
+  checked,
+  reversing,
+  onToggle,
+  onReverseOne,
+  openEdit,
+  removeRow,
+}: {
+  row: BankingTransactionRow;
+  visibleCols: Set<BankingTxColumnKey>;
+  checked: boolean;
+  reversing: boolean;
+  onToggle: () => void;
+  onReverseOne: (row: BankingTransactionRow) => void | Promise<void>;
+  openEdit: (row: BankingTransactionRow) => void;
+  removeRow: (row: BankingTransactionRow) => void;
+}) {
+  const showProducto = visibleCols.has("producto");
+  const showCategoria = visibleCols.has("categoria") || visibleCols.has("subcategoria");
+
+  return (
+    <div className={BANKING_MAIN_TX_ROW_CLASS}>
+      <BankingAuxRoundCheckbox
+        checked={checked}
+        onChange={onToggle}
+        color="indigo"
+        aria-label={`Seleccionar provisión ${row.description ?? row.id}`}
+      />
+      <AuxRowAvatar row={row} />
+      <AuxRowTitleBlock row={row} showProducto={showProducto} />
+      {showCategoria ? <AuxRowCategoryBlock row={row} /> : null}
+      <AuxRowAmount row={row} />
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          disabled={reversing}
+          onClick={() => void onReverseOne(row)}
+          className={bankingAuxIndigoPillBtnClass}
+        >
+          {reversing ? "…" : (
+            <>
+              <IconUndo className="h-3 w-3" />
+              Reversar
+            </>
+          )}
+        </button>
+        <BankingTxRowActionsMenu row={row} openEdit={openEdit} removeRow={removeRow} />
+      </div>
+    </div>
+  );
+}

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router-dom";
+import { IconMoon, IconSun, useBankingTheme } from "./BankingThemeContext";
 
 function IconDashboard({ className }: { className?: string }) {
   return (
@@ -191,6 +192,8 @@ export function AppSidebar({
   investmentsEnabled: boolean;
   bankingEnabled: boolean;
 }) {
+  const { isDark, toggleDark } = useBankingTheme();
+
   return (
     <aside
       className="fixed left-0 top-0 z-40 flex h-screen w-16 flex-col items-center overflow-visible border-r border-[#1a1f2e] bg-[#0b0e14] py-4"
@@ -199,10 +202,10 @@ export function AppSidebar({
       <div className="group relative mb-5 flex justify-center">
         <Link
           to="/"
-          className="flex h-11 w-11 items-center justify-center rounded-xl transition-opacity hover:opacity-90"
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3b82f6] transition-opacity hover:opacity-90"
           aria-label="Inicio — Zendo Finance"
         >
-          <span className="text-[28px] font-black leading-none tracking-tight text-[#3b82f6]">Z</span>
+          <span className="text-[19px] font-black leading-none tracking-tight text-white">Z</span>
         </Link>
         <SidebarTooltip label="Inicio" />
       </div>
@@ -217,6 +220,9 @@ export function AppSidebar({
               <IconTransactions className="shrink-0" />
             </SidebarNavLink>
           </>
+        )}
+        {investmentsEnabled && bankingEnabled && (
+          <div className="my-2 h-px w-8 self-center bg-[#1a1f2e]" aria-hidden />
         )}
         {bankingEnabled && (
           <>
@@ -237,6 +243,20 @@ export function AppSidebar({
       </nav>
 
       <div className="mt-auto flex w-full flex-col items-center gap-1 pt-4">
+        {bankingEnabled && (
+          <div className="group relative flex w-full justify-center">
+            <button
+              type="button"
+              onClick={toggleDark}
+              aria-pressed={isDark}
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-[#6e7681] outline-none hover:bg-[#12161f] hover:text-[#9ca3af] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#3b82f6]"
+              aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            >
+              {isDark ? <IconSun className="h-[22px] w-[22px] shrink-0" /> : <IconMoon className="h-[22px] w-[22px] shrink-0" />}
+            </button>
+            <SidebarTooltip label={isDark ? "Modo claro" : "Modo oscuro"} />
+          </div>
+        )}
         <SidebarNavLink to="/profile" label="Perfil">
           <IconProfile className="shrink-0" />
         </SidebarNavLink>

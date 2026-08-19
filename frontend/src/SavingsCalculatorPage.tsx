@@ -9,12 +9,12 @@ import {
   YAxis,
 } from "recharts";
 import { apiFetch, fetchJson, patchJson, postJson } from "./api";
-import { BankingThemeToggle, useBankingTheme } from "./BankingThemeContext";
+import { useBankingTheme } from "./BankingThemeContext";
 import { formatClpDots } from "./format";
 
 /** Misma línea visual que fecha en el modal «Nuevo movimiento»; para `type="month"`. */
 const BANKING_MONTH_INPUT_CLASS =
-  "mt-1.5 w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
+  "mt-1.5 w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
 
 function openBankingMonthPicker(e: MouseEvent<HTMLInputElement>) {
   e.currentTarget.showPicker?.();
@@ -95,10 +95,10 @@ function fieldLabel(isDark: boolean): string {
 
 function fieldInput(isDark: boolean): string {
   return [
-    "mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none ring-teal-400/0 transition focus:ring-2",
+    "mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none ring-indigo-400/0 transition focus:ring-2",
     isDark
       ? "border-zinc-600 bg-zinc-950 text-zinc-100 focus:border-amber-500 focus:ring-amber-500/35"
-      : "border-slate-300 bg-white text-slate-900 focus:border-teal-400 focus:ring-teal-400/35 [color-scheme:light]",
+      : "border-slate-300 bg-white text-slate-900 focus:border-indigo-400 focus:ring-indigo-400/35 [color-scheme:light]",
   ].join(" ");
 }
 
@@ -107,7 +107,7 @@ function primaryBtn(isDark: boolean): string {
     "rounded-lg px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50",
     isDark
       ? "bg-amber-500 text-zinc-950 shadow-md hover:bg-amber-400 disabled:opacity-45"
-      : "bg-teal-600 text-white hover:bg-teal-700",
+      : "bg-indigo-600 text-white hover:bg-indigo-700",
   ].join(" ");
 }
 
@@ -115,8 +115,8 @@ function secondaryBtn(isDark: boolean): string {
   return [
     "rounded-lg border px-4 py-2 text-sm font-medium shadow-sm transition-colors duration-150",
     isDark
-      ? "border-zinc-500 bg-zinc-900 text-zinc-100 hover:border-teal-400/55 hover:bg-teal-950/35"
-      : "border-slate-300 bg-white text-slate-800 hover:border-teal-400 hover:bg-teal-50",
+      ? "border-zinc-500 bg-zinc-900 text-zinc-100 hover:border-indigo-400/55 hover:bg-indigo-950/35"
+      : "border-slate-300 bg-white text-slate-800 hover:border-indigo-400 hover:bg-indigo-50",
   ].join(" ");
 }
 
@@ -132,7 +132,7 @@ function dangerBtn(isDark: boolean): string {
 function formTabBtn(active: boolean, isDark: boolean): string {
   const base = "rounded-lg px-3 py-1.5 text-sm font-medium transition ";
   if (active) {
-    return base + (isDark ? "bg-amber-500 text-zinc-950" : "bg-teal-600 text-white");
+    return base + (isDark ? "bg-amber-500 text-zinc-950" : "bg-indigo-600 text-white");
   }
   return (
     base +
@@ -143,7 +143,7 @@ function formTabBtn(active: boolean, isDark: boolean): string {
 function modeBadge(mode: SavingsMode, isDark: boolean): string {
   const base = "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ";
   if (mode === "end_date") {
-    return base + (isDark ? "bg-amber-950/60 text-amber-200" : "bg-teal-100 text-teal-900");
+    return base + (isDark ? "bg-amber-950/60 text-amber-200" : "bg-indigo-100 text-indigo-900");
   }
   return base + (isDark ? "bg-zinc-800 text-violet-300" : "bg-violet-100 text-violet-900");
 }
@@ -160,7 +160,7 @@ function PlanChart({ plan, isDark }: { plan: SavingsCalculatorPlanOut; isDark: b
 
   const axisColor = isDark ? "#a1a1aa" : "#64748b";
   const gridColor = isDark ? "#3f3f46" : "#e2e8f0";
-  const stroke = isDark ? "#fbbf24" : "#0d9488";
+  const stroke = isDark ? "#fbbf24" : "#4f46e5";
 
   if (data.length === 0) {
     return (
@@ -443,7 +443,6 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
               Tus planes se guardan en el servidor asociados a tu usuario.
             </p>
           </div>
-          <BankingThemeToggle />
         </header>
 
         <section className={panelCard(isDark)} aria-labelledby="new-plan-heading">
@@ -602,18 +601,18 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
                         </p>
                       ) : null}
                       {p.mode === "end_date" ? (
-                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-amber-200" : "text-teal-800"}`}>
+                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-amber-200" : "text-indigo-800"}`}>
                           En {p.months_count ?? "—"} meses acumulas{" "}
                           <strong>{formatClpDots(p.total_projected_clp ?? 0)}</strong>
                         </p>
                       ) : p.months_needed === 0 ? (
-                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-amber-200" : "text-teal-800"}`}>
+                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-amber-200" : "text-indigo-800"}`}>
                           Con saldo inicial de{" "}
                           <strong>{formatClpDots(p.initial_balance_clp ?? 0)}</strong> ya cumples la meta de{" "}
                           <strong>{formatClpDots(p.target_amount_clp ?? 0)}</strong> (sin meses de aporte adicional).
                         </p>
                       ) : (
-                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-amber-200" : "text-teal-800"}`}>
+                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-amber-200" : "text-indigo-800"}`}>
                           Para juntar <strong>{formatClpDots(p.target_amount_clp ?? 0)}</strong> necesitas{" "}
                           <strong>{p.months_needed ?? "—"}</strong> mes(es) de aporte · total al cerrar{" "}
                           <strong>{formatClpDots(p.total_at_goal_clp ?? 0)}</strong>

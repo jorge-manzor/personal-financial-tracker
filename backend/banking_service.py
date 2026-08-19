@@ -84,18 +84,18 @@ def _category_is_internal_reserved(c: BankingCategory | None) -> bool:
 
 
 CATEGORY_COLOR_PALETTE = (
-    "#58a6ff",
-    "#a371f7",
-    "#f0883e",
-    "#3fb950",
-    "#d2a8ff",
-    "#79c0ff",
-    "#ff7b72",
-    "#56d364",
-    "#e3b341",
-    "#22d3ee",
-    "#8b5cf6",
-    "#fb7185",
+    "#4f46e5",  # indigo-600 — acento primario del sitio
+    "#7c3aed",  # violet-600
+    "#2563eb",  # blue-600
+    "#0891b2",  # cyan-600
+    "#059669",  # emerald-600
+    "#0d9488",  # teal-600
+    "#d97706",  # amber-600
+    "#e11d48",  # rose-600
+    "#c026d3",  # fuchsia-600
+    "#0284c7",  # sky-600
+    "#9333ea",  # purple-600
+    "#475569",  # slate-600
 )
 
 # Colores de UI por nombre de categoría (hex RGB pedidos por producto).
@@ -103,7 +103,7 @@ _BANK_CAT_GREEN = "#00a329"  # Remuneracion, Otros Ingresos, Ahorros, Inversione
 _BANK_CAT_GRAY = "#8f8f8f"  # Transferencia(s)
 _BANK_CAT_BLUE = "#008cf0"  # Pago Tarjeta de Credito
 _BANK_CAT_ROSE = "#fb7185"  # Provisiones
-_BANK_CAT_DEFAULT = "#ff7b72"  # resto
+_BANK_CAT_DEFAULT = "#4f46e5"  # resto — indigo-600, acento del nuevo estilo
 
 _BANK_CAT_NAMES_GREEN = frozenset({"remuneracion", "otros ingresos", "ahorros", "inversiones"})
 
@@ -475,12 +475,15 @@ def category_color_for_index(index: int) -> str:
 
 
 def resolved_category_color(cat: BankingCategory | None) -> str:
-    """Color mostrado en UI: reglas fijas por nombre; el resto usa coral (#ff7b72)."""
+    """Color mostrado en UI: reglas fijas por nombre; si no, el color guardado por el usuario; si no hay, el default."""
     if cat is None:
         return _BANK_CAT_DEFAULT
     fixed = _canonical_hex_for_banking_category_name(getattr(cat, "name", None))
     if fixed:
         return fixed
+    stored = _normalize_hex_color(getattr(cat, "color", None))
+    if stored:
+        return stored
     return _BANK_CAT_DEFAULT
 
 
