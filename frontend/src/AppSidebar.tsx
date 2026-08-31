@@ -135,6 +135,26 @@ function IconSavingsCalc({ className }: { className?: string }) {
   );
 }
 
+function IconProjects({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+      <path d="M12 12v5M9.5 14.5h5" />
+    </svg>
+  );
+}
+
 /** Tooltip al hover: el `title` nativo es poco fiable en enlaces con hijos complejos (React Router). */
 function SidebarTooltip({ label }: { label: string }) {
   return (
@@ -187,10 +207,12 @@ export function AppSidebar({
   onLogout,
   investmentsEnabled,
   bankingEnabled,
+  proyectosEnabled,
 }: {
   onLogout: () => void;
   investmentsEnabled: boolean;
   bankingEnabled: boolean;
+  proyectosEnabled: boolean;
 }) {
   const { isDark, toggleDark } = useBankingTheme();
 
@@ -240,10 +262,18 @@ export function AppSidebar({
             </SidebarNavLink>
           </>
         )}
+        {(investmentsEnabled || bankingEnabled) && proyectosEnabled && (
+          <div className="my-2 h-px w-8 self-center bg-[#1a1f2e]" aria-hidden />
+        )}
+        {proyectosEnabled && (
+          <SidebarNavLink to="/proyectos" label="Proyectos y presupuestos">
+            <IconProjects className="shrink-0" />
+          </SidebarNavLink>
+        )}
       </nav>
 
       <div className="mt-auto flex w-full flex-col items-center gap-1 pt-4">
-        {bankingEnabled && (
+        {(bankingEnabled || proyectosEnabled) && (
           <div className="group relative flex w-full justify-center">
             <button
               type="button"

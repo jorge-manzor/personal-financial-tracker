@@ -46,13 +46,14 @@ export function formatMoneyUsdCompact(n: number): string {
 
 /** CLP: thousands with dot, prefix CLP $ */
 export function formatMoneyCLP(n: number): string {
-  const s = Math.round(n).toLocaleString("es-CL", { maximumFractionDigits: 0 });
+  // `|| 0` normaliza -0 (residuo de floating point en restas que dan cero) para no mostrar "-0".
+  const s = (Math.round(n) || 0).toLocaleString("es-CL", { maximumFractionDigits: 0 });
   return `CLP $${s.replace(/,/g, ".")}`;
 }
 
 /** CLP solo con miles tipo chileno — p. ej. cabeceras ($100.753.265). */
 export function formatClpDots(n: number): string {
-  const s = Math.round(n).toLocaleString("es-CL", { maximumFractionDigits: 0 });
+  const s = (Math.round(n) || 0).toLocaleString("es-CL", { maximumFractionDigits: 0 });
   return `$${s.replace(/,/g, ".")}`;
 }
 
@@ -125,7 +126,7 @@ export function formatMoneyUSDLabel(n: number): string {
 
 /** USD enteros con miles tipo punto — leyendas de torta / sectores (ej. $1.833.141). */
 export function formatUsdDotsInteger(n: number): string {
-  const s = Math.round(n).toLocaleString("es-CL", { maximumFractionDigits: 0 });
+  const s = (Math.round(n) || 0).toLocaleString("es-CL", { maximumFractionDigits: 0 });
   return `$${s.replace(/,/g, ".")}`;
 }
 
@@ -226,7 +227,7 @@ export function formatClpSigned(n: number): string {
 /** Tooltip del gráfico mensual: importe completo, sin abreviar (K/M) ni redondear a miles. */
 export function formatMonthlyTooltipValue(n: number, currency: "USD" | "CLP"): string {
   if (currency === "CLP") {
-    const s = Math.round(n).toLocaleString("es-CL", { maximumFractionDigits: 0 });
+    const s = (Math.round(n) || 0).toLocaleString("es-CL", { maximumFractionDigits: 0 });
     return `CLP $${s.replace(/,/g, ".")}`;
   }
   return new Intl.NumberFormat("en-US", {

@@ -37,6 +37,7 @@ from auth_routes import router as auth_router
 from banking_personal_order_routes import router as banking_personal_order_router
 from savings_calculator_routes import router as savings_calculator_router
 from banking_routes import router as banking_router
+from projects_routes import router as projects_router
 from database import Base, SessionLocal, engine, get_db
 from exchange_service import (
     ensure_exchange_history,
@@ -757,6 +758,7 @@ app.include_router(auth_router)
 app.include_router(banking_router, prefix="/banking", tags=["banking"])
 app.include_router(banking_personal_order_router, prefix="/banking", tags=["banking"])
 app.include_router(savings_calculator_router, prefix="/banking", tags=["banking"])
+app.include_router(projects_router, prefix="/proyectos", tags=["proyectos"])
 
 @app.get("/stock-logos/{symbol}.png")
 def stock_logo_png(symbol: str) -> FileResponse:

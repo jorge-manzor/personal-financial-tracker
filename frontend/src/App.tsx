@@ -42,6 +42,7 @@ const BankingPersonalOrderPage = lazy(() =>
 const SavingsCalculatorPage = lazy(() =>
   import("./SavingsCalculatorPage").then((m) => ({ default: m.SavingsCalculatorPage })),
 );
+const ProjectsPage = lazy(() => import("./ProjectsPage").then((m) => ({ default: m.ProjectsPage })));
 
 function RoutePageFallback() {
   return (
@@ -361,6 +362,7 @@ export default function App() {
   const syncBusy = overlay || headerSync;
   const investmentsOn = !!me?.services.investments;
   const bankingOn = !!me?.services.banking;
+  const proyectosOn = !!me?.services.proyectos;
   const needsFintualConnection = investmentsOn && !!me?.fintual_needs_setup;
   const showFintualSetupModal =
     showMain &&
@@ -377,6 +379,7 @@ export default function App() {
         }}
         investmentsEnabled={investmentsOn}
         bankingEnabled={bankingOn}
+        proyectosEnabled={proyectosOn}
       />
       {!onBankingRoute && (
         <AppHeader
@@ -464,6 +467,8 @@ export default function App() {
                     />
                   ) : bankingOn ? (
                     <Navigate to="/banking/transactions" replace />
+                  ) : proyectosOn ? (
+                    <Navigate to="/proyectos" replace />
                   ) : (
                     <NoServicesPage />
                   )
@@ -514,6 +519,14 @@ export default function App() {
                 element={
                   bankingOn ? <SavingsCalculatorPage onToast={setToast} /> : <Navigate to="/" replace />
                 }
+              />
+              <Route
+                path="/proyectos"
+                element={proyectosOn ? <ProjectsPage onToast={setToast} /> : <Navigate to="/" replace />}
+              />
+              <Route
+                path="/proyectos/:id"
+                element={proyectosOn ? <ProjectsPage onToast={setToast} /> : <Navigate to="/" replace />}
               />
             </Routes>
           </Suspense>
