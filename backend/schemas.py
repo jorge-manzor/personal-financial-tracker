@@ -255,6 +255,7 @@ class UserProfilePatch(BaseModel):
 
     investments: bool | None = None
     banking: bool | None = None
+    proyectos: bool | None = None
 
 
 class PasswordChange(BaseModel):
@@ -745,3 +746,126 @@ class SavingsCalculatorPlanPatch(BaseModel):
     monthly_amount_clp: float | None = Field(default=None, gt=0)
     initial_balance_clp: float | None = Field(default=None, ge=0)
     target_amount_clp: float | None = Field(default=None, gt=0)
+
+
+class ProjectContributionOut(BaseModel):
+    id: int
+    project_id: int
+    amount: float
+    fecha: date
+    note: str | None = None
+    created_at: datetime
+
+
+class ProjectContributionCreate(BaseModel):
+    amount: float = Field(..., gt=0, description="Monto del aporte.")
+    fecha: date
+    note: str | None = Field(default=None, max_length=512)
+
+
+class ProjectContributionPatch(BaseModel):
+    amount: float | None = Field(default=None, gt=0)
+    fecha: date | None = None
+    note: str | None = None
+
+
+class ProjectItemPaymentOut(BaseModel):
+    id: int
+    item_id: int
+    amount: float
+    fecha: date
+    note: str | None = None
+    created_at: datetime
+
+
+class ProjectItemPaymentCreate(BaseModel):
+    amount: float = Field(..., gt=0, description="Monto del abono.")
+    fecha: date
+    note: str | None = Field(default=None, max_length=512)
+
+
+class ProjectItemPaymentPatch(BaseModel):
+    amount: float | None = Field(default=None, gt=0)
+    fecha: date | None = None
+    note: str | None = None
+
+
+class ProjectItemOut(BaseModel):
+    id: int
+    project_id: int
+    name: str
+    costo_total: float
+    fecha_limite: date | None = None
+    sort_order: int
+    monto_pagado: float = Field(..., description="Suma de abonos del ítem.")
+    monto_restante: float = Field(..., description="costo_total - monto_pagado.")
+    payments: list[ProjectItemPaymentOut] = Field(default_factory=list)
+
+
+class ProjectItemCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=512)
+    costo_total: float = Field(..., gt=0)
+    fecha_limite: date | None = None
+    initial_payment_amount: float | None = Field(default=None, gt=0, description="Abono inicial opcional.")
+    initial_payment_fecha: date | None = None
+
+    @model_validator(mode="after")
+    def validate_initial_payment(self) -> ProjectItemCreate:
+        if self.initial_payment_amount is not None and self.initial_payment_fecha is None:
+            raise ValueError("Debes indicar la fecha del abono inicial.")
+        return self
+
+
+class ProjectItemPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=512)
+    costo_total: float | None = Field(default=None, gt=0)
+    fecha_limite: date | None = None
+    sort_order: int | None = None
+
+
+class ProjectOut(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    is_archived: bool
+    created_at: datetime
+    updated_at: datetime
+    presupuesto_total: float = Field(..., description="Suma de aportes.")
+    comprometido: float = Field(..., description="Suma de costo_total de los ítems.")
+    pagado: float = Field(..., description="Suma de todos los abonos de los ítems.")
+    disponible: float = Field(..., description="presupuesto_total - comprometido.")
+    contributions: list[ProjectContributionOut] = Field(default_factory=list)
+    items: list[ProjectItemOut] = Field(default_factory=list)
+
+
+class ProjectListOut(BaseModel):
+    """Vista liviana para el listado (sin aportes/ítems anidados)."""
+
+    id: int
+    name: str
+    description: str | None = None
+    is_archived: bool
+    presupuesto_total: float
+    comprometido: float
+    pagado: float
+    disponible: float
+    items_count: int
+
+
+class ProjectCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=512)
+    description: str | None = Field(default=None, max_length=2000)
+    initial_contribution_amount: float | None = Field(default=None, gt=0, description="Aporte inicial opcional.")
+    initial_contribution_fecha: date | None = None
+
+    @model_validator(mode="after")
+    def validate_initial_contribution(self) -> ProjectCreate:
+        if self.initial_contribution_amount is not None and self.initial_contribution_fecha is None:
+            raise ValueError("Debes indicar la fecha del aporte inicial.")
+        return self
+
+
+class ProjectPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=512)
+    description: str | None = None
+    is_archived: bool | None = None

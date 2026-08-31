@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from auth import (
     SERVICE_BANKING,
     SERVICE_INVESTMENTS,
+    SERVICE_PROYECTOS,
     CurrentUser,
     create_access_token,
     default_services,
@@ -101,6 +102,8 @@ def auth_patch_me(
         svc[SERVICE_INVESTMENTS] = body.investments
     if body.banking is not None:
         svc[SERVICE_BANKING] = body.banking
+    if body.proyectos is not None:
+        svc[SERVICE_PROYECTOS] = body.proyectos
     user.services_json = json.dumps(svc)
     db.add(user)
     db.commit()

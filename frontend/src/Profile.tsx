@@ -161,6 +161,7 @@ export function Profile({
 
   const inv = me.services.investments;
   const bank = me.services.banking;
+  const proy = me.services.proyectos;
 
   async function setInvestments(next: boolean) {
     if (next === inv) return;
@@ -182,6 +183,20 @@ export function Profile({
     setError(null);
     try {
       const u = await patchJson<UserMe>("/auth/me", { banking: next });
+      onUpdated(u);
+    } catch {
+      setError("No se pudo guardar. Intenta de nuevo.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function setProyectos(next: boolean) {
+    if (next === proy) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const u = await patchJson<UserMe>("/auth/me", { proyectos: next });
       onUpdated(u);
     } catch {
       setError("No se pudo guardar. Intenta de nuevo.");
@@ -362,6 +377,24 @@ export function Profile({
                 disabled={saving}
                 ariaLabel="Activar cuentas y movimientos"
                 onToggle={() => void setBanking(!bank)}
+              />
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[#21262d] bg-[#0d1117] p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-[#e6edf3]">Proyectos y presupuestos</p>
+                <p className="mt-1 text-xs leading-relaxed text-[#8b949e]">
+                  Organiza proyectos (matrimonio, muebles, etc.) con aportes, ítems y abonos. Independiente del
+                  portafolio y de cuentas bancarias.
+                </p>
+              </div>
+              <ServiceToggle
+                on={proy}
+                disabled={saving}
+                ariaLabel="Activar proyectos y presupuestos"
+                onToggle={() => void setProyectos(!proy)}
               />
             </div>
           </div>

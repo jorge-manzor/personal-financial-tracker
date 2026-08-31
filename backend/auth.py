@@ -23,10 +23,11 @@ security = HTTPBearer(auto_error=False)
 # Claves de `services_json` / API de perfil (extensible a futuras funcionalidades).
 SERVICE_INVESTMENTS = "investments"
 SERVICE_BANKING = "banking"
+SERVICE_PROYECTOS = "proyectos"
 
 
 def default_services() -> dict[str, bool]:
-    return {SERVICE_INVESTMENTS: False, SERVICE_BANKING: False}
+    return {SERVICE_INVESTMENTS: False, SERVICE_BANKING: False, SERVICE_PROYECTOS: False}
 
 
 def user_services(user: User) -> dict[str, bool]:
@@ -51,6 +52,10 @@ def investments_enabled(user: User) -> bool:
 
 def banking_enabled(user: User) -> bool:
     return bool(user_services(user).get(SERVICE_BANKING, False))
+
+
+def proyectos_enabled(user: User) -> bool:
+    return bool(user_services(user).get(SERVICE_PROYECTOS, False))
 
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-insecure-change-in-production")
@@ -202,3 +207,17 @@ def require_banking_user(
 
 
 BankingUser = Annotated[User, Depends(require_banking_user)]
+
+
+def require_proyectos_user(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    if not proyectos_enabled(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Servicio de proyectos y presupuestos desactivado",
+        )
+    return user
+
+
+ProyectosUser = Annotated[User, Depends(require_proyectos_user)]

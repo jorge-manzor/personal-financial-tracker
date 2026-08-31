@@ -337,3 +337,58 @@ class SavingsCalculatorPlan(Base):
     target_amount_clp = Column(Float, nullable=True)
     created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
     updated_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+
+
+class Project(Base):
+    """Proyecto personal con presupuesto propio (p. ej. matrimonio, muebles)."""
+
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name = Column(String(512), nullable=False)
+    description = Column(Text, nullable=True)
+    is_archived = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+    updated_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+
+
+class ProjectContribution(Base):
+    """Aporte al presupuesto de un proyecto (incluye el aporte inicial al crear)."""
+
+    __tablename__ = "project_contributions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    amount = Column(Float, nullable=False)
+    fecha = Column(Date, nullable=False)
+    note = Column(String(512), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+
+
+class ProjectItem(Base):
+    """Ítem de gasto dentro de un proyecto (p. ej. catering, fotógrafo)."""
+
+    __tablename__ = "project_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False, index=True)
+    name = Column(String(512), nullable=False)
+    costo_total = Column(Float, nullable=False)
+    fecha_limite = Column(Date, nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+    updated_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+
+
+class ProjectItemPayment(Base):
+    """Abono (pago parcial / anticipo) contra un ítem del proyecto."""
+
+    __tablename__ = "project_item_payments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    item_id = Column(Integer, ForeignKey("project_items.id"), nullable=False, index=True)
+    amount = Column(Float, nullable=False)
+    fecha = Column(Date, nullable=False)
+    note = Column(String(512), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=_naive_utc_now)

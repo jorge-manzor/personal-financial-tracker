@@ -2,6 +2,7 @@
 export interface UserServices {
   investments: boolean;
   banking: boolean;
+  proyectos: boolean;
 }
 
 export interface UserMe {
@@ -28,10 +29,11 @@ export function normalizeUserMe(raw: {
 }): UserMe {
   const inv = raw.services && "investments" in raw.services ? raw.services.investments : undefined;
   const bank = raw.services && "banking" in raw.services ? raw.services.banking : undefined;
+  const proy = raw.services && "proyectos" in raw.services ? raw.services.proyectos : undefined;
   return {
     id: raw.id,
     email: raw.email,
-    services: { investments: inv ?? false, banking: bank ?? false },
+    services: { investments: inv ?? false, banking: bank ?? false, proyectos: proy ?? false },
     fintual_needs_setup: raw.fintual_needs_setup ?? false,
     fintual_reconnect_required: raw.fintual_reconnect_required ?? false,
     fintual_session_cookie: raw.fintual_session_cookie ?? null,
