@@ -118,14 +118,34 @@ export function AppHeader({
       style={{ height: 56 }}
     >
       <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-col justify-center gap-0.5 py-0.5">
-          <h1 className="truncate text-lg font-bold leading-tight tracking-tight md:text-xl">
-            <span className="text-[#3b82f6]">Zendo</span>
-            <span className="text-white"> Finance</span>
-          </h1>
-          <p className="truncate text-[11px] font-medium text-[#8b949e] md:text-xs">
-            {headerSubtitle(pathname, investmentsEnabled)}
-          </p>
+        <div className="flex min-w-0 items-center gap-2.5 py-0.5">
+          <svg viewBox="0 0 100 100" className="h-6 w-6 shrink-0" aria-hidden>
+            <path
+              d="M70.08,47.01 A27,27 0 1 0 55.41,78.47"
+              fill="none"
+              stroke="#8FBFA6"
+              strokeWidth="11"
+              strokeLinecap="round"
+            />
+            <path
+              d="M55.41,78.47 C59.64,76.5 60.57,63.25 63,62 C65.43,60.76 67.5,73 70,71 C72.5,69 75.33,56.17 78,50 C80.67,43.83 83.87,38.27 86,34"
+              fill="none"
+              stroke="#C79A56"
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle cx="86" cy="34" r="8" fill="#C79A56" />
+          </svg>
+          <div className="flex min-w-0 flex-col justify-center gap-0.5">
+            <h1 className="truncate text-lg font-bold leading-tight tracking-tight md:text-xl">
+              <span className="text-[#8FBFA6]">Zendo</span>
+              <span className="text-white"> Finance</span>
+            </h1>
+            <p className="truncate text-[11px] font-medium text-[#8b949e] md:text-xs">
+              {headerSubtitle(pathname, investmentsEnabled)}
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-shrink-0 items-center justify-end gap-3 md:gap-4">
