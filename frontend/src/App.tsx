@@ -423,6 +423,10 @@ export default function App() {
                 element={
                   !hasAnyActiveService(me!.services) ? (
                     <NoServicesPage />
+                  ) : bankingOn ? (
+                    <Navigate to="/banking/transactions" replace />
+                  ) : proyectosOn ? (
+                    <Navigate to="/proyectos" replace />
                   ) : investmentsOn ? (
                     <Dashboard
                       portfolio={portfolio}
@@ -467,10 +471,6 @@ export default function App() {
                       onToast={setToast}
                       onMutate={loadAll}
                     />
-                  ) : bankingOn ? (
-                    <Navigate to="/banking/transactions" replace />
-                  ) : proyectosOn ? (
-                    <Navigate to="/proyectos" replace />
                   ) : (
                     <NoServicesPage />
                   )
