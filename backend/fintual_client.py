@@ -669,7 +669,7 @@ def _is_dividend_reinvestment(buy: dict[str, Any], dividends: list[dict[str, Any
     return False, None
 
 
-def get_buys_and_dividends(symbol: str, limit: int = 500) -> dict[str, Any]:
+def get_buys_and_dividends(symbol: str, limit: int = 100) -> dict[str, Any]:
     sym = symbol.upper().strip()
     data = _post_gql(
         "StocksAssetMovements",
@@ -739,7 +739,7 @@ def _enrich_sell(client: httpx.Client, sell: dict[str, Any]) -> dict[str, Any]:
     return sell
 
 
-def get_sells(symbol: str, limit: int = 500, enrich: bool = True) -> list[dict[str, Any]]:
+def get_sells(symbol: str, limit: int = 100, enrich: bool = True) -> list[dict[str, Any]]:
     sym = symbol.upper().strip()
     data = _post_gql(
         "StocksAssetMovements",

@@ -558,24 +558,17 @@ def _collect_symbols(db: Session, position_symbols: list[str], user_id: int) -> 
 
 
 def sync_fintual_stock_transactions(db: Session, symbols: list[str], user_id: int) -> int:
-    """Reemplaza movimientos de acciones desde Fintual (compras, ventas, divs, divisiones)."""
+    """
+    Reemplaza movimientos de acciones desde Fintual (compras, ventas, divs, divisiones), símbolo por símbolo.
+
+    Solo se borra y reemplaza el historial de un ticker si su fetch a Fintual fue exitoso: si falla
+    (p. ej. límite de la API GraphQL, timeout), sus transacciones existentes se dejan intactas en vez
+    de perderse — antes se borraba todo el historial de Acciones al inicio y solo se reinsertaba lo que
+    sí se pudo traer, así que cualquier falla parcial vaciaba el historial de los tickers que fallaron.
+    """
     u_row = db.query(User).filter(User.id == user_id).first()
     fs = ((u_row.fintual_session or "").strip() if u_row else "") or None
     fu = ((u_row.fintual_uid or "").strip() if u_row else "") or None
-
-    db.execute(
-        delete(Transaction).where(
-            and_(
-                Transaction.user_id == user_id,
-                Transaction.source == "fintual",
-                or_(
-                    Transaction.categoria == "Acciones",
-                    Transaction.categoria == "División Acción",
-                ),
-            )
-        )
-    )
-    db.commit()
 
     pending: list[dict[str, Any]] = []
 
@@ -591,6 +584,25 @@ def sync_fintual_stock_transactions(db: Session, symbols: list[str], user_id: in
                     continue
                 if pack is not None:
                     fetched.append((sym, pack, sells or []))
+
+    fetched_symbols = [sym for sym, _, _ in fetched]
+    if fetched_symbols:
+        # Sin commit aquí a propósito: el borrado debe quedar en la misma transacción que el
+        # reinsert de más abajo (único db.commit() de la función), para que ambos se apliquen
+        # juntos o ninguno lo haga si algo falla entremedio (p. ej. get_asset_details).
+        db.execute(
+            delete(Transaction).where(
+                and_(
+                    Transaction.user_id == user_id,
+                    Transaction.source == "fintual",
+                    Transaction.activo.in_(fetched_symbols),
+                    or_(
+                        Transaction.categoria == "Acciones",
+                        Transaction.categoria == "División Acción",
+                    ),
+                )
+            )
+        )
 
     for sym, pack, sells in fetched:
         asset_display_name: str | None = None
