@@ -549,7 +549,7 @@ def get_asset_details(symbol: str) -> dict[str, Any]:
     }
 
 
-def fetch_wallet_graphql(limit: int = 500, offset: int = 0) -> dict[str, Any]:
+def fetch_wallet_graphql(limit: int = 100, offset: int = 0) -> dict[str, Any]:
     with httpx.Client(headers=_gql_headers(), cookies=_cookie_dict(), timeout=120.0) as client:
         r = client.post(
             FINTUAL_GQL,
@@ -594,7 +594,7 @@ def _merge_wallet_data_chunk(acc: dict[str, Any], chunk: dict[str, Any]) -> dict
     return out
 
 
-def fetch_wallet_graphql_all_pages(limit: int = 500) -> dict[str, Any]:
+def fetch_wallet_graphql_all_pages(limit: int = 100) -> dict[str, Any]:
     """
     Descarga todos los bloques de WalletMovements paginando `offset` hasta que ninguna
     lista devuelva una página llena.
