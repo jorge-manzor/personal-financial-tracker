@@ -587,6 +587,9 @@ def sync_fintual_stock_transactions(db: Session, symbols: list[str], user_id: in
 
     fetched_symbols = [sym for sym, _, _ in fetched]
     if fetched_symbols:
+        # Sin commit aquí a propósito: el borrado debe quedar en la misma transacción que el
+        # reinsert de más abajo (único db.commit() de la función), para que ambos se apliquen
+        # juntos o ninguno lo haga si algo falla entremedio (p. ej. get_asset_details).
         db.execute(
             delete(Transaction).where(
                 and_(
@@ -600,7 +603,6 @@ def sync_fintual_stock_transactions(db: Session, symbols: list[str], user_id: in
                 )
             )
         )
-        db.commit()
 
     for sym, pack, sells in fetched:
         asset_display_name: str | None = None
