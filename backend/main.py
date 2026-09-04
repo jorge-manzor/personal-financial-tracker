@@ -46,7 +46,7 @@ from exchange_service import (
     get_rate_for_date,
     store_today_rate,
 )
-from fintual_goals_dashboard import fetch_active_goal_cards, fetch_cached_goal_cards
+from fintual_goals_dashboard import fetch_active_goal_cards, fetch_cached_goal_cards, upsert_goal_cache
 from fintual_client import fintual_configured, get_asset_details, use_fintual_credentials
 from stock_assets import get_stock_display_from_db, upsert_stock_asset
 from history import (
@@ -1298,6 +1298,7 @@ def dashboard_initial(
     if fintual_live:
         with use_fintual_credentials(user.fintual_session, user.fintual_uid):
             goal_cards = fetch_active_goal_cards(db, user_id=uid)
+        upsert_goal_cache(db, uid, goal_cards)
     else:
         goal_cards = fetch_cached_goal_cards(db, uid)
     goals_out = [FintualGoalCardOut(**x) for x in goal_cards]

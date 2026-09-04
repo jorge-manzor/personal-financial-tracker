@@ -166,6 +166,28 @@ class StockAsset(Base):
     updated_at = Column(DateTime, nullable=False)
 
 
+class FintualGoalCache(Base):
+    """
+    Último NAV real conocido por meta/fondo Fintual (de `fetch_active_goal_cards`, con red),
+    para servir `/dashboard-initial?fintual_live=false` sin red sin caer en la aproximación
+    sin ganancias de `_cards_from_synced_fondos_tx`.
+    """
+
+    __tablename__ = "fintual_goal_cache"
+    __table_args__ = (UniqueConstraint("user_id", "goal_id", name="uq_fintual_goal_cache_user_goal"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    goal_id = Column(String(64), nullable=False, index=True)
+    name = Column(Text, nullable=False)
+    nav_clp = Column(Float, nullable=False, default=0.0)
+    deposited_clp = Column(Float, nullable=False, default=0.0)
+    profit_clp = Column(Float, nullable=False, default=0.0)
+    profit_pct = Column(Float, nullable=False, default=0.0)
+    badge_label = Column(String(32), nullable=False, default="INVERSIÓN")
+    updated_at = Column(DateTime, nullable=False)
+
+
 class StockSplit(Base):
     """Splits desde Fintual (`stocksAssetMovements.splits`) — replay: shares ×= rate; cost basis USD sin cambio."""
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import func
@@ -16,9 +17,13 @@ from fintual_client import (
     portal_balance_snapshot_from_graph,
     use_fintual_credentials,
 )
-from models import Transaction, User
+from models import FintualGoalCache, Transaction, User
 
 logger = logging.getLogger(__name__)
+
+
+def _naive_utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _first_float(attr: dict[str, Any], *keys: str, default: float = 0.0) -> float:
@@ -324,9 +329,71 @@ def _enrich_goal_cards_with_portal_balance_graph(
             c["profit_pct"] = profit_pct
 
 
+def upsert_goal_cache(db: Session, user_id: int, cards: list[dict[str, Any]]) -> None:
+    """
+    Persiste el último NAV real conocido (de `fetch_active_goal_cards`, con red) para poder
+    servir `/dashboard-initial?fintual_live=false` sin red sin recurrir a una aproximación.
+    """
+    seen_ids: set[str] = set()
+    now = _naive_utc_now()
+    for c in cards:
+        gid = str(c.get("id") or "").strip()
+        if not gid:
+            continue
+        seen_ids.add(gid)
+        row = (
+            db.query(FintualGoalCache)
+            .filter(FintualGoalCache.user_id == user_id, FintualGoalCache.goal_id == gid)
+            .first()
+        )
+        if row is None:
+            row = FintualGoalCache(user_id=user_id, goal_id=gid)
+            db.add(row)
+        row.name = str(c.get("name") or f"Meta {gid}")
+        row.nav_clp = float(c.get("nav_clp") or 0.0)
+        row.deposited_clp = float(c.get("deposited_clp") or 0.0)
+        row.profit_clp = float(c.get("profit_clp") or 0.0)
+        row.profit_pct = float(c.get("profit_pct") or 0.0)
+        row.badge_label = str(c.get("badge_label") or "INVERSIÓN")
+        row.updated_at = now
+
+    query = db.query(FintualGoalCache).filter(FintualGoalCache.user_id == user_id)
+    if seen_ids:
+        query = query.filter(FintualGoalCache.goal_id.notin_(seen_ids))
+    query.delete(synchronize_session=False)
+    db.commit()
+
+
 def fetch_cached_goal_cards(db: Session, user_id: int) -> list[dict[str, Any]]:
-    """Tarjetas de metas sin red: solo desde movimientos ya sincronizados en BD (mismo respaldo que stocks)."""
-    return _cards_from_synced_fondos_tx(db, user_id)
+    """
+    Tarjetas de metas sin red: usa el último NAV real conocido (`FintualGoalCache`, actualizado en
+    cada carga/sync con `fintual_live=true`). Si todavía no hay cache para este usuario (primer
+    login antes de cualquier carga con red), cae al respaldo aproximado desde movimientos sync
+    (sin ganancias — solo capital neto).
+    """
+    rows = db.query(FintualGoalCache).filter(FintualGoalCache.user_id == user_id).all()
+    if not rows:
+        return _cards_from_synced_fondos_tx(db, user_id)
+    out = [
+        {
+            "id": r.goal_id,
+            "name": r.name,
+            "nav_clp": r.nav_clp,
+            "deposited_clp": r.deposited_clp,
+            "profit_clp": r.profit_clp,
+            "profit_pct": r.profit_pct,
+            "badge_label": r.badge_label,
+        }
+        for r in rows
+    ]
+    out.sort(
+        key=lambda x: (
+            0 if (x["nav_clp"] > 1e-6 or x["deposited_clp"] > 1e-6) else 1,
+            -x["nav_clp"],
+            x["name"].lower(),
+        )
+    )
+    return out
 
 
 def fetch_active_goal_cards(db: Session | None = None, user_id: int | None = None) -> list[dict[str, Any]]:

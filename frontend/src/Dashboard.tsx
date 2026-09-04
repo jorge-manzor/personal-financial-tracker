@@ -250,20 +250,33 @@ export function Dashboard({
       const { scrollLeft, scrollWidth, clientWidth } = el;
       const eps = 8;
       const overflow = scrollWidth > clientWidth + eps;
-      setAccionesScrollHints({
+      const next = {
         left: overflow && scrollLeft > eps,
         right: overflow && scrollLeft < scrollWidth - clientWidth - eps,
+      };
+      // Evita re-renders del Dashboard completo en cada tick de scroll (el evento nativo dispara
+      // muy seguido durante scrollBy smooth); solo actualiza si left/right realmente cambiaron.
+      setAccionesScrollHints((prev) => (prev.left === next.left && prev.right === next.right ? prev : next));
+    };
+    // Coalesce: el listener de scroll solo agenda el recálculo, como máximo una vez por frame.
+    let scrollRaf = 0;
+    const onScroll = () => {
+      if (scrollRaf) return;
+      scrollRaf = requestAnimationFrame(() => {
+        scrollRaf = 0;
+        update();
       });
     };
     update();
     const raf = requestAnimationFrame(update);
-    el.addEventListener("scroll", update, { passive: true });
+    el.addEventListener("scroll", onScroll, { passive: true });
     const ro = new ResizeObserver(update);
     ro.observe(el);
     window.addEventListener("resize", update);
     return () => {
       cancelAnimationFrame(raf);
-      el.removeEventListener("scroll", update);
+      if (scrollRaf) cancelAnimationFrame(scrollRaf);
+      el.removeEventListener("scroll", onScroll);
       ro.disconnect();
       window.removeEventListener("resize", update);
     };

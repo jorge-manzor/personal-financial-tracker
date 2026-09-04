@@ -106,7 +106,9 @@ export default function App() {
   const [fintualGoals, setFintualGoals] = useState<FintualGoalCard[]>([]);
   const [period, setPeriod] = useState<Period>("ALL");
   const [chartCurrency, setChartCurrency] = useState<ChartCurrency>("CLP");
-  const [chartLoading, setChartLoading] = useState(false);
+  // true por defecto: el efecto que trae /chart-data recién corre después del primer render con
+  // `ready=true`, así que arrancar en false pintaba un frame de "No hay datos" antes del skeleton.
+  const [chartLoading, setChartLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [txOpen, setTxOpen] = useState(false);
   const [editingTx, setEditingTx] = useState<TransactionRow | null>(null);
