@@ -788,27 +788,41 @@ export function Dashboard({
                 </div>
               </div>
               {accionesScrollHints.left && (
-                <div
-                  className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 flex w-11 items-center justify-start bg-gradient-to-r from-[#0d1117] from-40% via-[#0d1117]/70 to-transparent pl-0.5 sm:w-12"
-                  aria-hidden
-                >
-                  <span className="inline-flex rounded-full border border-[#30363d] bg-[#161b22]/90 p-1 text-[#8b949e] shadow-sm">
+                <div className="pointer-events-none absolute bottom-0 left-0 top-0 z-10 flex w-11 items-center justify-start bg-gradient-to-r from-[#0d1117] from-40% via-[#0d1117]/70 to-transparent pl-0.5 sm:w-12">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      accionesScrollRef.current?.scrollBy({
+                        left: -Math.round(accionesScrollRef.current.clientWidth * 0.85),
+                        behavior: "smooth",
+                      })
+                    }
+                    aria-label="Ver acciones anteriores"
+                    className="pointer-events-auto inline-flex rounded-full border border-[#30363d] bg-[#161b22]/90 p-1 text-[#8b949e] shadow-sm transition hover:border-[#6e7681] hover:text-white"
+                  >
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
                     </svg>
-                  </span>
+                  </button>
                 </div>
               )}
               {accionesScrollHints.right && (
-                <div
-                  className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 flex w-11 items-center justify-end bg-gradient-to-l from-[#0d1117] from-40% via-[#0d1117]/70 to-transparent pr-0.5 sm:w-12"
-                  aria-hidden
-                >
-                  <span className="inline-flex rounded-full border border-[#30363d] bg-[#161b22]/90 p-1 text-[#8b949e] shadow-sm">
+                <div className="pointer-events-none absolute bottom-0 right-0 top-0 z-10 flex w-11 items-center justify-end bg-gradient-to-l from-[#0d1117] from-40% via-[#0d1117]/70 to-transparent pr-0.5 sm:w-12">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      accionesScrollRef.current?.scrollBy({
+                        left: Math.round(accionesScrollRef.current.clientWidth * 0.85),
+                        behavior: "smooth",
+                      })
+                    }
+                    aria-label="Ver más acciones"
+                    className="pointer-events-auto inline-flex rounded-full border border-[#30363d] bg-[#161b22]/90 p-1 text-[#8b949e] shadow-sm transition hover:border-[#6e7681] hover:text-white"
+                  >
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                     </svg>
-                  </span>
+                  </button>
                 </div>
               )}
             </div>

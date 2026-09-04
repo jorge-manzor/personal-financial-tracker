@@ -324,6 +324,11 @@ def _enrich_goal_cards_with_portal_balance_graph(
             c["profit_pct"] = profit_pct
 
 
+def fetch_cached_goal_cards(db: Session, user_id: int) -> list[dict[str, Any]]:
+    """Tarjetas de metas sin red: solo desde movimientos ya sincronizados en BD (mismo respaldo que stocks)."""
+    return _cards_from_synced_fondos_tx(db, user_id)
+
+
 def fetch_active_goal_cards(db: Session | None = None, user_id: int | None = None) -> list[dict[str, Any]]:
     """
     Metas para el dashboard: primero API de goals (NAV real); si falta algo, rellena con
