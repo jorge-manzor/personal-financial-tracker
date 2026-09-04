@@ -100,19 +100,27 @@ export function SyncOverlay({
               className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#30363d] bg-white shadow-[0_0_0_1px_rgba(255,255,255,0.06)_inset]"
               aria-hidden
             >
-              <svg viewBox="0 0 32 32" className="h-7 w-7">
+              <svg viewBox="0 0 100 100" className="h-7 w-7">
                 <path
-                  d="M4 22 L11 15 L17 17 L28 6"
-                  stroke="#dc2626"
-                  strokeWidth="2.4"
+                  d="M70.08,47.01 A27,27 0 1 0 55.41,78.47"
                   fill="none"
+                  stroke="#4B7B63"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M55.41,78.47 C59.64,76.5 60.57,63.25 63,62 C65.43,60.76 67.5,73 70,71 C72.5,69 75.33,56.17 78,50 C80.67,43.83 83.87,38.27 86,34"
+                  fill="none"
+                  stroke="#C79A56"
+                  strokeWidth="7"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
+                <circle cx="86" cy="34" r="7" fill="#C79A56" />
               </svg>
             </div>
             <h1 className="text-xl font-semibold leading-tight">
-              <span className="text-[#3b82f6]">Zendo</span>
+              <span className="text-[#8FBFA6]">Zendo</span>
               <span className="text-white"> Finance</span>
             </h1>
           </div>

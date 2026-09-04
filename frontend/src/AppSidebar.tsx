@@ -224,28 +224,32 @@ export function AppSidebar({
       <div className="group relative mb-5 flex justify-center">
         <Link
           to="/"
-          className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#3b82f6] transition-opacity hover:opacity-90"
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F7F5F1] transition-opacity hover:opacity-90"
           aria-label="Inicio — Zendo Finance"
         >
-          <span className="text-[19px] font-black leading-none tracking-tight text-white">Z</span>
+          <svg viewBox="0 0 100 100" className="h-6 w-6" aria-hidden>
+            <path
+              d="M70.08,47.01 A27,27 0 1 0 55.41,78.47"
+              fill="none"
+              stroke="#4B7B63"
+              strokeWidth="11"
+              strokeLinecap="round"
+            />
+            <path
+              d="M55.41,78.47 C59.64,76.5 60.57,63.25 63,62 C65.43,60.76 67.5,73 70,71 C72.5,69 75.33,56.17 78,50 C80.67,43.83 83.87,38.27 86,34"
+              fill="none"
+              stroke="#C79A56"
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle cx="86" cy="34" r="8" fill="#C79A56" />
+          </svg>
         </Link>
         <SidebarTooltip label="Inicio" />
       </div>
 
       <nav className="flex w-full flex-col items-stretch gap-1 overflow-visible" role="navigation">
-        {investmentsEnabled && (
-          <>
-            <SidebarNavLink to="/" end label="Panel">
-              <IconDashboard className="shrink-0" />
-            </SidebarNavLink>
-            <SidebarNavLink to="/transactions" label="Transacciones">
-              <IconTransactions className="shrink-0" />
-            </SidebarNavLink>
-          </>
-        )}
-        {investmentsEnabled && bankingEnabled && (
-          <div className="my-2 h-px w-8 self-center bg-[#1a1f2e]" aria-hidden />
-        )}
         {bankingEnabled && (
           <>
             <SidebarNavLink to="/banking/transactions" label="Movimientos bancarios">
@@ -262,13 +266,26 @@ export function AppSidebar({
             </SidebarNavLink>
           </>
         )}
-        {(investmentsEnabled || bankingEnabled) && proyectosEnabled && (
+        {bankingEnabled && proyectosEnabled && (
           <div className="my-2 h-px w-8 self-center bg-[#1a1f2e]" aria-hidden />
         )}
         {proyectosEnabled && (
           <SidebarNavLink to="/proyectos" label="Proyectos y presupuestos">
             <IconProjects className="shrink-0" />
           </SidebarNavLink>
+        )}
+        {(bankingEnabled || proyectosEnabled) && investmentsEnabled && (
+          <div className="my-2 h-px w-8 self-center bg-[#1a1f2e]" aria-hidden />
+        )}
+        {investmentsEnabled && (
+          <>
+            <SidebarNavLink to="/" end label="Panel">
+              <IconDashboard className="shrink-0" />
+            </SidebarNavLink>
+            <SidebarNavLink to="/transactions" label="Transacciones">
+              <IconTransactions className="shrink-0" />
+            </SidebarNavLink>
+          </>
         )}
       </nav>
 
