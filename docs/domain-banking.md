@@ -21,7 +21,7 @@ Servicio opt-in `banking`. Moneda principal: **CLP**. Independiente del portafol
 | Ruta | Archivo | Rol |
 |------|---------|-----|
 | `/banking/transactions` | `BankingTransactionsPage.tsx` | Tabla principal (muy grande) |
-| `/banking/settings` | `BankingSettingsPage.tsx` | Cuentas / categorías |
+| `/profile#banking` | `Profile.tsx` (pestaña «Banking» → `BankingSettingsSection` en `BankingSettingsPage.tsx`) | Cuentas / categorías — embebido en Perfil, sin ruta propia |
 | `/banking/personal-order` | `BankingPersonalOrderPage.tsx` | Provisiones y ahorro personal |
 | `/banking/savings-calculator` | `SavingsCalculatorPage.tsx` | Planes calculadora |
 | Tema | `BankingThemeContext.tsx` | Clase/tema banking |

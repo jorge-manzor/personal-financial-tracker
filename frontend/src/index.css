@@ -18,6 +18,13 @@ body,
   height: 100%;
 }
 
+html {
+  /* Reserva el ancho de la scrollbar siempre, para que cambiar de pestaña
+     (p. ej. Productos ↔ Categorías en Configuración bancaria) no angoste/ensanche
+     el layout centrado según si esa vista necesita o no scroll vertical. */
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   background: var(--color-bg);

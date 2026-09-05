@@ -1,9 +1,14 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, lazy, Suspense, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { patchJson, postJson } from "./api";
 import type { UserMe } from "./types";
 
-type Tab = "cuenta" | "seguridad" | "servicios";
+/** Carga diferida: solo pesa el bundle cuando alguien realmente abre esta pestaña. */
+const BankingSettingsSection = lazy(() =>
+  import("./BankingSettingsPage").then((m) => ({ default: m.BankingSettingsSection })),
+);
+
+type Tab = "cuenta" | "seguridad" | "servicios" | "banking";
 
 function IconEye({ className }: { className?: string }) {
   return (
@@ -194,11 +199,14 @@ export function Profile({
   me,
   onUpdated,
   onRequestFintualConnect,
+  onToast,
 }: {
   me: UserMe;
   onUpdated: (next: UserMe) => void;
   /** Abre el modal de credenciales Fintual (p. ej. para rotar la cookie). */
   onRequestFintualConnect?: () => void;
+  /** Toasts de la sección Banking embebida (ver BankingSettingsSection). */
+  onToast: (msg: string | null) => void;
 }) {
   const [tab, setTab] = useState<Tab>("cuenta");
   const [saving, setSaving] = useState(false);
@@ -213,12 +221,15 @@ export function Profile({
 
   useEffect(() => {
     if (window.location.hash === "#servicios") setTab("servicios");
+    else if (window.location.hash === "#banking") setTab("banking");
   }, []);
 
   const inv = me.services.investments;
   const bank = me.services.banking;
   const proy = me.services.proyectos;
   const initial = me.email.trim().charAt(0).toUpperCase() || "?";
+
+  const navItems = bank ? [...NAV_ITEMS, { id: "banking" as const, label: "Banking", icon: IconBank }] : NAV_ITEMS;
 
   async function setInvestments(next: boolean) {
     if (next === inv) return;
@@ -295,7 +306,7 @@ export function Profile({
     <div className="mx-auto flex max-w-[940px] gap-10 p-4 pb-28 md:p-6">
       <nav className="w-[190px] shrink-0">
         <h2 className="mb-5 text-xl font-semibold tracking-tight text-white">Perfil</h2>
-        {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+        {navItems.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             type="button"
@@ -499,6 +510,18 @@ export function Profile({
             </div>
 
             {error && <p className="mt-3 text-sm text-[#f85149]">{error}</p>}
+          </div>
+        )}
+
+        {tab === "banking" && bank && (
+          <div>
+            <div className="mb-5">
+              <h3 className="text-base font-semibold text-white">Banking</h3>
+              <p className="mt-1 text-[13px] text-[#8b949e]">Productos y categorías de cuentas y movimientos.</p>
+            </div>
+            <Suspense fallback={<p className="text-sm text-[#8b949e]">Cargando…</p>}>
+              <BankingSettingsSection onToast={onToast} />
+            </Suspense>
           </div>
         )}
 
