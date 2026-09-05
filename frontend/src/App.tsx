@@ -370,6 +370,52 @@ export default function App() {
     showMain &&
     (fintualModalFromProfile || (needsFintualConnection && !fintualSetupSkipped));
 
+  const dashboardElement = (
+    <Dashboard
+      portfolio={portfolio}
+      holdings={holdings}
+      chart={chart}
+      chartLoading={chartLoading}
+      period={period}
+      onPeriod={setPeriod}
+      chartCurrency={chartCurrency}
+      onChartCurrency={setChartCurrency}
+      sectors={sectors}
+      manualAssets={manualAssets}
+      fintualGoals={fintualGoals}
+      onManualSnapshot={(a) => setSnapshotAsset(a)}
+      onDeleteManual={async (m) => {
+        if (
+          !confirm(
+            `¿Eliminar "${m.nombre}"? Se borrarán también sus valores históricos. Esta acción no se puede deshacer.`,
+          )
+        ) {
+          return;
+        }
+        try {
+          const r = await apiFetch(`/manual-assets/${m.id}`, {
+            method: "DELETE",
+          });
+          if (!r.ok) {
+            setToast("No se pudo eliminar el activo");
+            return;
+          }
+          setToast("Activo eliminado");
+          await loadAll();
+        } catch {
+          setToast("No se pudo eliminar el activo");
+        }
+      }}
+      dataVersion={dataVersion}
+      onEditTransaction={(tx) => {
+        setEditingTx(tx);
+        setTxOpen(true);
+      }}
+      onToast={setToast}
+      onMutate={loadAll}
+    />
+  );
+
   return (
     <BankingThemeProvider>
       <BankingBodyClassSync />
@@ -428,53 +474,15 @@ export default function App() {
                   ) : proyectosOn ? (
                     <Navigate to="/proyectos" replace />
                   ) : investmentsOn ? (
-                    <Dashboard
-                      portfolio={portfolio}
-                      holdings={holdings}
-                      chart={chart}
-                      chartLoading={chartLoading}
-                      period={period}
-                      onPeriod={setPeriod}
-                      chartCurrency={chartCurrency}
-                      onChartCurrency={setChartCurrency}
-                      sectors={sectors}
-                      manualAssets={manualAssets}
-                      fintualGoals={fintualGoals}
-                      onManualSnapshot={(a) => setSnapshotAsset(a)}
-                      onDeleteManual={async (m) => {
-                        if (
-                          !confirm(
-                            `¿Eliminar "${m.nombre}"? Se borrarán también sus valores históricos. Esta acción no se puede deshacer.`,
-                          )
-                        ) {
-                          return;
-                        }
-                        try {
-                          const r = await apiFetch(`/manual-assets/${m.id}`, {
-                            method: "DELETE",
-                          });
-                          if (!r.ok) {
-                            setToast("No se pudo eliminar el activo");
-                            return;
-                          }
-                          setToast("Activo eliminado");
-                          await loadAll();
-                        } catch {
-                          setToast("No se pudo eliminar el activo");
-                        }
-                      }}
-                      dataVersion={dataVersion}
-                      onEditTransaction={(tx) => {
-                        setEditingTx(tx);
-                        setTxOpen(true);
-                      }}
-                      onToast={setToast}
-                      onMutate={loadAll}
-                    />
+                    dashboardElement
                   ) : (
                     <NoServicesPage />
                   )
                 }
+              />
+              <Route
+                path="/portfolio"
+                element={investmentsOn ? dashboardElement : <Navigate to="/" replace />}
               />
               <Route
                 path="/transactions"
