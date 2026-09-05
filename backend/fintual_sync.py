@@ -328,6 +328,30 @@ def _fetch_symbol_movements_in_thread(
         return _fetch_symbol_movements(sym)
 
 
+def _fetch_goal_movements_in_thread(
+    gid: str,
+    session_cookie: str | None,
+    uid: str | None,
+) -> tuple[str, list[dict[str, Any]] | None, Exception | None]:
+    with use_fintual_credentials(session_cookie, uid):
+        try:
+            return gid, fetch_goal_movements_all_pages(gid), None
+        except Exception as exc:
+            return gid, None, exc
+
+
+def _fetch_stock_asset_details_in_thread(
+    sym: str,
+    session_cookie: str | None,
+    uid: str | None,
+) -> tuple[str, dict[str, Any] | None, Exception | None]:
+    with use_fintual_credentials(session_cookie, uid):
+        try:
+            return sym, get_asset_details(sym), None
+        except Exception as exc:
+            return sym, None, exc
+
+
 def sync_positions(db: Session, user_id: int) -> int:
     u_row = db.query(User).filter(User.id == user_id).first()
     fs = ((u_row.fintual_session or "").strip() if u_row else "") or None
@@ -604,20 +628,32 @@ def sync_fintual_stock_transactions(db: Session, symbols: list[str], user_id: in
             )
         )
 
+    asset_details: dict[str, dict[str, Any]] = {}
+    if fintual_configured() and fetched:
+        workers = min(10, len(fetched))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = {
+                ex.submit(_fetch_stock_asset_details_in_thread, sym, fs, fu): sym for sym, _, _ in fetched
+            }
+            for fut in as_completed(futs):
+                sym, ad, err = fut.result()
+                if err is not None:
+                    logger.debug("get_asset_details(%s): %s", sym, err)
+                    continue
+                if ad is not None:
+                    asset_details[sym] = ad
+
     for sym, pack, sells in fetched:
+        ad = asset_details.get(sym)
         asset_display_name: str | None = None
-        if fintual_configured():
-            try:
-                ad = get_asset_details(sym)
-                asset_display_name = (ad.get("name") or "").strip() or None
-                upsert_stock_asset(
-                    db,
-                    sym,
-                    asset_display_name or "",
-                    fintual_asset_id=str(ad.get("id") or "") or None,
-                )
-            except Exception as e:
-                logger.debug("get_asset_details(%s): %s", sym, e)
+        if ad is not None:
+            asset_display_name = (ad.get("name") or "").strip() or None
+            upsert_stock_asset(
+                db,
+                sym,
+                asset_display_name or "",
+                fintual_asset_id=str(ad.get("id") or "") or None,
+            )
 
         reinvest_ids = pack.get("reinvested_dividend_ids") or set()
         manual = pack.get("manual_buys") or []
@@ -781,20 +817,38 @@ def sync_fintual_goal_transactions(db: Session, user_id: int) -> int:
         logger.warning("Fintual GET /api/goals/: %s", exc)
         return 0
 
-    pending: list[dict[str, Any]] = []
+    u_row = db.query(User).filter(User.id == user_id).first()
+    fs = ((u_row.fintual_session or "").strip() if u_row else "") or None
+    fu = ((u_row.fintual_uid or "").strip() if u_row else "") or None
+
+    goal_names: dict[str, str] = {}
+    goal_ids: list[str] = []
     for g in goals_raw:
         gid = str(g.get("id", "")).strip()
         if not gid:
             continue
         attr = g.get("attributes") or {}
-        name = (attr.get("name") or "").strip() or f"Meta {gid}"
+        goal_names[gid] = (attr.get("name") or "").strip() or f"Meta {gid}"
+        goal_ids.append(gid)
 
-        try:
-            movements = fetch_goal_movements_all_pages(gid)
-        except Exception as exc:
-            logger.warning("goal movements %s: %s", gid, exc)
-            continue
+    fetched_goals: list[tuple[str, list[dict[str, Any]]]] = []
+    if goal_ids:
+        workers = min(10, len(goal_ids))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = {
+                ex.submit(_fetch_goal_movements_in_thread, gid, fs, fu): gid for gid in goal_ids
+            }
+            for fut in as_completed(futs):
+                gid, movements, err = fut.result()
+                if err is not None:
+                    logger.warning("goal movements %s: %s", gid, err)
+                    continue
+                if movements is not None:
+                    fetched_goals.append((gid, movements))
 
+    pending: list[dict[str, Any]] = []
+    for gid, movements in fetched_goals:
+        name = goal_names[gid]
         for m in movements:
             mtype = (m.get("type") or "").strip()
             if mtype not in _GOAL_DEPOSIT_WITHDRAW_TYPES:
@@ -1045,21 +1099,43 @@ def sync_all_fintual(db: Session, user_id: int, *, force_prices: bool = False) -
     total_prices = 0
     last_td = get_last_trading_day()
     jwt = refresh_pricing_jwt()
+
+    to_fetch: list[tuple[str, str]] = []
     for sym in tickers:
-        try:
-            if not force_prices:
-                latest = _latest_price_cache_date(db, sym)
-                if latest is not None and latest >= last_td:
+        if not force_prices:
+            latest = _latest_price_cache_date(db, sym)
+            if latest is not None and latest >= last_td:
+                continue
+        fd = _first_event_date_for_symbol(db, sym, user_id)
+        start_iso = _date_to_start_iso(fd) if fd else DEFAULT_HIST_START
+        if force_prices:
+            db.query(PriceCache).filter(PriceCache.ticker == sym.upper()).delete()
+            db.commit()
+        to_fetch.append((sym, start_iso))
+
+    if to_fetch:
+        u_row = db.query(User).filter(User.id == user_id).first()
+        fs = ((u_row.fintual_session or "").strip() if u_row else "") or None
+        fu = ((u_row.fintual_uid or "").strip() if u_row else "") or None
+
+        def _fetch_price_history_in_thread(sym: str, start_iso: str) -> list[dict[str, Any]]:
+            with use_fintual_credentials(fs, fu):
+                return get_historical_prices_raw(sym.upper(), start=start_iso, jwt=jwt)
+
+        workers = min(10, len(to_fetch))
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = {
+                ex.submit(_fetch_price_history_in_thread, sym, start_iso): sym
+                for sym, start_iso in to_fetch
+            }
+            for fut in as_completed(futs):
+                sym = futs[fut]
+                try:
+                    raw = fut.result()
+                except Exception as e:
+                    logger.warning("histórico Fintual %s: %s", sym, e)
                     continue
-            fd = _first_event_date_for_symbol(db, sym, user_id)
-            start_iso = _date_to_start_iso(fd) if fd else DEFAULT_HIST_START
-            if force_prices:
-                db.query(PriceCache).filter(PriceCache.ticker == sym.upper()).delete()
-                db.commit()
-            raw = get_historical_prices_raw(sym.upper(), start=start_iso, jwt=jwt)
-            total_prices += _upsert_prices(db, sym, raw)
-        except Exception as e:
-            logger.warning("histórico Fintual %s: %s", sym, e)
+                total_prices += _upsert_prices(db, sym, raw)
 
     n_cur = sync_current_prices_batch(db, tickers, user_id)
 

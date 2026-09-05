@@ -26,7 +26,6 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from activity_service import distinct_transaction_tipos, monthly_movements, query_transactions
-from chart_goal_fondos import augment_chart_rows_with_fintual_goal_balance
 from auth import (
     InvestmentsUser,
     InvestmentsUserSSE,
@@ -1409,8 +1408,6 @@ def chart_data(
                 fx_usd_clp=rate,
             )
         )
-    with use_fintual_credentials(user.fintual_session, user.fintual_uid):
-        out = augment_chart_rows_with_fintual_goal_balance(db, out, uid)
     return _subsample_chart_rows(out, period)
 
 

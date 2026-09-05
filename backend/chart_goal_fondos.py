@@ -1,21 +1,20 @@
 """
-Enriquece filas del gráfico de portafolio con NAV e invertido de metas Fintual (GQL balance graph).
-
-El cache histórico (`compute_portfolio_history`) solo incluye fondos desde activos manuales CLP;
-las metas API no estaban en `fondos_valor` / `fondos_invertido`, por eso las líneas salían en 0.
+Helpers para incorporar NAV e invertido de metas Fintual (GQL balance graph) al historial
+del portafolio. `compute_portfolio_history` (history.py) los usa para que `fondos_valor` /
+`fondos_invertido` en `PortfolioValueCache` incluyan metas API, no solo activos manuales CLP.
 """
 
 from __future__ import annotations
 
 import bisect
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from typing import Any
 
-from exchange_service import get_rate_for_date
-from fintual_client import fetch_goal_balance_graph_points, fintual_configured
+from fintual_client import fetch_goal_balance_graph_points, use_fintual_credentials
 from fintual_goals_dashboard import fetch_active_goal_cards
-from schemas import ChartRow
+from models import User
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -55,25 +54,48 @@ def _dedupe_goal_points_to_series(pts: list[dict[str, Any]]) -> list[tuple[date,
     return [(d, a, b) for d, (a, b) in sorted(by_d.items())]
 
 
+def _fetch_goal_balance_graph_in_thread(
+    gid: str,
+    session_cookie: str | None,
+    uid: str | None,
+) -> tuple[str, list[dict[str, Any]] | None, Exception | None]:
+    with use_fintual_credentials(session_cookie, uid):
+        try:
+            return gid, fetch_goal_balance_graph_points(gid, "all_time"), None
+        except Exception as exc:
+            return gid, None, exc
+
+
 def _goal_balance_series_list(db: Session, user_id: int) -> list[list[tuple[date, float, float]]]:
     """Una serie ordenada por meta; cada una con forward-fill independiente antes de sumar."""
     cards = fetch_active_goal_cards(db, user_id=user_id)
+    goal_ids = [str(c.get("id") or "").strip() for c in cards]
+    goal_ids = [gid for gid in goal_ids if gid]
+
     out: list[list[tuple[date, float, float]]] = []
-    for c in cards:
-        gid = str(c.get("id") or "").strip()
-        if not gid:
-            continue
-        try:
-            pts = fetch_goal_balance_graph_points(gid, "all_time")
-        except Exception as exc:
-            logger.debug("balance graph %s: %s", gid, exc)
-            continue
-        if not pts:
-            continue
-        raw = pts if isinstance(pts, list) else []
-        series = _dedupe_goal_points_to_series(raw)
-        if series:
-            out.append(series)
+    if not goal_ids:
+        return out
+
+    u_row = db.query(User).filter(User.id == user_id).first()
+    fs = ((u_row.fintual_session or "").strip() if u_row else "") or None
+    fu = ((u_row.fintual_uid or "").strip() if u_row else "") or None
+
+    workers = min(10, len(goal_ids))
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futs = {
+            ex.submit(_fetch_goal_balance_graph_in_thread, gid, fs, fu): gid for gid in goal_ids
+        }
+        for fut in as_completed(futs):
+            gid, pts, err = fut.result()
+            if err is not None:
+                logger.debug("balance graph %s: %s", gid, err)
+                continue
+            if not pts:
+                continue
+            raw = pts if isinstance(pts, list) else []
+            series = _dedupe_goal_points_to_series(raw)
+            if series:
+                out.append(series)
     return out
 
 
@@ -89,54 +111,3 @@ def _forward_fill_val_cost(
         return 0.0, 0.0
     _, v, c = series[i]
     return v, c
-
-
-def augment_chart_rows_with_fintual_goal_balance(
-    db: Session, rows: list[ChartRow], user_id: int
-) -> list[ChartRow]:
-    if not fintual_configured() or not rows:
-        return rows
-    per_goal = _goal_balance_series_list(db, user_id)
-    if not per_goal:
-        return rows
-
-    out: list[ChartRow] = []
-    for row in rows:
-        rate = float(get_rate_for_date(db, row.date))
-        if rate <= 0:
-            rate = 950.0
-        gv_clp = 0.0
-        gc_clp = 0.0
-        for goal_series in per_goal:
-            v, c = _forward_fill_val_cost(goal_series, row.date)
-            gv_clp += v
-            gc_clp += c
-        gv_usd = gv_clp / rate
-        gc_usd = gc_clp / rate
-
-        fv = float(row.fondos_valor) + gv_usd
-        fi = max(float(row.fondos_invertido), gc_usd)
-
-        av = float(row.acciones_valor)
-        ai = float(row.acciones_invertido)
-        afv = float(row.afp_valor)
-        afi = float(row.afp_invertido)
-        mv = float(row.manuales_valor)
-
-        tv = av + fv + afv + mv
-        ti = ai + fi + afi
-
-        out.append(
-            row.model_copy(
-                update={
-                    "fondos_valor": fv,
-                    "fondos_invertido": fi,
-                    "total_valor": tv,
-                    "total_invertido": ti,
-                    "total_valor_clp": tv * rate,
-                    "total_invertido_clp": ti * rate,
-                    "fx_usd_clp": rate,
-                }
-            )
-        )
-    return out
