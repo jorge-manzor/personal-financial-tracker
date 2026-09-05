@@ -33,9 +33,6 @@ const Profile = lazy(() => import("./Profile").then((m) => ({ default: m.Profile
 const BankingTransactionsPage = lazy(() =>
   import("./BankingTransactionsPage").then((m) => ({ default: m.BankingTransactionsPage })),
 );
-const BankingSettingsPage = lazy(() =>
-  import("./BankingSettingsPage").then((m) => ({ default: m.BankingSettingsPage })),
-);
 const BankingPersonalOrderPage = lazy(() =>
   import("./BankingPersonalOrderPage").then((m) => ({ default: m.BankingPersonalOrderPage })),
 );
@@ -463,6 +460,7 @@ export default function App() {
                     me={me!}
                     onUpdated={handleProfileUpdated}
                     onRequestFintualConnect={() => setFintualModalFromProfile(true)}
+                    onToast={setToast}
                   />
                 }
               />
@@ -512,12 +510,6 @@ export default function App() {
                   ) : (
                     <Navigate to="/" replace />
                   )
-                }
-              />
-              <Route
-                path="/banking/settings"
-                element={
-                  bankingOn ? <BankingSettingsPage onToast={setToast} /> : <Navigate to="/" replace />
                 }
               />
               <Route

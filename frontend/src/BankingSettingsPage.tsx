@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
   DndContext,
@@ -50,34 +51,6 @@ function IconTrash({ className = "h-4 w-4" }: { className?: string }) {
       />
     </svg>
   );
-}
-
-function IconPalette({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" stroke="none" />
-      <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" stroke="none" />
-      <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" stroke="none" />
-      <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" stroke="none" />
-      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C22 6.012 17.461 2 12 2z" />
-    </svg>
-  );
-}
-
-function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
-  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!m) return null;
-  const n = parseInt(m[1], 16);
-  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
-}
-
-function softCategorySurface(hex: string): CSSProperties {
-  const rgb = hexToRgb(hex) ?? { r: 143, g: 191, b: 166 };
-  const { r, g, b } = rgb;
-  return {
-    backgroundImage: `linear-gradient(105deg, rgba(${r},${g},${b},0.14) 0%, rgba(${r},${g},${b},0.05) 38%, transparent 70%)`,
-    boxShadow: `inset 0 0 0 1px rgba(${r},${g},${b},0.16), inset 0 0 28px -12px rgba(${r},${g},${b},0.14)`,
-  };
 }
 
 function IconChevronDown({ className = "h-4 w-4" }: { className?: string }) {
@@ -146,84 +119,111 @@ type SettingsMenuItem = {
   onClick: () => void;
 };
 
-/** Menú «⋯» con acciones (Editar/Eliminar…), mismo patrón que en Movimientos. */
+/**
+ * Menú «⋯» con acciones (Editar/Eliminar…), mismo patrón que en Movimientos.
+ * Se monta en un portal con posición `fixed` para no quedar recortado por el
+ * `overflow-hidden` de las tarjetas de categoría cuando están minimizadas.
+ */
 function BankingSettingsMenu({ items, ariaLabel }: { items: SettingsMenuItem[]; ariaLabel: string }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuWidth = 176;
 
   useEffect(() => {
     if (!open) return;
     function onDocDown(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (btnRef.current?.contains(e.target as Node)) return;
+      if (menuRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
+    function onReflow() {
+      setOpen(false);
+    }
     document.addEventListener("mousedown", onDocDown);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onReflow, true);
+    window.addEventListener("resize", onReflow);
     return () => {
       document.removeEventListener("mousedown", onDocDown);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onReflow, true);
+      window.removeEventListener("resize", onReflow);
     };
   }, [open]);
 
+  function toggle() {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: Math.max(8, Math.min(r.right - menuWidth, window.innerWidth - menuWidth - 8)) });
+    }
+    setOpen((o) => !o);
+  }
+
   return (
-    <div className="relative shrink-0" ref={ref}>
+    <>
       <button
         type="button"
+        ref={btnRef}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={ariaLabel}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          setOpen((o) => !o);
+          toggle();
         }}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8b949e] transition-colors hover:bg-[#1c2129] hover:text-[#e6edf3]"
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8b949e] transition-colors hover:bg-[#1c2129] hover:text-[#e6edf3]"
       >
         <IconDotsHorizontal className="h-4 w-4" />
       </button>
-      {open ? (
-        <div
-          role="menu"
-          aria-label={ariaLabel}
-          className="absolute right-0 top-9 z-30 w-44 overflow-hidden rounded-xl border border-[#21262d] bg-[#161b22] py-1 shadow-2xl shadow-black/40"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {items.map((it) => (
-            <button
-              key={it.label}
-              type="button"
-              role="menuitem"
-              disabled={it.disabled}
-              title={it.title}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setOpen(false);
-                it.onClick();
-              }}
-              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                it.danger ? "text-[#f85149] hover:bg-[#f85149]/10" : "text-[#c9d1d9] hover:bg-[#1c2129]"
-              }`}
+      {open && pos
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              aria-label={ariaLabel}
+              className="fixed z-[90] w-44 overflow-hidden rounded-xl border border-[#21262d] bg-[#161b22] py-1 shadow-2xl shadow-black/40"
+              style={{ top: pos.top, left: pos.left }}
+              onClick={(e) => e.stopPropagation()}
             >
-              {it.icon}
-              {it.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
+              {items.map((it) => (
+                <button
+                  key={it.label}
+                  type="button"
+                  role="menuitem"
+                  disabled={it.disabled}
+                  title={it.title}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setOpen(false);
+                    it.onClick();
+                  }}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                    it.danger ? "text-[#f85149] hover:bg-[#f85149]/10" : "text-[#c9d1d9] hover:bg-[#1c2129]"
+                  }`}
+                >
+                  {it.icon}
+                  {it.label}
+                </button>
+              ))}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
   );
 }
 
 /** Vista flotante mientras se arrastra: mismo ancho que la lista y altura similar si está expandida. */
 function CategoryDragPreview({ cat, expanded }: { cat: BankingCategoryRow; expanded: boolean }) {
   return (
-    <div
-      className="pointer-events-none box-border w-full min-w-[min(100%,42rem)] max-w-full cursor-grabbing overflow-hidden rounded-xl border border-[#8FBFA6]/40 bg-[#161b22] shadow-2xl shadow-black/50 ring-2 ring-[#8FBFA6]/25"
-      style={softCategorySurface(cat.color)}
-    >
+    <div className="pointer-events-none box-border w-full min-w-[min(100%,42rem)] max-w-full cursor-grabbing overflow-hidden rounded-xl border border-[#8FBFA6]/40 bg-[#161b22] shadow-2xl shadow-black/50 ring-2 ring-[#8FBFA6]/25">
       <div className="flex items-center gap-2 px-4 py-2.5">
         <IconGripVertical className="h-4 w-4 shrink-0 text-[#6b7280]" />
         <span className="min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: cat.color }}>
@@ -408,6 +408,18 @@ const settingsGhostBtnSm =
 /** Asa de arrastre / chevron en filas de categoría. */
 const categoryHandleHover = "text-[#6b7280] hover:bg-[#1c2129] hover:text-[#8FBFA6]";
 
+/**
+ * Reordena para mostrar visibles primero y ocultas (`enabled === false`) al final,
+ * preservando el orden relativo dentro de cada grupo. El backend de reordenar exige
+ * la lista completa (visibles + ocultas), así que esto solo cambia la presentación,
+ * no separa las ocultas en un contexto de drag-and-drop distinto.
+ */
+function partitionByEnabled<T extends { enabled?: boolean }>(rows: T[]): T[] {
+  const visible = rows.filter((r) => r.enabled ?? true);
+  const hidden = rows.filter((r) => !(r.enabled ?? true));
+  return [...visible, ...hidden];
+}
+
 const PRODUCT_TYPE_OPTIONS: { value: BankingProductType; label: string }[] = [
   { value: "cuenta_corriente", label: "Cuenta Corriente" },
   { value: "cuenta_vista", label: "Cuenta Vista" },
@@ -418,12 +430,6 @@ const PRODUCT_TYPE_OPTIONS: { value: BankingProductType; label: string }[] = [
 function productTypeLabel(t: BankingProductType | null | undefined): string {
   if (!t) return "Sin tipo";
   return PRODUCT_TYPE_OPTIONS.find((o) => o.value === t)?.label ?? t;
-}
-
-/** Subcategorías de plantilla no renombrables; las añadidas por el usuario (`template_sub_id` nulo) sí. */
-function bankingSubcategoryAllowsRename(cat: BankingCategoryRow, sub: BankingSubcategoryRow): boolean {
-  if (!cat.names_locked) return true;
-  return sub.template_sub_id == null;
 }
 
 type SettingsTab = "productos" | "categorias";
@@ -453,7 +459,12 @@ const NAV_ITEMS: { id: SettingsTab; label: string; icon: (p: { className?: strin
   },
 ];
 
-export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null) => void }) {
+/**
+ * Contenido embebido en Perfil → pestaña «Banking» (ya no es una página propia con ruta:
+ * ver Profile.tsx). Usa pestañas tipo pill (Productos/Categorías) en vez de nav lateral
+ * para no anidar dos columnas de navegación dentro del layout de Perfil.
+ */
+export function BankingSettingsSection({ onToast }: { onToast: (msg: string | null) => void }) {
   const [tab, setTab] = useState<SettingsTab>("productos");
   const [accounts, setAccounts] = useState<BankingAccountRow[]>([]);
   const [banks, setBanks] = useState<BankingBankRow[]>([]);
@@ -492,7 +503,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
   );
 
   const sortableCategories = useMemo(
-    () => categories.filter((c) => !c.internal_reserved),
+    () => partitionByEnabled(categories.filter((c) => !c.internal_reserved)),
     [categories],
   );
   const reservedCategories = useMemo(
@@ -947,16 +958,14 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
   }
 
   return (
-    <div className="mx-auto flex max-w-[980px] gap-10 p-4 pb-28 md:p-6">
-      <nav className="w-[200px] shrink-0">
-        <h2 className="mb-1.5 text-xl font-semibold tracking-tight text-white">Configuración bancaria</h2>
-        <p className="mb-5 text-[12.5px] leading-relaxed text-[#6b7280]">Productos y categorías del catálogo.</p>
+    <div>
+      <div className="mb-5 flex flex-wrap items-center gap-1.5 border-b border-[#1e242e] pb-3">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={`mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
               tab === id ? "bg-[#8FBFA6]/10 text-[#8FBFA6]" : "text-[#8b949e] hover:text-[#c9d1d9]"
             }`}
           >
@@ -964,9 +973,9 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
             {label}
           </button>
         ))}
-      </nav>
+      </div>
 
-      <div className="min-w-0 flex-1">
+      <div>
         {tab === "productos" && (
           <div>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -1164,12 +1173,24 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
               >
                 <div className="flex flex-col gap-2.5">
                   <SortableContext items={sortableCategories.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-                    {sortableCategories.map((cat) => (
-                      <SortableCategoryWrapper key={cat.id} id={cat.id} disabled={busyKey !== null}>
+                    {sortableCategories.map((cat, catIdx) => {
+                      const catHidden = !(cat.enabled ?? true);
+                      const prevHidden = catIdx > 0 && !(sortableCategories[catIdx - 1].enabled ?? true);
+                      const isFirstHidden = catHidden && !prevHidden;
+                      return (
+                      <Fragment key={cat.id}>
+                        {isFirstHidden ? (
+                          <p className={`mt-1 text-xs leading-relaxed ${settingsMuted}`}>
+                            Ocultas — no aparecen al elegir categoría en movimientos nuevos, pero podés reactivarlas
+                            cuando quieras.
+                          </p>
+                        ) : null}
+                      <SortableCategoryWrapper id={cat.id} disabled={busyKey !== null}>
                         {(handle) => (
                           <details
-                            className="group overflow-hidden rounded-2xl border border-[#1e242e] bg-[#12161d]"
-                            style={softCategorySurface(cat.color)}
+                            className={`group overflow-hidden rounded-2xl border bg-[#12161d] ${
+                              catHidden ? "border-dashed border-[#30363d] opacity-70" : "border-[#1e242e]"
+                            }`}
                             open={expandedCategoryIds.has(cat.id)}
                             onToggle={(e) => {
                               const el = e.currentTarget;
@@ -1202,7 +1223,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                 <IconChevronDown className="block h-4 w-4" />
                               </span>
                               <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                                {categoryFullEdit?.id === cat.id && !cat.names_locked ? (
+                                {categoryFullEdit?.id === cat.id ? (
                                   <>
                                     <input
                                       type="text"
@@ -1216,7 +1237,6 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                     />
                                     <span className={`shrink-0 text-xs ${settingsMuted}`}>({cat.subcategories.length})</span>
                                     <div
-                                      className={`flex shrink-0 items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
                                       onClick={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
@@ -1224,14 +1244,14 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                     >
                                       <BankingEnabledToggle
                                         enabled={cat.enabled ?? true}
-                                        disabled={busyKey !== null || !!(cat.has_transactions ?? false)}
+                                        disabled={busyKey !== null}
                                         onChange={(next) => void setCategoryEnabled(cat, next)}
                                         title={
-                                          (cat.has_transactions ?? false)
-                                            ? "Hay movimientos con esta categoría; no se puede desactivar."
-                                            : "Disponible para movimientos nuevos"
+                                          cat.enabled ?? true
+                                            ? "Visible al elegir categoría en movimientos nuevos"
+                                            : "Oculta: no aparece al elegir categoría en movimientos nuevos"
                                         }
-                                        ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "inactiva"}`}
+                                        ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "oculta"}`}
                                       />
                                     </div>
                                     <input
@@ -1269,69 +1289,13 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                       Cancelar
                                     </button>
                                   </>
-                                ) : categoryEdit?.id === cat.id ? (
-                                  <>
-                                    <p
-                                      className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug"
-                                      style={{ color: cat.color }}
-                                    >
-                                      {cat.name}{" "}
-                                      <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
-                                    </p>
-                                    <div
-                                      className={`flex shrink-0 items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                      }}
-                                    >
-                                      <BankingEnabledToggle
-                                        enabled={cat.enabled ?? true}
-                                        disabled={busyKey !== null || !!(cat.has_transactions ?? false)}
-                                        onChange={(next) => void setCategoryEnabled(cat, next)}
-                                        title={
-                                          (cat.has_transactions ?? false)
-                                            ? "Hay movimientos con esta categoría; no se puede desactivar."
-                                            : "Disponible para movimientos nuevos"
-                                        }
-                                        ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "inactiva"}`}
-                                      />
-                                    </div>
-                                    <input
-                                      type="color"
-                                      value={categoryEdit.color}
-                                      onChange={(e) => setCategoryEdit({ ...categoryEdit, color: e.target.value })}
-                                      className="h-9 w-12 shrink-0 cursor-pointer rounded border border-[#30363d] bg-[#0d1117] p-0.5 shadow-sm"
-                                      title="Color"
-                                      onClick={(e) => e.stopPropagation()}
-                                    />
-                                    <button
-                                      type="button"
-                                      disabled={busyKey !== null}
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        void saveCategoryEdit();
-                                      }}
-                                      className={`${btnGreen} shrink-0 px-3 py-1.5 text-xs`}
-                                    >
-                                      Guardar
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={busyKey !== null}
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setCategoryEdit(null);
-                                      }}
-                                      className={settingsGhostBtnSm}
-                                    >
-                                      Cancelar
-                                    </button>
-                                  </>
                                 ) : (
                                   <>
+                                    <span
+                                      className="h-3 w-3 shrink-0 rounded"
+                                      style={{ background: cat.color }}
+                                      aria-hidden
+                                    />
                                     <p
                                       className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug"
                                       style={{ color: cat.color }}
@@ -1339,9 +1303,13 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                       {cat.name}{" "}
                                       <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
                                     </p>
+                                    {catHidden ? (
+                                      <span className="shrink-0 rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[#8b949e]">
+                                        Oculta
+                                      </span>
+                                    ) : null}
                                     <div className="ml-auto flex h-8 shrink-0 items-center gap-2">
                                       <div
-                                        className={`flex items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
                                         onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
@@ -1349,41 +1317,28 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                       >
                                         <BankingEnabledToggle
                                           enabled={cat.enabled ?? true}
-                                          disabled={busyKey !== null || !!(cat.has_transactions ?? false)}
+                                          disabled={busyKey !== null}
                                           onChange={(next) => void setCategoryEnabled(cat, next)}
                                           title={
-                                            (cat.has_transactions ?? false)
-                                              ? "Hay movimientos con esta categoría; no se puede desactivar."
-                                              : "Disponible para movimientos nuevos"
+                                            cat.enabled ?? true
+                                              ? "Visible al elegir categoría en movimientos nuevos"
+                                              : "Oculta: no aparece al elegir categoría en movimientos nuevos"
                                           }
-                                          ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "inactiva"}`}
+                                          ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "oculta"}`}
                                         />
                                       </div>
                                       <BankingSettingsMenu
                                         ariaLabel={`Acciones para «${cat.name}»`}
                                         items={[
                                           {
-                                            label: cat.names_locked ? "Editar color" : "Editar",
-                                            icon: cat.names_locked ? (
-                                              <IconPalette className="h-3.5 w-3.5" />
-                                            ) : (
-                                              <IconPencil className="h-3.5 w-3.5" />
-                                            ),
+                                            label: "Editar",
+                                            icon: <IconPencil className="h-3.5 w-3.5" />,
                                             onClick: () => {
-                                              if (cat.names_locked) {
-                                                setCategoryFullEdit(null);
-                                                setCategoryEdit({
-                                                  id: cat.id,
-                                                  color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR,
-                                                });
-                                              } else {
-                                                setCategoryEdit(null);
-                                                setCategoryFullEdit({
-                                                  id: cat.id,
-                                                  name: cat.name,
-                                                  color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR,
-                                                });
-                                              }
+                                              setCategoryFullEdit({
+                                                id: cat.id,
+                                                name: cat.name,
+                                                color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR,
+                                              });
                                             },
                                           },
                                           {
@@ -1412,22 +1367,26 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                 onDragEnd={(e) => handleSubcategoriesDragEnd(cat.id, e)}
                               >
                                 <SortableContext
-                                  items={cat.subcategories.map((s) => subSortableId(s.id))}
+                                  items={partitionByEnabled(cat.subcategories).map((s) => subSortableId(s.id))}
                                   strategy={verticalListSortingStrategy}
                                 >
-                                  {cat.subcategories.map((s) => {
+                                  {partitionByEnabled(cat.subcategories).map((s, subIdx, orderedSubs) => {
                                     const parentEnabled = cat.enabled ?? true;
+                                    const subHidden = !(s.enabled ?? true);
+                                    const subPrevHidden = subIdx > 0 && !(orderedSubs[subIdx - 1].enabled ?? true);
+                                    const isFirstHiddenSub = subHidden && !subPrevHidden;
                                     const dragDisabled = busyKey !== null || !parentEnabled;
-                                    const toggleDisabled =
-                                      busyKey !== null ||
-                                      !!(s.has_transactions ?? false) ||
-                                      !parentEnabled;
+                                    const toggleDisabled = busyKey !== null || !parentEnabled;
                                     const showOn = parentEnabled ? (s.enabled ?? true) : false;
-                                    const canRename = bankingSubcategoryAllowsRename(cat, s);
-                                    const canDelete = canRename && !s.has_transactions;
                                     const isEditingThis = subNameEdit?.id === s.id;
                                     return (
-                                      <SortableSubcategoryWrapper key={s.id} subId={s.id} disabled={dragDisabled}>
+                                      <Fragment key={s.id}>
+                                      {isFirstHiddenSub ? (
+                                        <li className={`list-none px-1 pt-1.5 text-[10.5px] font-medium uppercase tracking-wide ${settingsMuted}`}>
+                                          Ocultas
+                                        </li>
+                                      ) : null}
+                                      <SortableSubcategoryWrapper subId={s.id} disabled={dragDisabled}>
                                         {(handle) =>
                                           isEditingThis ? (
                                             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#8FBFA6]/50 bg-[#0d1117] p-2">
@@ -1468,9 +1427,11 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                           ) : (
                                             <div
                                               className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2 py-2 text-xs ${
-                                                parentEnabled
-                                                  ? "border-[#1e242e] bg-[#0d1117] text-[#c9d1d9]"
-                                                  : "cursor-not-allowed border-[#1e242e] bg-[#0d1117]/60 text-[#6b7280]"
+                                                !parentEnabled
+                                                  ? "cursor-not-allowed border-[#1e242e] bg-[#0d1117]/60 text-[#6b7280]"
+                                                  : subHidden
+                                                    ? "border-dashed border-[#30363d] bg-[#0d1117]/70 text-[#8b949e]"
+                                                    : "border-[#1e242e] bg-[#0d1117] text-[#c9d1d9]"
                                               }`}
                                               aria-disabled={!parentEnabled}
                                             >
@@ -1494,16 +1455,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                                 className="flex shrink-0 items-center gap-2"
                                                 onClick={(e) => e.stopPropagation()}
                                               >
-                                                <div
-                                                  className={`flex flex-col items-center gap-0.5 ${
-                                                    (s.has_transactions ?? false) && (s.enabled ?? true) && parentEnabled
-                                                      ? "opacity-55"
-                                                      : ""
-                                                  }`}
-                                                >
-                                                  <span className="text-[9px] font-semibold uppercase tracking-wide text-[#6b7280]">
-                                                    Activa
-                                                  </span>
+                                                <div>
                                                   <BankingEnabledToggle
                                                     enabled={showOn}
                                                     disabled={toggleDisabled}
@@ -1511,47 +1463,43 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                                                     title={
                                                       !parentEnabled
                                                         ? "Activa la categoría primero para poder usar o cambiar subcategorías."
-                                                        : (s.has_transactions ?? false)
-                                                          ? "Hay movimientos con esta subcategoría; no se puede desactivar."
-                                                          : "Disponible para movimientos nuevos"
+                                                        : showOn
+                                                          ? "Visible al elegir subcategoría en movimientos nuevos"
+                                                          : "Oculta: no aparece al elegir subcategoría en movimientos nuevos"
                                                     }
-                                                    ariaLabel={`Subcategoría «${s.name}»: ${showOn ? "activa" : "inactiva"}`}
+                                                    ariaLabel={`Subcategoría «${s.name}»: ${showOn ? "activa" : "oculta"}`}
                                                   />
                                                 </div>
-                                                {canRename || canDelete ? (
-                                                  <BankingSettingsMenu
-                                                    ariaLabel={`Acciones para «${s.name}»`}
-                                                    items={[
-                                                      ...(canRename
-                                                        ? [
-                                                            {
-                                                              label: "Renombrar",
-                                                              icon: <IconPencil className="h-3.5 w-3.5" />,
-                                                              disabled: busyKey !== null || !parentEnabled,
-                                                              onClick: () =>
-                                                                setSubNameEdit({ id: s.id, categoryId: cat.id, name: s.name }),
-                                                            },
-                                                          ]
-                                                        : []),
-                                                      ...(canDelete
-                                                        ? [
-                                                            {
-                                                              label: "Eliminar",
-                                                              icon: <IconTrash className="h-3.5 w-3.5" />,
-                                                              danger: true,
-                                                              disabled: busyKey !== null || !parentEnabled,
-                                                              onClick: () => void removeSubcategory(cat, s),
-                                                            },
-                                                          ]
-                                                        : []),
-                                                    ]}
-                                                  />
-                                                ) : null}
+                                                <BankingSettingsMenu
+                                                  ariaLabel={`Acciones para «${s.name}»`}
+                                                  items={[
+                                                    {
+                                                      label: "Editar",
+                                                      icon: <IconPencil className="h-3.5 w-3.5" />,
+                                                      disabled: busyKey !== null || !parentEnabled,
+                                                      onClick: () =>
+                                                        setSubNameEdit({ id: s.id, categoryId: cat.id, name: s.name }),
+                                                    },
+                                                    {
+                                                      label: "Eliminar",
+                                                      icon: <IconTrash className="h-3.5 w-3.5" />,
+                                                      danger: true,
+                                                      disabled: busyKey !== null || !parentEnabled || !!(s.has_transactions ?? false),
+                                                      title: !parentEnabled
+                                                        ? "Activa la categoría primero para poder eliminar subcategorías."
+                                                        : (s.has_transactions ?? false)
+                                                          ? "Hay movimientos con esta subcategoría; no se puede eliminar."
+                                                          : "Eliminar subcategoría",
+                                                      onClick: () => void removeSubcategory(cat, s),
+                                                    },
+                                                  ]}
+                                                />
                                               </div>
                                             </div>
                                           )
                                         }
                                       </SortableSubcategoryWrapper>
+                                      </Fragment>
                                     );
                                   })}
                                 </SortableContext>
@@ -1584,7 +1532,9 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           </details>
                         )}
                       </SortableCategoryWrapper>
-                    ))}
+                      </Fragment>
+                      );
+                    })}
                   </SortableContext>
                   {reservedCategories.length > 0 ? (
                     <p className={`text-xs leading-relaxed ${settingsMuted}`}>
@@ -1596,7 +1546,6 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                     <div key={cat.id}>
                       <details
                         className="group overflow-hidden rounded-2xl border border-dashed border-[#30363d] bg-[#12161d]/60"
-                        style={softCategorySurface(cat.color)}
                         open={expandedCategoryIds.has(cat.id)}
                         onToggle={(e) => {
                           const el = e.currentTarget;
@@ -1619,6 +1568,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
                             {categoryEdit?.id === cat.id ? (
                               <>
+                                <span className="h-3 w-3 shrink-0 rounded" style={{ background: cat.color }} aria-hidden />
                                 <p className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: cat.color }}>
                                   {cat.name}{" "}
                                   <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
@@ -1661,6 +1611,7 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                               </>
                             ) : (
                               <>
+                                <span className="h-3 w-3 shrink-0 rounded" style={{ background: cat.color }} aria-hidden />
                                 <p className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: cat.color }}>
                                   {cat.name}{" "}
                                   <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>

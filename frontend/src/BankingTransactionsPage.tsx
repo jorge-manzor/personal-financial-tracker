@@ -2247,7 +2247,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             )}
           </div>
           <Link
-            to="/banking/settings"
+            to="/profile#banking"
             className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800"
           >
             Cuentas
@@ -2276,7 +2276,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900/90 banking-dark:border-amber-900/45 banking-dark:bg-amber-950/35 banking-dark:text-amber-100/90">
           Primero crea al menos un producto en{" "}
           <Link
-            to="/banking/settings"
+            to="/profile#banking"
             className="font-medium text-teal-700 underline decoration-teal-300 hover:text-teal-800 banking-dark:text-amber-300/95 banking-dark:decoration-amber-900 banking-dark:hover:text-amber-200"
           >
             Cuentas
@@ -2288,7 +2288,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900/90 banking-dark:border-amber-900/45 banking-dark:bg-amber-950/35 banking-dark:text-amber-100/90">
           Ningún producto está visible para movimientos. Activa al menos uno en{" "}
           <Link
-            to="/banking/settings"
+            to="/profile#banking"
             className="font-medium text-teal-700 underline decoration-teal-300 hover:text-teal-800 banking-dark:text-amber-300/95 banking-dark:decoration-amber-900 banking-dark:hover:text-amber-200"
           >
             Cuentas

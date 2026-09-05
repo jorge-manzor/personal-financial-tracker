@@ -267,6 +267,23 @@ class BankingSubcategory(Base):
     created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
 
 
+class BankingDeletedTemplateRef(Base):
+    """
+    Tumba de una categoría/subcategoría de plantilla borrada por el usuario.
+    `ensure_default_categories` la consulta antes de recrear filas de plantilla
+    faltantes, para no resucitar algo que el usuario eliminó a propósito.
+    Exactamente una de `template_cat_id` / `template_sub_id` va no-nula.
+    """
+
+    __tablename__ = "banking_deleted_template_refs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    template_cat_id = Column(Integer, nullable=True, index=True)
+    template_sub_id = Column(Integer, nullable=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=_naive_utc_now)
+
+
 class BankingTransaction(Base):
     """Monto con signo: positivo = ingreso, negativo = egreso (respecto de la cuenta)."""
 

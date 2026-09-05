@@ -22,6 +22,7 @@ from banking_banks import bank_name_for_sbif, is_valid_bank_sbif, load_bancos_ch
 from models import (
     BankingAccount,
     BankingCategory,
+    BankingDeletedTemplateRef,
     BankingPersonalProvisionItem,
     BankingSubcategory,
     BankingTransaction,
@@ -743,6 +744,16 @@ def sync_user_categories_from_json(
         if nl not in by_name_lower:
             by_name_lower[nl] = c
 
+    deleted_sub_tpl_ids = {
+        r[0]
+        for r in db.query(BankingDeletedTemplateRef.template_sub_id)
+        .filter(
+            BankingDeletedTemplateRef.user_id == user_id,
+            BankingDeletedTemplateRef.template_sub_id.isnot(None),
+        )
+        .all()
+    }
+
     max_sort = db.query(func.max(BankingCategory.sort_order)).filter(BankingCategory.user_id == user_id).scalar()
     next_sort = int(max_sort) + 1 if max_sort is not None else 0
 
@@ -779,7 +790,9 @@ def sync_user_categories_from_json(
             if tpl_id is not None:
                 by_tpl_cat[tpl_id] = bc
         else:
-            bc.name = name
+            # No se fuerza `bc.name` aquí: el usuario puede haber renombrado la categoría
+            # (ver `patch_category_row`) y no queremos que la sincronización con la
+            # plantilla se lo pise en la próxima carga.
             if tpl_id is not None:
                 if bc.template_cat_id != tpl_id:
                     bc.template_cat_id = tpl_id
@@ -820,6 +833,9 @@ def sync_user_categories_from_json(
                 bs = by_tpl_sub.get(sub_tid)
             if bs is None:
                 bs = by_sub_name.get(sn.lower())
+            if bs is None and sub_tid is not None and sub_tid in deleted_sub_tpl_ids:
+                sub_pos += 1 if reset_sort_order_from_json else 0
+                continue
             if bs is None:
                 if reset_sort_order_from_json:
                     next_so = sub_pos
@@ -845,7 +861,8 @@ def sync_user_categories_from_json(
                     by_tpl_sub[sub_tid] = ns
                 bs = ns
             else:
-                bs.name = sn
+                # No se fuerza `bs.name` aquí: preserva el renombre del usuario (ver
+                # `patch_subcategory_row`) entre sincronizaciones con la plantilla.
                 if getattr(bs, "user_id", None) != user_id:
                     bs.user_id = user_id
                 if sub_tid is not None and bs.template_sub_id != sub_tid:
@@ -952,6 +969,15 @@ def _ensure_template_subcategories_complete(db: Session, user_id: int) -> None:
     raw = _load_default_categories_json()
     if not raw:
         return
+    deleted_sub_tpl_ids = {
+        r[0]
+        for r in db.query(BankingDeletedTemplateRef.template_sub_id)
+        .filter(
+            BankingDeletedTemplateRef.user_id == user_id,
+            BankingDeletedTemplateRef.template_sub_id.isnot(None),
+        )
+        .all()
+    }
     changed = False
     for cat in raw:
         if not isinstance(cat, dict):
@@ -996,9 +1022,9 @@ def _ensure_template_subcategories_complete(db: Session, user_id: int) -> None:
                     )
                     existing.category_id = bc.id
                     changed = True
-                if existing.name != sn:
-                    existing.name = sn
-                    changed = True
+                # No se fuerza `existing.name` aquí: preserva el renombre del usuario.
+                continue
+            if stid_int in deleted_sub_tpl_ids:
                 continue
             max_so = (
                 db.query(func.coalesce(func.max(BankingSubcategory.sort_order), -1))
@@ -2684,11 +2710,6 @@ def patch_category_row(
         return c
     locked = _names_locked(c)
     if locked:
-        if name is not None:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="El nombre de la categoría está fijado por la plantilla.",
-            )
         if sort_order is not None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -2702,21 +2723,6 @@ def patch_category_row(
         n = _normalize_hex_color(color)
         c.color = n if n else category_color_for_index(c.sort_order)
     if enabled is not None:
-        if not enabled:
-            n_cat = (
-                db.query(func.count(BankingTransaction.id))
-                .filter(
-                    BankingTransaction.user_id == user_id,
-                    BankingTransaction.category_id == category_id,
-                )
-                .scalar()
-                or 0
-            )
-            if n_cat > 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="No puedes desactivar la categoría: hay movimientos que la usan.",
-                )
         c.enabled = enabled
     db.commit()
     db.refresh(c)
@@ -2802,38 +2808,17 @@ def patch_subcategory_row(
     locked = parent_old is not None and _names_locked(parent_old)
 
     if locked:
-        user_custom = getattr(sub, "template_sub_id", None) is None
         if category_id is not None:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No se puede cambiar la categoría de una subcategoría bajo plantilla fijada.",
             )
-        if name is not None and not user_custom:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Los nombres de subcategorías vienen de la plantilla.",
-            )
-        if name is not None and user_custom:
+        if name is not None:
             nm = name.strip()
             if not nm:
                 raise HTTPException(status_code=400, detail="El nombre no puede estar vacío.")
             sub.name = nm
         if enabled is not None:
-            if not enabled:
-                n_tx = (
-                    db.query(func.count(BankingTransaction.id))
-                    .filter(
-                        BankingTransaction.user_id == user_id,
-                        BankingTransaction.subcategory_id == subcategory_id,
-                    )
-                    .scalar()
-                    or 0
-                )
-                if n_tx > 0:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail="No puedes desactivar esta subcategoría: hay movimientos que la usan.",
-                    )
             sub.enabled = enabled
         if name is None and enabled is None:
             raise HTTPException(status_code=400, detail="Nada que actualizar")
@@ -2855,21 +2840,6 @@ def patch_subcategory_row(
     if name is not None:
         sub.name = name.strip()
     if enabled is not None:
-        if not enabled:
-            n_tx = (
-                db.query(func.count(BankingTransaction.id))
-                .filter(
-                    BankingTransaction.user_id == user_id,
-                    BankingTransaction.subcategory_id == subcategory_id,
-                )
-                .scalar()
-                or 0
-            )
-            if n_tx > 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="No puedes desactivar esta subcategoría: hay movimientos que la usan.",
-                )
         sub.enabled = enabled
     db.commit()
     db.refresh(sub)
@@ -2880,12 +2850,6 @@ def delete_subcategory_row(db: Session, user_id: int, subcategory_id: int) -> No
     sub = get_subcategory_for_user(db, user_id, subcategory_id)
     if not sub:
         raise HTTPException(status_code=404, detail="Subcategoría no encontrada")
-    parent = get_category_for_user(db, user_id, sub.category_id)
-    if parent and _names_locked(parent) and getattr(sub, "template_sub_id", None) is not None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No se puede eliminar una subcategoría fijada por la plantilla.",
-        )
     n_tx = (
         db.query(func.count(BankingTransaction.id))
         .filter(BankingTransaction.subcategory_id == subcategory_id)
@@ -2897,5 +2861,9 @@ def delete_subcategory_row(db: Session, user_id: int, subcategory_id: int) -> No
             status_code=400,
             detail="No se puede eliminar: hay movimientos con esta subcategoría.",
         )
+    tpl_sub_id = getattr(sub, "template_sub_id", None)
     db.delete(sub)
+    if tpl_sub_id is not None:
+        # Sin esto, `ensure_default_categories` la recrearía en la próxima sincronización.
+        db.add(BankingDeletedTemplateRef(user_id=user_id, template_sub_id=tpl_sub_id))
     db.commit()
