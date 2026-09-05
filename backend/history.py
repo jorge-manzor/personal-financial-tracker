@@ -17,6 +17,7 @@ from models import (
     PriceCache,
     StockSplit,
     Transaction,
+    User,
     WalletMovement,
 )
 
@@ -369,10 +370,9 @@ def compute_portfolio_history(db: Session, from_date: date, to_date: date, user_
     latest_close_by_ticker = _latest_close_by_ticker(db, tickers)
     tx_by_date = _tx_by_date(db, user_id)
 
-    from fintual_client import fintual_configured
-
     goal_series_list: list[list[tuple[date, float, float]]] = []
-    if fintual_configured():
+    user_row = db.query(User).filter(User.id == user_id).first()
+    if user_row and (user_row.fintual_session or "").strip():
         from chart_goal_fondos import _forward_fill_val_cost, _goal_balance_series_list
 
         try:
