@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
+import time
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta
@@ -374,7 +376,7 @@ def _post_gql_goals(operation: str, variables: dict[str, Any], query: str) -> di
         "x-fintual-session": fintual_session(),
         "x-fintual-uid": fintual_uid(),
     }
-    with httpx.Client(headers=headers, cookies=_cookie_dict(), timeout=120.0) as client:
+    with httpx.Client(headers=headers, cookies=_cookie_dict(), timeout=45.0) as client:
         r = client.post(
             FINTUAL_GQL_GOALS,
             json={"operationName": operation, "variables": variables, "query": query},
@@ -443,21 +445,49 @@ query GoalInvestedBalanceGraphDataPoints($goalId: ID!, $timeIntervalCode: String
 """
 
 
+_GOAL_BALANCE_GRAPH_CACHE: dict[tuple[str, str], tuple[float, list[dict[str, Any]]]] = {}
+_GOAL_BALANCE_GRAPH_CACHE_LOCK = threading.Lock()
+_GOAL_BALANCE_GRAPH_CACHE_TTL_S = 300.0
+
+
 def fetch_goal_balance_graph_points(goal_id: str, time_interval_code: str = "all_time") -> list[dict[str, Any]]:
     """
     Serie del gráfico de balance de la meta (mismo origen que la ficha en fintual.cl).
     `time_interval_code`: all_time | 1m | 3m | 6m | 1y | ytd
+
+    Este gráfico es lento en la API de Fintual (puede acercarse al timeout). Dentro de una
+    misma carga de página se pide dos veces para la misma meta (tarjetas del dashboard y
+    gráfico de portafolio), así que se cachea en memoria por un rato corto para no pagar la
+    llamada dos veces seguidas.
     """
     gid = str(goal_id).strip()
     if not gid:
         return []
-    data = _post_gql(
-        "GoalInvestedBalanceGraphDataPoints",
-        {"goalId": gid, "timeIntervalCode": time_interval_code},
-        QUERY_GOAL_BALANCE_GRAPH,
-    )
-    raw = data.get("balanceGraphDataPoints")
-    return raw if isinstance(raw, list) else []
+    cache_key = (gid, time_interval_code)
+    now = time.monotonic()
+    with _GOAL_BALANCE_GRAPH_CACHE_LOCK:
+        cached = _GOAL_BALANCE_GRAPH_CACHE.get(cache_key)
+        if cached is not None and (now - cached[0]) < _GOAL_BALANCE_GRAPH_CACHE_TTL_S:
+            return cached[1]
+
+    try:
+        data = _post_gql(
+            "GoalInvestedBalanceGraphDataPoints",
+            {"goalId": gid, "timeIntervalCode": time_interval_code},
+            QUERY_GOAL_BALANCE_GRAPH,
+        )
+        raw = data.get("balanceGraphDataPoints")
+        points = raw if isinstance(raw, list) else []
+    except Exception as exc:
+        # Metas rotas/eliminadas en Fintual pueden tardar ~40s en responder con error;
+        # sin este cache, la misma meta se reintenta (y se paga esa demora otra vez) en
+        # la segunda llamada dentro de la misma carga de página (tarjetas + gráfico).
+        logger.debug("balance graph %s: %s", gid, exc)
+        points = []
+
+    with _GOAL_BALANCE_GRAPH_CACHE_LOCK:
+        _GOAL_BALANCE_GRAPH_CACHE[cache_key] = (now, points)
+    return points
 
 
 def portal_balance_snapshot_from_graph(

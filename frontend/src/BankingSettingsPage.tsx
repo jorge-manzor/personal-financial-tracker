@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   DndContext,
@@ -16,8 +16,7 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { apiFetch, fetchJson, patchJson, postJson } from "./api";
-import { useBankingTheme } from "./BankingThemeContext";
-import { bankingSwitchThumbClass, bankingSwitchTrackClass } from "./bankingTxShared";
+import { IconDotsHorizontal } from "./bankingTxIcons";
 import type {
   BankingAccountRow,
   BankingBankRow,
@@ -26,8 +25,8 @@ import type {
   BankingSubcategoryRow,
 } from "./types";
 
-/** Coincide con `backend` `_BANK_CAT_DEFAULT`: indigo-600, acento del nuevo estilo, para categorías nuevas. */
-const BANKING_DEFAULT_NEW_CATEGORY_COLOR = "#4f46e5";
+/** Coincide con `backend` `_BANK_CAT_DEFAULT`: acento verde del nuevo estilo, para categorías nuevas. */
+const BANKING_DEFAULT_NEW_CATEGORY_COLOR = "#4B7B63";
 
 function IconPencil({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -53,6 +52,18 @@ function IconTrash({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
+function IconPalette({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
+      <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" stroke="none" />
+      <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" stroke="none" />
+      <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" stroke="none" />
+      <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" stroke="none" />
+      <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 011.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C22 6.012 17.461 2 12 2z" />
+    </svg>
+  );
+}
+
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return null;
@@ -61,11 +72,11 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
 }
 
 function softCategorySurface(hex: string): CSSProperties {
-  const rgb = hexToRgb(hex) ?? { r: 88, g: 166, b: 255 };
+  const rgb = hexToRgb(hex) ?? { r: 143, g: 191, b: 166 };
   const { r, g, b } = rgb;
   return {
-    backgroundImage: `linear-gradient(105deg, rgba(${r},${g},${b},0.16) 0%, rgba(${r},${g},${b},0.06) 38%, transparent 70%)`,
-    boxShadow: `inset 0 0 0 1px rgba(${r},${g},${b},0.14), inset 0 0 28px -12px rgba(${r},${g},${b},0.12)`,
+    backgroundImage: `linear-gradient(105deg, rgba(${r},${g},${b},0.14) 0%, rgba(${r},${g},${b},0.05) 38%, transparent 70%)`,
+    boxShadow: `inset 0 0 0 1px rgba(${r},${g},${b},0.16), inset 0 0 28px -12px rgba(${r},${g},${b},0.14)`,
   };
 }
 
@@ -86,7 +97,7 @@ function IconGripVertical({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
-/** Activo/inactivo para categoría o subcategoría (`role="switch"`, no checkbox). */
+/** Activo/inactivo para producto, categoría o subcategoría (`role="switch"`, no checkbox). */
 function BankingEnabledToggle({
   enabled,
   disabled,
@@ -113,10 +124,96 @@ function BankingEnabledToggle({
         e.stopPropagation();
         if (!disabled) onChange(!enabled);
       }}
-      className={bankingSwitchTrackClass(enabled)}
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#12161d] disabled:cursor-not-allowed disabled:opacity-50 ${
+        enabled ? "border-[#166534] bg-[#22c55e]/90" : "border-[#30363d] bg-[#21262d]"
+      }`}
     >
-      <span className={bankingSwitchThumbClass(enabled)} />
+      <span
+        className={`pointer-events-none absolute top-1 left-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${
+          enabled ? "translate-x-5" : "translate-x-0"
+        }`}
+      />
     </button>
+  );
+}
+
+type SettingsMenuItem = {
+  label: string;
+  icon: ReactNode;
+  danger?: boolean;
+  disabled?: boolean;
+  title?: string;
+  onClick: () => void;
+};
+
+/** Menú «⋯» con acciones (Editar/Eliminar…), mismo patrón que en Movimientos. */
+function BankingSettingsMenu({ items, ariaLabel }: { items: SettingsMenuItem[]; ariaLabel: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocDown(e: MouseEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8b949e] transition-colors hover:bg-[#1c2129] hover:text-[#e6edf3]"
+      >
+        <IconDotsHorizontal className="h-4 w-4" />
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          aria-label={ariaLabel}
+          className="absolute right-0 top-9 z-30 w-44 overflow-hidden rounded-xl border border-[#21262d] bg-[#161b22] py-1 shadow-2xl shadow-black/40"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {items.map((it) => (
+            <button
+              key={it.label}
+              type="button"
+              role="menuitem"
+              disabled={it.disabled}
+              title={it.title}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setOpen(false);
+                it.onClick();
+              }}
+              className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition disabled:cursor-not-allowed disabled:opacity-40 ${
+                it.danger ? "text-[#f85149] hover:bg-[#f85149]/10" : "text-[#c9d1d9] hover:bg-[#1c2129]"
+              }`}
+            >
+              {it.icon}
+              {it.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -124,20 +221,18 @@ function BankingEnabledToggle({
 function CategoryDragPreview({ cat, expanded }: { cat: BankingCategoryRow; expanded: boolean }) {
   return (
     <div
-      className="pointer-events-none box-border w-full min-w-[min(100%,42rem)] max-w-full cursor-grabbing overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-2xl shadow-indigo-900/15 ring-2 ring-indigo-200/80 banking-dark:border-amber-700/40 banking-dark:bg-zinc-900 banking-dark:shadow-black/40 banking-dark:ring-amber-600/25"
+      className="pointer-events-none box-border w-full min-w-[min(100%,42rem)] max-w-full cursor-grabbing overflow-hidden rounded-xl border border-[#8FBFA6]/40 bg-[#161b22] shadow-2xl shadow-black/50 ring-2 ring-[#8FBFA6]/25"
       style={softCategorySurface(cat.color)}
     >
       <div className="flex items-center gap-2 px-4 py-2.5">
-        <IconGripVertical className="h-4 w-4 shrink-0 text-slate-500 banking-dark:text-zinc-400" />
+        <IconGripVertical className="h-4 w-4 shrink-0 text-[#6b7280]" />
         <span className="min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: cat.color }}>
           {cat.name}
         </span>
-        <span className="shrink-0 text-xs text-slate-500 banking-dark:text-zinc-400">
-          ({cat.subcategories.length})
-        </span>
+        <span className="shrink-0 text-xs text-[#6b7280]">({cat.subcategories.length})</span>
       </div>
       {expanded ? (
-        <div className="border-t border-slate-300 px-4 py-2.5 text-[11px] leading-relaxed text-slate-500 banking-dark:border-zinc-600 banking-dark:text-zinc-400">
+        <div className="border-t border-[#21262d] px-4 py-2.5 text-[11px] leading-relaxed text-[#6b7280]">
           {cat.subcategories.length} subcategorías · arrastra el asa ⋮⋮ para orden (también en movimientos)
         </div>
       ) : null}
@@ -294,30 +389,24 @@ function CategoryDragHandleButton({
   );
 }
 
-const btnGreenBanking =
-  "rounded-xl border border-indigo-800 bg-indigo-800 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50 banking-dark:border-amber-600/45 banking-dark:bg-gradient-to-r banking-dark:from-amber-600 banking-dark:to-amber-500 banking-dark:text-zinc-950 banking-dark:hover:from-amber-500 banking-dark:hover:to-amber-400 banking-dark:hover:border-amber-500/50";
-
-const iconBtn =
-  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-transparent text-slate-500 transition hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 disabled:opacity-40 banking-dark:text-zinc-400 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200";
-const iconBtnDanger = `${iconBtn} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 banking-dark:hover:border-rose-900 banking-dark:hover:bg-rose-950/40 banking-dark:hover:text-rose-300`;
+const btnGreen =
+  "inline-flex items-center gap-1.5 rounded-lg bg-[#22c55e] px-3.5 py-2 text-sm font-semibold text-[#0d1117] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50";
 
 const selectFieldClass =
-  "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
+  "mt-1.5 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-white shadow-sm outline-none transition focus:border-[#58a6ff] focus:ring-2 focus:ring-[#58a6ff]/20 [color-scheme:dark]";
 
-const bankingSettingsCardClass =
-  "rounded-xl border border-slate-300 bg-white p-5 shadow-sm banking-dark:border-zinc-700 banking-dark:bg-zinc-950 banking-dark:shadow-none";
+const bankingSettingsCardClass = "rounded-2xl border border-[#1e242e] bg-[#12161d] p-5";
 
-/** Ayudas y etiquetas: legibles sobre zinc-950 / zinc-900. */
-const settingsMuted = "text-slate-500 banking-dark:text-zinc-400";
+const settingsMuted = "text-[#8b949e]";
+
 const settingsGhostBtn =
-  "rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50 banking-dark:border-zinc-500 banking-dark:bg-zinc-900 banking-dark:text-zinc-100 banking-dark:hover:border-zinc-400 banking-dark:hover:bg-zinc-800";
+  "rounded-lg border border-[#30363d] bg-[#161b22] px-4 py-2 text-sm text-[#c9d1d9] transition hover:bg-[#1c2129]";
 
 const settingsGhostBtnSm =
-  "shrink-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-600 shadow-sm hover:bg-slate-50 banking-dark:border-zinc-500 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-800";
+  "shrink-0 rounded-lg border border-[#30363d] bg-[#161b22] px-3 py-1.5 text-xs text-[#c9d1d9] transition hover:bg-[#1c2129]";
 
 /** Asa de arrastre / chevron en filas de categoría. */
-const categoryHandleHover =
-  "text-slate-500 hover:bg-indigo-50 hover:text-indigo-800 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200";
+const categoryHandleHover = "text-[#6b7280] hover:bg-[#1c2129] hover:text-[#8FBFA6]";
 
 const PRODUCT_TYPE_OPTIONS: { value: BankingProductType; label: string }[] = [
   { value: "cuenta_corriente", label: "Cuenta Corriente" },
@@ -337,8 +426,35 @@ function bankingSubcategoryAllowsRename(cat: BankingCategoryRow, sub: BankingSub
   return sub.template_sub_id == null;
 }
 
+type SettingsTab = "productos" | "categorias";
+
+const NAV_ITEMS: { id: SettingsTab; label: string; icon: (p: { className?: string }) => ReactNode }[] = [
+  {
+    id: "productos",
+    label: "Productos",
+    icon: ({ className }) => (
+      <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+        <rect x="2" y="5" width="20" height="14" rx="2" />
+        <path d="M2 10h20M6 15h.01M10 15h4" />
+      </svg>
+    ),
+  },
+  {
+    id: "categorias",
+    label: "Categorías",
+    icon: ({ className }) => (
+      <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </svg>
+    ),
+  },
+];
+
 export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null) => void }) {
-  const { isDark } = useBankingTheme();
+  const [tab, setTab] = useState<SettingsTab>("productos");
   const [accounts, setAccounts] = useState<BankingAccountRow[]>([]);
   const [banks, setBanks] = useState<BankingBankRow[]>([]);
   const [categories, setCategories] = useState<BankingCategoryRow[]>([]);
@@ -784,6 +900,28 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
     }
   }
 
+  async function removeSubcategory(cat: BankingCategoryRow, sub: BankingSubcategoryRow) {
+    if (sub.has_transactions) return;
+    if (!confirm(`¿Eliminar «${sub.name}»?`)) return;
+    setBusyKey(`del-sub-${sub.id}`);
+    try {
+      const r = await apiFetch(`/banking/subcategories/${sub.id}`, { method: "DELETE" });
+      if (!r.ok) {
+        const j = (await r.json().catch(() => null)) as { detail?: string } | null;
+        onToast(j?.detail ?? "No se pudo eliminar la subcategoría");
+        return;
+      }
+      if (subNameEdit?.id === sub.id) setSubNameEdit(null);
+      onToast("Subcategoría eliminada");
+      await load();
+    } catch {
+      onToast("No se pudo eliminar la subcategoría");
+    } finally {
+      setBusyKey(null);
+    }
+    void cat;
+  }
+
   async function setCategoryEnabled(cat: BankingCategoryRow, next: boolean) {
     setBusyKey(`cat-en-${cat.id}`);
     try {
@@ -809,841 +947,828 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
   }
 
   return (
-    <div
-      className={`banking-theme w-full min-h-[calc(100dvh-3.5rem)] ${
-        isDark
-          ? "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(251,191,36,0.055),transparent_52%),linear-gradient(to_bottom,#0d0d0d,#070707)] text-zinc-300"
-          : "bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100/80 text-slate-800"
-      }`}
-    >
-    <div className="mx-auto max-w-[880px] space-y-10 p-4 pb-28 md:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-        <h2 className="text-lg font-semibold text-slate-900 banking-dark:text-zinc-100">Configuración bancaria</h2>
-        <p className="mt-1 text-sm text-slate-500 banking-dark:text-zinc-400">
-          Productos (cuentas) y categorías del catálogo del servidor. Activa las categorías y subcategorías que quieras
-          usar en movimientos manuales; personaliza el color y el orden con el asa (⋮⋮). Al final verás categorías de
-          uso interno (siempre activas, sin interruptor).
-        </p>
-        </div>
-      </div>
-
-      <section className="space-y-4" aria-labelledby="banking-accounts-heading">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h3 id="banking-accounts-heading" className="text-base font-semibold text-slate-900 banking-dark:text-zinc-100">
-              Productos
-            </h3>
-            <p className="mt-1 text-sm text-slate-500 banking-dark:text-zinc-400">
-              Activa la visibilidad en «Nuevo movimiento» y, en cuentas líquidas, si suman en el «Saldo real» del
-              resumen en Movimientos (excluye respaldos o cuentas transitorias). El saldo se gestiona en el backend.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={openNewProduct} className={btnGreenBanking}>
-              Agregar producto
-            </button>
-          </div>
-        </div>
-
-        <div className={bankingSettingsCardClass}>
-          {loading ? (
-            <p className={`text-sm ${settingsMuted}`}>Cargando…</p>
-          ) : accounts.length === 0 ? (
-            <p className={`text-sm ${settingsMuted}`}>No hay productos todavía. Usa «Agregar producto».</p>
-          ) : (
-            <ul
-              className="space-y-0 divide-y divide-slate-100 banking-dark:divide-zinc-800"
-              role="list"
-            >
-              {accounts.map((a) => (
-                <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-800 banking-dark:text-zinc-100">{a.name}</p>
-                    <p className={`text-xs ${settingsMuted}`}>
-                      {productTypeLabel(a.product_type)}
-                      {a.bank_name ? ` · ${a.bank_name}` : ""}
-                      {a.product_type === "tarjeta_credito" && a.linked_checking_account_name
-                        ? ` · Liquidación: ${a.linked_checking_account_name}`
-                        : ""}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    <div
-                      className="flex items-center gap-1"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                    >
-                      <span
-                        className={`max-w-[3.25rem] shrink-0 text-[10px] leading-tight ${settingsMuted}`}
-                        title="Visible al registrar movimientos"
-                      >
-                        Activa
-                      </span>
-                      <BankingEnabledToggle
-                        enabled={a.enabled ?? true}
-                        disabled={busyKey !== null}
-                        onChange={(next) => void setAccountEnabledRow(a, next)}
-                        title={
-                          (a.enabled ?? true)
-                            ? "Visible al registrar movimientos"
-                            : "Oculto en el selector de movimientos"
-                        }
-                        ariaLabel={`Producto «${a.name}»: ${(a.enabled ?? true) ? "visible en movimientos" : "oculto"}`}
-                      />
-                    </div>
-                    {a.product_type !== "tarjeta_credito" ? (
-                      <div
-                        className="flex items-center gap-1"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }}
-                      >
-                        <span
-                          className={`max-w-[3.25rem] shrink-0 text-[10px] leading-tight ${settingsMuted}`}
-                          title="Incluir en saldo total del resumen en Movimientos"
-                        >
-                          En total
-                        </span>
-                        <BankingEnabledToggle
-                          enabled={a.include_in_total_balance !== false}
-                          disabled={busyKey !== null}
-                          onChange={(next) => void setAccountIncludeInTotalRow(a, next)}
-                          title={
-                            (a.include_in_total_balance !== false)
-                              ? "Incluida en el saldo total del resumen"
-                              : "Excluida del saldo total (respaldos / transitorias)"
-                          }
-                          ariaLabel={`«${a.name}»: ${a.include_in_total_balance !== false ? "incluida en saldo total" : "excluida del saldo total"}`}
-                        />
-                      </div>
-                    ) : null}
-                    <button
-                      type="button"
-                      title="Editar producto"
-                      className={iconBtn}
-                      onClick={() => openEditAccount(a)}
-                    >
-                      <IconPencil />
-                    </button>
-                    <button
-                      type="button"
-                      title={
-                        a.has_transactions
-                          ? "Hay movimientos: no se puede eliminar; desactiva la visibilidad si no quieres usarlo."
-                          : "Eliminar producto"
-                      }
-                      className={iconBtnDanger}
-                      disabled={!!a.has_transactions || busyKey !== null}
-                      onClick={() => void removeAccount(a)}
-                    >
-                      <IconTrash />
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
-
-      <section className="space-y-4" aria-labelledby="banking-categories-heading">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h3
-              id="banking-categories-heading"
-              className="text-base font-semibold text-slate-900 banking-dark:text-zinc-100"
-            >
-              Categorías y subcategorías
-            </h3>
-            <p className={`mt-1 text-sm ${settingsMuted}`}>
-              Categorías iniciales desde el servidor; puedes añadir las tuyas, editar nombre y color (salvo plantilla
-              fijada) y crear subcategorías en cualquier categoría manual o de plantilla. Las subcategorías propias se
-              pueden renombrar aunque la categoría esté fijada por plantilla. El interruptor controla visibilidad en
-              movimientos. Las categorías reservadas al final solo permiten color.
-            </p>
-          </div>
+    <div className="mx-auto flex max-w-[980px] gap-10 p-4 pb-28 md:p-6">
+      <nav className="w-[200px] shrink-0">
+        <h2 className="mb-1.5 text-xl font-semibold tracking-tight text-white">Configuración bancaria</h2>
+        <p className="mb-5 text-[12.5px] leading-relaxed text-[#6b7280]">Productos y categorías del catálogo.</p>
+        {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
           <button
+            key={id}
             type="button"
-            disabled={loading || busyKey !== null}
-            onClick={() => {
-              setCategoryEdit(null);
-              setCategoryFullEdit(null);
-              setNewCategoryForm({ name: "", color: BANKING_DEFAULT_NEW_CATEGORY_COLOR });
-            }}
-            className={btnGreenBanking}
+            onClick={() => setTab(id)}
+            className={`mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+              tab === id ? "bg-[#8FBFA6]/10 text-[#8FBFA6]" : "text-[#8b949e] hover:text-[#c9d1d9]"
+            }`}
           >
-            Nueva categoría
+            <Icon className="shrink-0" />
+            {label}
           </button>
-        </div>
+        ))}
+      </nav>
 
-        <div className={bankingSettingsCardClass}>
-          {newCategoryForm ? (
-            <div className="mb-4 flex flex-col gap-3 rounded-xl border border-dashed border-indigo-200 bg-indigo-50/50 p-4 banking-dark:border-amber-900/45 banking-dark:bg-amber-950/35 sm:flex-row sm:flex-wrap sm:items-end">
-              <label className="min-w-[12rem] flex-1 text-sm">
-                <span className={`text-xs ${settingsMuted}`}>Nombre</span>
-                <input
-                  type="text"
-                  value={newCategoryForm.name}
-                  onChange={(e) => setNewCategoryForm({ ...newCategoryForm, name: e.target.value })}
-                  className={selectFieldClass}
-                  placeholder="Ej. Gastos hogar"
-                  autoFocus
-                />
-              </label>
-              <label className="flex shrink-0 items-center gap-2">
-                <span className={`text-xs ${settingsMuted}`}>Color</span>
-                <input
-                  type="color"
-                  value={newCategoryForm.color}
-                  onChange={(e) => setNewCategoryForm({ ...newCategoryForm, color: e.target.value })}
-                  className="h-10 w-14 cursor-pointer rounded-lg border border-slate-300 bg-white p-1 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-900"
-                  title="Color de la categoría"
-                />
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={busyKey !== null}
-                  onClick={() => void createCategory()}
-                  className={`${btnGreenBanking} px-4 py-2 text-sm`}
-                >
-                  Crear
-                </button>
-                <button
-                  type="button"
-                  disabled={busyKey !== null}
-                  onClick={() => setNewCategoryForm(null)}
-                  className={settingsGhostBtn}
-                >
-                  Cancelar
-                </button>
+      <div className="min-w-0 flex-1">
+        {tab === "productos" && (
+          <div>
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-white">Productos</h3>
+                <p className="mt-1 text-sm text-[#8b949e]">
+                  Activa la visibilidad en «Nuevo movimiento» y, en cuentas líquidas, si suman en el «Saldo real» del
+                  resumen en Movimientos.
+                </p>
               </div>
+              <button type="button" onClick={openNewProduct} className={btnGreen}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Agregar producto
+              </button>
             </div>
-          ) : null}
-          {loading ? (
-            <p className={`text-sm ${settingsMuted}`}>Cargando categorías…</p>
-          ) : categories.length === 0 ? (
-            <p className={`text-sm ${settingsMuted}`}>
-              No hay categorías disponibles. Comprueba que exista el archivo de catálogo en el servidor.
-            </p>
-          ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleCategoryDragStart}
-              onDragEnd={handleCategoryDragEnd}
-              onDragCancel={handleCategoryDragCancel}
-            >
-              <div className="flex flex-col gap-3">
-              <SortableContext items={sortableCategories.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-                  {sortableCategories.map((cat) => (
-                    <SortableCategoryWrapper key={cat.id} id={cat.id} disabled={busyKey !== null}>
-                      {(handle) => (
-                        <details
-                          className="group overflow-hidden rounded-xl border border-slate-300/80 bg-white/70 banking-dark:border-zinc-600 banking-dark:bg-zinc-900/50"
-                          style={softCategorySurface(cat.color)}
-                          open={expandedCategoryIds.has(cat.id)}
-                          onToggle={(e) => {
-                            const el = e.currentTarget;
-                            setExpandedCategoryIds((prev) => {
-                              const next = new Set(prev);
-                              if (el.open) next.add(cat.id);
-                              else next.delete(cat.id);
-                              return next;
-                            });
-                          }}
-                        >
-                          <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-slate-300/80 px-3 py-2.5 marker:content-none banking-dark:border-zinc-600 sm:px-4 [&::-webkit-details-marker]:hidden">
-                            <CategoryDragHandleButton
-                              setActivatorNodeRef={handle.setActivatorNodeRef}
-                              attributes={handle.attributes}
-                              listeners={handle.listeners}
-                              disabled={busyKey !== null}
-                              title="Arrastrar para reordenar"
-                              aria-label="Arrastrar para reordenar categoría"
-                              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 ${categoryHandleHover} active:cursor-grabbing ${
-                                busyKey !== null ? "cursor-not-allowed opacity-40" : "cursor-grab"
-                              }`}
-                            >
-                              <IconGripVertical className="block h-4 w-4" />
-                            </CategoryDragHandleButton>
-                    <span
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 banking-dark:text-zinc-400 transition-transform duration-200 group-open:rotate-180"
-                      aria-hidden
-                    >
-                      <IconChevronDown className="block h-4 w-4" />
-                    </span>
-                    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                    {categoryFullEdit?.id === cat.id && !cat.names_locked ? (
-                      <>
-                        <input
-                          type="text"
-                          className="min-w-[10rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm font-medium text-slate-900 shadow-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-100 banking-dark:focus:border-amber-600/55 banking-dark:focus:ring-amber-500/20"
-                          value={categoryFullEdit.name}
-                          onChange={(e) =>
-                            setCategoryFullEdit({ ...categoryFullEdit, name: e.target.value })
-                          }
-                          onClick={(e) => e.stopPropagation()}
-                          aria-label="Nombre de categoría"
-                        />
-                        <span className={`shrink-0 text-xs ${settingsMuted}`}>({cat.subcategories.length})</span>
+
+            <div className={`${bankingSettingsCardClass} p-0`}>
+              {loading ? (
+                <p className={`p-5 text-sm ${settingsMuted}`}>Cargando…</p>
+              ) : accounts.length === 0 ? (
+                <p className={`p-5 text-sm ${settingsMuted}`}>No hay productos todavía. Usa «Agregar producto».</p>
+              ) : (
+                <ul className="divide-y divide-[#1a1f2e]" role="list">
+                  {accounts.map((a) => (
+                    <li key={a.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-[#F3F1EC]">{a.name}</p>
+                        <p className={`text-xs ${settingsMuted}`}>
+                          {productTypeLabel(a.product_type)}
+                          {a.bank_name ? ` · ${a.bank_name}` : ""}
+                          {a.product_type === "tarjeta_credito" && a.linked_checking_account_name
+                            ? ` · Liquidación: ${a.linked_checking_account_name}`
+                            : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap items-center gap-4">
                         <div
-                          className={`flex shrink-0 items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
+                          className="flex flex-col items-center gap-1"
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                           }}
                         >
+                          <span className="text-[9.5px] font-semibold uppercase tracking-wide text-[#6b7280]">Activa</span>
                           <BankingEnabledToggle
-                            enabled={cat.enabled ?? true}
-                            disabled={busyKey !== null || !!(cat.has_transactions ?? false)}
-                            onChange={(next) => void setCategoryEnabled(cat, next)}
-                            title={
-                              (cat.has_transactions ?? false)
-                                ? "Hay movimientos con esta categoría; no se puede desactivar."
-                                : "Disponible para movimientos nuevos"
-                            }
-                            ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "inactiva"}`}
-                          />
-                        </div>
-                        <input
-                          type="color"
-                          value={categoryFullEdit.color}
-                          onChange={(e) =>
-                            setCategoryFullEdit({ ...categoryFullEdit, color: e.target.value })
-                          }
-                          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-900"
-                          title="Color"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <button
-                          type="button"
-                          disabled={busyKey !== null}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            void saveCategoryFullEdit();
-                          }}
-                          className={`${btnGreenBanking} shrink-0 px-3 py-1.5 text-xs`}
-                        >
-                          Guardar
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busyKey !== null}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setCategoryFullEdit(null);
-                          }}
-                          className={settingsGhostBtnSm}
-                        >
-                          Cancelar
-                        </button>
-                        {!cat.names_locked && !cat.has_transactions ? (
-                          <button
-                            type="button"
-                            title="Eliminar categoría"
+                            enabled={a.enabled ?? true}
                             disabled={busyKey !== null}
-                            className={iconBtnDanger}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              void removeCategory(cat);
-                            }}
-                          >
-                            <IconTrash />
-                          </button>
-                        ) : null}
-                      </>
-                    ) : categoryEdit?.id === cat.id ? (
-                      <>
-                        <p
-                          className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800 banking-dark:text-zinc-100"
-                          style={{ color: cat.color }}
-                        >
-                          {cat.name}{" "}
-                          <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
-                        </p>
-                        <div
-                          className={`flex shrink-0 items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
-                        >
-                          <BankingEnabledToggle
-                            enabled={cat.enabled ?? true}
-                            disabled={busyKey !== null || !!(cat.has_transactions ?? false)}
-                            onChange={(next) => void setCategoryEnabled(cat, next)}
+                            onChange={(next) => void setAccountEnabledRow(a, next)}
                             title={
-                              (cat.has_transactions ?? false)
-                                ? "Hay movimientos con esta categoría; no se puede desactivar."
-                                : "Disponible para movimientos nuevos"
+                              (a.enabled ?? true)
+                                ? "Visible al registrar movimientos"
+                                : "Oculto en el selector de movimientos"
                             }
-                            ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "inactiva"}`}
+                            ariaLabel={`Producto «${a.name}»: ${(a.enabled ?? true) ? "visible en movimientos" : "oculto"}`}
                           />
                         </div>
-                        <input
-                          type="color"
-                          value={categoryEdit.color}
-                          onChange={(e) => setCategoryEdit({ ...categoryEdit, color: e.target.value })}
-                          className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-900"
-                          title="Color"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <button
-                          type="button"
-                          disabled={busyKey !== null}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            void saveCategoryEdit();
-                          }}
-                          className={`${btnGreenBanking} shrink-0 px-3 py-1.5 text-xs`}
-                        >
-                          Guardar
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busyKey !== null}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setCategoryEdit(null);
-                          }}
-                          className={settingsGhostBtnSm}
-                        >
-                          Cancelar
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <p
-                          className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800 banking-dark:text-zinc-100"
-                          style={{ color: cat.color }}
-                        >
-                          {cat.name}{" "}
-                          <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
-                        </p>
-                        <div className="ml-auto flex h-8 shrink-0 items-center gap-2">
+                        {a.product_type !== "tarjeta_credito" ? (
                           <div
-                            className={`flex items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
+                            className="flex flex-col items-center gap-1"
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
                             }}
                           >
+                            <span className="text-[9.5px] font-semibold uppercase tracking-wide text-[#6b7280]">En total</span>
                             <BankingEnabledToggle
-                              enabled={cat.enabled ?? true}
-                              disabled={busyKey !== null || !!(cat.has_transactions ?? false)}
-                              onChange={(next) => void setCategoryEnabled(cat, next)}
+                              enabled={a.include_in_total_balance !== false}
+                              disabled={busyKey !== null}
+                              onChange={(next) => void setAccountIncludeInTotalRow(a, next)}
                               title={
-                                (cat.has_transactions ?? false)
-                                  ? "Hay movimientos con esta categoría; no se puede desactivar."
-                                  : "Disponible para movimientos nuevos"
+                                a.include_in_total_balance !== false
+                                  ? "Incluida en el saldo total del resumen"
+                                  : "Excluida del saldo total (respaldos / transitorias)"
                               }
-                              ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "inactiva"}`}
+                              ariaLabel={`«${a.name}»: ${a.include_in_total_balance !== false ? "incluida en saldo total" : "excluida del saldo total"}`}
                             />
                           </div>
-                          <button
-                            type="button"
-                            title={cat.names_locked ? "Cambiar color (nombre fijado por plantilla)" : "Editar nombre y color"}
-                            className={iconBtn}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              if (cat.names_locked) {
-                                setCategoryFullEdit(null);
-                                setCategoryEdit({
-                                  id: cat.id,
-                                  color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR,
-                                });
-                              } else {
-                                setCategoryEdit(null);
-                                setCategoryFullEdit({
-                                  id: cat.id,
-                                  name: cat.name,
-                                  color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR,
-                                });
-                              }
+                        ) : null}
+                        <BankingSettingsMenu
+                          ariaLabel={`Acciones para «${a.name}»`}
+                          items={[
+                            {
+                              label: "Editar",
+                              icon: <IconPencil className="h-3.5 w-3.5" />,
+                              onClick: () => openEditAccount(a),
+                            },
+                            {
+                              label: "Eliminar",
+                              icon: <IconTrash className="h-3.5 w-3.5" />,
+                              danger: true,
+                              disabled: !!a.has_transactions || busyKey !== null,
+                              title: a.has_transactions
+                                ? "Hay movimientos: no se puede eliminar; desactiva la visibilidad si no quieres usarlo."
+                                : "Eliminar producto",
+                              onClick: () => void removeAccount(a),
+                            },
+                          ]}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+
+        {tab === "categorias" && (
+          <div>
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-white">Categorías y subcategorías</h3>
+                <p className={`mt-1 text-sm ${settingsMuted}`}>
+                  Categorías iniciales desde el servidor; puedes añadir las tuyas, editar nombre y color (salvo
+                  plantilla fijada) y crear subcategorías en cualquier categoría manual o de plantilla. Arrastra ⋮⋮
+                  para reordenar (mismo orden en movimientos).
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={loading || busyKey !== null}
+                onClick={() => {
+                  setCategoryEdit(null);
+                  setCategoryFullEdit(null);
+                  setNewCategoryForm({ name: "", color: BANKING_DEFAULT_NEW_CATEGORY_COLOR });
+                }}
+                className={btnGreen}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Nueva categoría
+              </button>
+            </div>
+
+            {newCategoryForm ? (
+              <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-dashed border-[#8FBFA6]/35 bg-[#8FBFA6]/[0.06] p-4 sm:flex-row sm:flex-wrap sm:items-end">
+                <label className="min-w-[12rem] flex-1 text-sm">
+                  <span className={`text-xs ${settingsMuted}`}>Nombre</span>
+                  <input
+                    type="text"
+                    value={newCategoryForm.name}
+                    onChange={(e) => setNewCategoryForm({ ...newCategoryForm, name: e.target.value })}
+                    className={selectFieldClass}
+                    placeholder="Ej. Gastos hogar"
+                    autoFocus
+                  />
+                </label>
+                <label className="flex shrink-0 items-center gap-2">
+                  <span className={`text-xs ${settingsMuted}`}>Color</span>
+                  <input
+                    type="color"
+                    value={newCategoryForm.color}
+                    onChange={(e) => setNewCategoryForm({ ...newCategoryForm, color: e.target.value })}
+                    className="h-10 w-14 cursor-pointer rounded-lg border border-[#30363d] bg-[#0d1117] p-1 shadow-sm"
+                    title="Color de la categoría"
+                  />
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={busyKey !== null}
+                    onClick={() => void createCategory()}
+                    className={`${btnGreen} px-4 py-2 text-sm`}
+                  >
+                    Crear
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyKey !== null}
+                    onClick={() => setNewCategoryForm(null)}
+                    className={settingsGhostBtn}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {loading ? (
+              <p className={`text-sm ${settingsMuted}`}>Cargando categorías…</p>
+            ) : categories.length === 0 ? (
+              <p className={`text-sm ${settingsMuted}`}>
+                No hay categorías disponibles. Comprueba que exista el archivo de catálogo en el servidor.
+              </p>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleCategoryDragStart}
+                onDragEnd={handleCategoryDragEnd}
+                onDragCancel={handleCategoryDragCancel}
+              >
+                <div className="flex flex-col gap-2.5">
+                  <SortableContext items={sortableCategories.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+                    {sortableCategories.map((cat) => (
+                      <SortableCategoryWrapper key={cat.id} id={cat.id} disabled={busyKey !== null}>
+                        {(handle) => (
+                          <details
+                            className="group overflow-hidden rounded-2xl border border-[#1e242e] bg-[#12161d]"
+                            style={softCategorySurface(cat.color)}
+                            open={expandedCategoryIds.has(cat.id)}
+                            onToggle={(e) => {
+                              const el = e.currentTarget;
+                              setExpandedCategoryIds((prev) => {
+                                const next = new Set(prev);
+                                if (el.open) next.add(cat.id);
+                                else next.delete(cat.id);
+                                return next;
+                              });
                             }}
                           >
-                            <IconPencil />
-                          </button>
-                        </div>
-                      </>
-                    )}
-                    </div>
-                  </summary>
-                  <ul className="list-none space-y-1 px-3 py-3 sm:px-4" role="list">
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={(e) => handleSubcategoriesDragEnd(cat.id, e)}
-                    >
-                      <SortableContext
-                        items={cat.subcategories.map((s) => subSortableId(s.id))}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        {cat.subcategories.map((s) => {
-                          const parentEnabled = cat.enabled ?? true;
-                          const dragDisabled = busyKey !== null || !parentEnabled;
-                          const toggleDisabled =
-                            busyKey !== null ||
-                            !!(s.has_transactions ?? false) ||
-                            !parentEnabled;
-                          const showOn = parentEnabled ? (s.enabled ?? true) : false;
-                          return (
-                            <SortableSubcategoryWrapper key={s.id} subId={s.id} disabled={dragDisabled}>
-                              {(handle) => (
-                                <div
-                                  className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2 py-2 text-xs ${
-                                    parentEnabled
-                                      ? "border-slate-300 bg-slate-50/90 text-slate-700 banking-dark:border-zinc-600 banking-dark:bg-zinc-900/65 banking-dark:text-zinc-200"
-                                      : "cursor-not-allowed border-slate-300 bg-slate-100/80 text-slate-500 banking-dark:border-zinc-700 banking-dark:bg-zinc-900/40 banking-dark:text-zinc-500"
-                                  }`}
-                                  aria-disabled={!parentEnabled}
-                                >
-                                  <div className="flex min-w-0 flex-1 items-center gap-2">
-                                    <CategoryDragHandleButton
-                                      setActivatorNodeRef={handle.setActivatorNodeRef}
-                                      attributes={handle.attributes}
-                                      listeners={handle.listeners}
-                                      disabled={dragDisabled}
-                                      title="Arrastrar para reordenar subcategorías"
-                                      aria-label="Arrastrar para reordenar subcategoría"
-                                      className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 ${categoryHandleHover} active:cursor-grabbing ${
-                                        dragDisabled ? "cursor-not-allowed opacity-40" : "cursor-grab"
-                                      }`}
+                            <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-[#1e242e] px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
+                              <CategoryDragHandleButton
+                                setActivatorNodeRef={handle.setActivatorNodeRef}
+                                attributes={handle.attributes}
+                                listeners={handle.listeners}
+                                disabled={busyKey !== null}
+                                title="Arrastrar para reordenar"
+                                aria-label="Arrastrar para reordenar categoría"
+                                className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 ${categoryHandleHover} active:cursor-grabbing ${
+                                  busyKey !== null ? "cursor-not-allowed opacity-40" : "cursor-grab"
+                                }`}
+                              >
+                                <IconGripVertical className="block h-4 w-4" />
+                              </CategoryDragHandleButton>
+                              <span
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-[#6b7280] transition-transform duration-200 group-open:rotate-180"
+                                aria-hidden
+                              >
+                                <IconChevronDown className="block h-4 w-4" />
+                              </span>
+                              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                                {categoryFullEdit?.id === cat.id && !cat.names_locked ? (
+                                  <>
+                                    <input
+                                      type="text"
+                                      className="min-w-[10rem] flex-1 rounded-lg border border-[#30363d] bg-[#0d1117] px-2 py-1.5 text-sm font-medium text-white shadow-sm outline-none focus:border-[#58a6ff] focus:ring-2 focus:ring-[#58a6ff]/20"
+                                      value={categoryFullEdit.name}
+                                      onChange={(e) =>
+                                        setCategoryFullEdit({ ...categoryFullEdit, name: e.target.value })
+                                      }
+                                      onClick={(e) => e.stopPropagation()}
+                                      aria-label="Nombre de categoría"
+                                    />
+                                    <span className={`shrink-0 text-xs ${settingsMuted}`}>({cat.subcategories.length})</span>
+                                    <div
+                                      className={`flex shrink-0 items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                      }}
                                     >
-                                      <IconGripVertical className="block h-3.5 w-3.5" />
-                                    </CategoryDragHandleButton>
-                                    {bankingSubcategoryAllowsRename(cat, s) && subNameEdit?.id === s.id ? (
-                                      <input
-                                        type="text"
-                                        className="min-w-0 flex-1 rounded border border-indigo-300 bg-white px-1.5 py-1 text-xs text-slate-900 outline-none focus:ring-2 focus:ring-indigo-400/35 banking-dark:border-amber-600/45 banking-dark:bg-zinc-900 banking-dark:text-zinc-100 banking-dark:focus:ring-amber-500/25"
-                                        value={subNameEdit.name}
-                                        onChange={(e) =>
-                                          setSubNameEdit({ ...subNameEdit, name: e.target.value })
+                                      <BankingEnabledToggle
+                                        enabled={cat.enabled ?? true}
+                                        disabled={busyKey !== null || !!(cat.has_transactions ?? false)}
+                                        onChange={(next) => void setCategoryEnabled(cat, next)}
+                                        title={
+                                          (cat.has_transactions ?? false)
+                                            ? "Hay movimientos con esta categoría; no se puede desactivar."
+                                            : "Disponible para movimientos nuevos"
                                         }
-                                        onClick={(e) => e.stopPropagation()}
-                                        aria-label="Nombre de subcategoría"
+                                        ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "inactiva"}`}
                                       />
-                                    ) : (
-                                      <span
-                                        className={`min-w-0 flex-1 ${!parentEnabled ? `${settingsMuted}` : ""}`}
-                                      >
-                                        {s.name}
-                                      </span>
-                                    )}
-                                    {bankingSubcategoryAllowsRename(cat, s) && subNameEdit?.id !== s.id ? (
-                                      <button
-                                        type="button"
-                                        title="Renombrar subcategoría"
-                                        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${categoryHandleHover}`}
-                                        disabled={busyKey !== null || !parentEnabled}
+                                    </div>
+                                    <input
+                                      type="color"
+                                      value={categoryFullEdit.color}
+                                      onChange={(e) =>
+                                        setCategoryFullEdit({ ...categoryFullEdit, color: e.target.value })
+                                      }
+                                      className="h-9 w-12 shrink-0 cursor-pointer rounded border border-[#30363d] bg-[#0d1117] p-0.5 shadow-sm"
+                                      title="Color"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={busyKey !== null}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        void saveCategoryFullEdit();
+                                      }}
+                                      className={`${btnGreen} shrink-0 px-3 py-1.5 text-xs`}
+                                    >
+                                      Guardar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={busyKey !== null}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setCategoryFullEdit(null);
+                                      }}
+                                      className={settingsGhostBtnSm}
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </>
+                                ) : categoryEdit?.id === cat.id ? (
+                                  <>
+                                    <p
+                                      className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug"
+                                      style={{ color: cat.color }}
+                                    >
+                                      {cat.name}{" "}
+                                      <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
+                                    </p>
+                                    <div
+                                      className={`flex shrink-0 items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                      }}
+                                    >
+                                      <BankingEnabledToggle
+                                        enabled={cat.enabled ?? true}
+                                        disabled={busyKey !== null || !!(cat.has_transactions ?? false)}
+                                        onChange={(next) => void setCategoryEnabled(cat, next)}
+                                        title={
+                                          (cat.has_transactions ?? false)
+                                            ? "Hay movimientos con esta categoría; no se puede desactivar."
+                                            : "Disponible para movimientos nuevos"
+                                        }
+                                        ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "inactiva"}`}
+                                      />
+                                    </div>
+                                    <input
+                                      type="color"
+                                      value={categoryEdit.color}
+                                      onChange={(e) => setCategoryEdit({ ...categoryEdit, color: e.target.value })}
+                                      className="h-9 w-12 shrink-0 cursor-pointer rounded border border-[#30363d] bg-[#0d1117] p-0.5 shadow-sm"
+                                      title="Color"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={busyKey !== null}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        void saveCategoryEdit();
+                                      }}
+                                      className={`${btnGreen} shrink-0 px-3 py-1.5 text-xs`}
+                                    >
+                                      Guardar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      disabled={busyKey !== null}
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setCategoryEdit(null);
+                                      }}
+                                      className={settingsGhostBtnSm}
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p
+                                      className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug"
+                                      style={{ color: cat.color }}
+                                    >
+                                      {cat.name}{" "}
+                                      <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
+                                    </p>
+                                    <div className="ml-auto flex h-8 shrink-0 items-center gap-2">
+                                      <div
+                                        className={`flex items-center ${(cat.has_transactions ?? false) ? "opacity-55" : ""}`}
                                         onClick={(e) => {
+                                          e.preventDefault();
                                           e.stopPropagation();
-                                          setSubNameEdit({ id: s.id, categoryId: cat.id, name: s.name });
                                         }}
                                       >
-                                        <IconPencil className="h-3.5 w-3.5" />
-                                      </button>
-                                    ) : null}
-                                    {bankingSubcategoryAllowsRename(cat, s) && subNameEdit?.id === s.id ? (
-                                      <div className="flex shrink-0 gap-1">
-                                        <button
-                                          type="button"
-                                          disabled={busyKey !== null}
-                                          className="rounded-md bg-indigo-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-indigo-700 disabled:opacity-40"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            void saveSubNameEdit();
-                                          }}
-                                        >
-                                          OK
-                                        </button>
-                                        <button
-                                          type="button"
-                                          disabled={busyKey !== null}
-                                          className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-800 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-700"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSubNameEdit(null);
-                                          }}
-                                        >
-                                          ✕
-                                        </button>
+                                        <BankingEnabledToggle
+                                          enabled={cat.enabled ?? true}
+                                          disabled={busyKey !== null || !!(cat.has_transactions ?? false)}
+                                          onChange={(next) => void setCategoryEnabled(cat, next)}
+                                          title={
+                                            (cat.has_transactions ?? false)
+                                              ? "Hay movimientos con esta categoría; no se puede desactivar."
+                                              : "Disponible para movimientos nuevos"
+                                          }
+                                          ariaLabel={`Categoría «${cat.name}»: ${cat.enabled ?? true ? "activa" : "inactiva"}`}
+                                        />
                                       </div>
-                                    ) : null}
-                                  </div>
-                                  <div
-                                    className={`flex shrink-0 items-center ${
-                                      (s.has_transactions ?? false) &&
-                                      (s.enabled ?? true) &&
-                                      parentEnabled
-                                        ? "opacity-55"
-                                        : ""
-                                    }`}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <BankingEnabledToggle
-                                      enabled={showOn}
-                                      disabled={toggleDisabled}
-                                      onChange={(next) => void setSubcategoryEnabled(s, next)}
-                                      title={
-                                        !parentEnabled
-                                          ? "Activa la categoría primero para poder usar o cambiar subcategorías."
-                                          : (s.has_transactions ?? false)
-                                            ? "Hay movimientos con esta subcategoría; no se puede desactivar."
-                                            : "Disponible para movimientos nuevos"
-                                      }
-                                      ariaLabel={`Subcategoría «${s.name}»: ${showOn ? "activa" : "inactiva"}`}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </SortableSubcategoryWrapper>
-                          );
-                        })}
-                      </SortableContext>
-                      <li className="mt-2 flex list-none flex-wrap items-center gap-2 border-t border-slate-300 pt-3 banking-dark:border-zinc-700">
-                        <input
-                          type="text"
-                          placeholder="Nueva subcategoría…"
-                          className="min-w-[12rem] flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-800 shadow-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-600/50 banking-dark:focus:ring-amber-500/15"
-                          value={newSubDraft[cat.id] ?? ""}
-                          onChange={(e) =>
-                            setNewSubDraft((d) => ({ ...d, [cat.id]: e.target.value }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              void createSubcategory(cat.id);
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          disabled={busyKey !== null}
-                          className={`${btnGreenBanking} shrink-0 px-3 py-1.5 text-xs`}
-                          onClick={() => void createSubcategory(cat.id)}
-                        >
-                          Añadir
-                        </button>
-                      </li>
-                    </DndContext>
-                  </ul>
-                        </details>
-                      )}
-                    </SortableCategoryWrapper>
-                  ))}
-              </SortableContext>
-              {reservedCategories.length > 0 ? (
-                <p className={`text-xs leading-relaxed ${settingsMuted}`}>
-                  Categorías reservadas para la aplicación (siempre activas; no aparecen al agregar movimientos a mano). El
-                  color sí se puede personalizar.
-                </p>
-              ) : null}
-              {reservedCategories.map((cat) => (
-                <div key={cat.id}>
-                  <details
-                    className="group overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50/50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900/35"
-                    style={softCategorySurface(cat.color)}
-                    open={expandedCategoryIds.has(cat.id)}
-                    onToggle={(e) => {
-                      const el = e.currentTarget;
-                      setExpandedCategoryIds((prev) => {
-                        const next = new Set(prev);
-                        if (el.open) next.add(cat.id);
-                        else next.delete(cat.id);
-                        return next;
-                      });
-                    }}
-                  >
-                    <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-slate-300/80 px-3 py-2.5 marker:content-none banking-dark:border-zinc-600 sm:px-4 [&::-webkit-details-marker]:hidden">
-                      <span className="inline-flex h-8 w-8 shrink-0" aria-hidden />
-                      <span
-                        className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-slate-500 banking-dark:text-zinc-400 transition-transform duration-200 group-open:rotate-180"
-                        aria-hidden
-                      >
-                        <IconChevronDown className="block h-4 w-4" />
-                      </span>
-                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                        {categoryEdit?.id === cat.id ? (
-                          <>
-                            <p
-                              className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800 banking-dark:text-zinc-100"
-                              style={{ color: cat.color }}
-                            >
-                              {cat.name}{" "}
-                              <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
-                            </p>
-                            <span
-                              className={`shrink-0 rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide banking-dark:border-zinc-600 banking-dark:bg-zinc-800 ${settingsMuted}`}
-                              title="No se puede desactivar; la app usa estas categorías internamente."
-                            >
-                              Siempre activa
-                            </span>
-                            <input
-                              type="color"
-                              value={categoryEdit.color}
-                              onChange={(e) => setCategoryEdit({ ...categoryEdit, color: e.target.value })}
-                              className="h-9 w-12 shrink-0 cursor-pointer rounded border border-slate-300 bg-white p-0.5 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-900"
-                              title="Color"
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                            <button
-                              type="button"
-                              disabled={busyKey !== null}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                void saveCategoryEdit();
-                              }}
-                              className={`${btnGreenBanking} shrink-0 px-3 py-1.5 text-xs`}
-                            >
-                              Guardar
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busyKey !== null}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                setCategoryEdit(null);
-                              }}
-                              className={settingsGhostBtnSm}
-                            >
-                              Cancelar
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <p
-                              className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug text-slate-800 banking-dark:text-zinc-100"
-                              style={{ color: cat.color }}
-                            >
-                              {cat.name}{" "}
-                              <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
-                            </p>
-                            <div className="ml-auto flex h-8 shrink-0 items-center gap-2">
-                              <span
-                                className={`shrink-0 rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-[10px] font-medium uppercase tracking-wide banking-dark:border-zinc-600 banking-dark:bg-zinc-800 ${settingsMuted}`}
-                                title="No se puede desactivar; la app usa estas categorías internamente."
-                              >
-                                Siempre activa
-                              </span>
-                              <button
-                                type="button"
-                                title="Cambiar color"
-                                className={iconBtn}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setCategoryEdit({ id: cat.id, color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR });
-                                }}
-                              >
-                                <IconPencil />
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </summary>
-                    <ul className="list-none space-y-1 px-3 py-3 sm:px-4" role="list">
-                      <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={(e) => handleSubcategoriesDragEnd(cat.id, e)}
-                      >
-                        <SortableContext
-                          items={cat.subcategories.map((s) => subSortableId(s.id))}
-                          strategy={verticalListSortingStrategy}
-                        >
-                          {cat.subcategories.map((s) => {
-                            const dragDisabled = busyKey !== null;
-                            return (
-                              <SortableSubcategoryWrapper key={s.id} subId={s.id} disabled={dragDisabled}>
-                                {(handle) => (
-                                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-2 py-2 text-xs text-slate-600 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-900/70 banking-dark:text-zinc-300">
-                                    <div className="flex min-w-0 flex-1 items-center gap-2">
-                                      <CategoryDragHandleButton
-                                        setActivatorNodeRef={handle.setActivatorNodeRef}
-                                        attributes={handle.attributes}
-                                        listeners={handle.listeners}
-                                        disabled={dragDisabled}
-                                        title="Arrastrar para reordenar subcategorías"
-                                        aria-label="Arrastrar para reordenar subcategoría"
-                                        className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 ${categoryHandleHover} active:cursor-grabbing ${
-                                          dragDisabled ? "cursor-not-allowed opacity-40" : "cursor-grab"
-                                        }`}
-                                      >
-                                        <IconGripVertical className="block h-3.5 w-3.5" />
-                                      </CategoryDragHandleButton>
-                                      <span className="min-w-0 flex-1">{s.name}</span>
+                                      <BankingSettingsMenu
+                                        ariaLabel={`Acciones para «${cat.name}»`}
+                                        items={[
+                                          {
+                                            label: cat.names_locked ? "Editar color" : "Editar",
+                                            icon: cat.names_locked ? (
+                                              <IconPalette className="h-3.5 w-3.5" />
+                                            ) : (
+                                              <IconPencil className="h-3.5 w-3.5" />
+                                            ),
+                                            onClick: () => {
+                                              if (cat.names_locked) {
+                                                setCategoryFullEdit(null);
+                                                setCategoryEdit({
+                                                  id: cat.id,
+                                                  color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR,
+                                                });
+                                              } else {
+                                                setCategoryEdit(null);
+                                                setCategoryFullEdit({
+                                                  id: cat.id,
+                                                  name: cat.name,
+                                                  color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR,
+                                                });
+                                              }
+                                            },
+                                          },
+                                          {
+                                            label: "Eliminar categoría",
+                                            icon: <IconTrash className="h-3.5 w-3.5" />,
+                                            danger: true,
+                                            disabled: cat.names_locked || !!(cat.has_transactions ?? false) || busyKey !== null,
+                                            title: cat.names_locked
+                                              ? "Categoría fijada por plantilla: no se puede eliminar."
+                                              : (cat.has_transactions ?? false)
+                                                ? "Hay movimientos con esta categoría; no se puede eliminar."
+                                                : "Eliminar categoría",
+                                            onClick: () => void removeCategory(cat),
+                                          },
+                                        ]}
+                                      />
                                     </div>
-                                    <span
-                                      className={`shrink-0 text-[10px] font-medium uppercase tracking-wide ${settingsMuted}`}
-                                      title="Las subcategorías de esta categoría están siempre activas para la aplicación."
-                                    >
-                                      Activa
-                                    </span>
-                                  </div>
+                                  </>
                                 )}
-                              </SortableSubcategoryWrapper>
-                            );
-                          })}
-                        </SortableContext>
-                      </DndContext>
-                    </ul>
-                  </details>
+                              </div>
+                            </summary>
+                            <ul className="list-none space-y-1.5 px-3 py-3 sm:px-4" role="list">
+                              <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={(e) => handleSubcategoriesDragEnd(cat.id, e)}
+                              >
+                                <SortableContext
+                                  items={cat.subcategories.map((s) => subSortableId(s.id))}
+                                  strategy={verticalListSortingStrategy}
+                                >
+                                  {cat.subcategories.map((s) => {
+                                    const parentEnabled = cat.enabled ?? true;
+                                    const dragDisabled = busyKey !== null || !parentEnabled;
+                                    const toggleDisabled =
+                                      busyKey !== null ||
+                                      !!(s.has_transactions ?? false) ||
+                                      !parentEnabled;
+                                    const showOn = parentEnabled ? (s.enabled ?? true) : false;
+                                    const canRename = bankingSubcategoryAllowsRename(cat, s);
+                                    const canDelete = canRename && !s.has_transactions;
+                                    const isEditingThis = subNameEdit?.id === s.id;
+                                    return (
+                                      <SortableSubcategoryWrapper key={s.id} subId={s.id} disabled={dragDisabled}>
+                                        {(handle) =>
+                                          isEditingThis ? (
+                                            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#8FBFA6]/50 bg-[#0d1117] p-2">
+                                              <input
+                                                type="text"
+                                                className="min-w-[8rem] flex-1 rounded-md border border-[#30363d] bg-[#12161d] px-2.5 py-1.5 text-sm text-white outline-none focus:border-[#8FBFA6]"
+                                                value={subNameEdit.name}
+                                                onChange={(e) => setSubNameEdit({ ...subNameEdit, name: e.target.value })}
+                                                onClick={(e) => e.stopPropagation()}
+                                                aria-label="Nombre de subcategoría"
+                                                autoFocus
+                                              />
+                                              <div className="flex shrink-0 gap-1.5">
+                                                <button
+                                                  type="button"
+                                                  disabled={busyKey !== null}
+                                                  className="rounded-md bg-[#22c55e] px-3 py-1.5 text-xs font-semibold text-[#0d1117] hover:brightness-110 disabled:opacity-40"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    void saveSubNameEdit();
+                                                  }}
+                                                >
+                                                  Guardar
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  disabled={busyKey !== null}
+                                                  className="rounded-md border border-[#30363d] px-3 py-1.5 text-xs text-[#8b949e] hover:bg-[#1c2129]"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSubNameEdit(null);
+                                                  }}
+                                                >
+                                                  Cancelar
+                                                </button>
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div
+                                              className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2 py-2 text-xs ${
+                                                parentEnabled
+                                                  ? "border-[#1e242e] bg-[#0d1117] text-[#c9d1d9]"
+                                                  : "cursor-not-allowed border-[#1e242e] bg-[#0d1117]/60 text-[#6b7280]"
+                                              }`}
+                                              aria-disabled={!parentEnabled}
+                                            >
+                                              <div className="flex min-w-0 flex-1 items-center gap-2">
+                                                <CategoryDragHandleButton
+                                                  setActivatorNodeRef={handle.setActivatorNodeRef}
+                                                  attributes={handle.attributes}
+                                                  listeners={handle.listeners}
+                                                  disabled={dragDisabled}
+                                                  title="Arrastrar para reordenar subcategorías"
+                                                  aria-label="Arrastrar para reordenar subcategoría"
+                                                  className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 ${categoryHandleHover} active:cursor-grabbing ${
+                                                    dragDisabled ? "cursor-not-allowed opacity-40" : "cursor-grab"
+                                                  }`}
+                                                >
+                                                  <IconGripVertical className="block h-3.5 w-3.5" />
+                                                </CategoryDragHandleButton>
+                                                <span className="min-w-0 flex-1">{s.name}</span>
+                                              </div>
+                                              <div
+                                                className="flex shrink-0 items-center gap-2"
+                                                onClick={(e) => e.stopPropagation()}
+                                              >
+                                                <div
+                                                  className={`flex flex-col items-center gap-0.5 ${
+                                                    (s.has_transactions ?? false) && (s.enabled ?? true) && parentEnabled
+                                                      ? "opacity-55"
+                                                      : ""
+                                                  }`}
+                                                >
+                                                  <span className="text-[9px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                                                    Activa
+                                                  </span>
+                                                  <BankingEnabledToggle
+                                                    enabled={showOn}
+                                                    disabled={toggleDisabled}
+                                                    onChange={(next) => void setSubcategoryEnabled(s, next)}
+                                                    title={
+                                                      !parentEnabled
+                                                        ? "Activa la categoría primero para poder usar o cambiar subcategorías."
+                                                        : (s.has_transactions ?? false)
+                                                          ? "Hay movimientos con esta subcategoría; no se puede desactivar."
+                                                          : "Disponible para movimientos nuevos"
+                                                    }
+                                                    ariaLabel={`Subcategoría «${s.name}»: ${showOn ? "activa" : "inactiva"}`}
+                                                  />
+                                                </div>
+                                                {canRename || canDelete ? (
+                                                  <BankingSettingsMenu
+                                                    ariaLabel={`Acciones para «${s.name}»`}
+                                                    items={[
+                                                      ...(canRename
+                                                        ? [
+                                                            {
+                                                              label: "Renombrar",
+                                                              icon: <IconPencil className="h-3.5 w-3.5" />,
+                                                              disabled: busyKey !== null || !parentEnabled,
+                                                              onClick: () =>
+                                                                setSubNameEdit({ id: s.id, categoryId: cat.id, name: s.name }),
+                                                            },
+                                                          ]
+                                                        : []),
+                                                      ...(canDelete
+                                                        ? [
+                                                            {
+                                                              label: "Eliminar",
+                                                              icon: <IconTrash className="h-3.5 w-3.5" />,
+                                                              danger: true,
+                                                              disabled: busyKey !== null || !parentEnabled,
+                                                              onClick: () => void removeSubcategory(cat, s),
+                                                            },
+                                                          ]
+                                                        : []),
+                                                    ]}
+                                                  />
+                                                ) : null}
+                                              </div>
+                                            </div>
+                                          )
+                                        }
+                                      </SortableSubcategoryWrapper>
+                                    );
+                                  })}
+                                </SortableContext>
+                              </DndContext>
+                              <li className="mt-2 flex list-none flex-wrap items-center gap-2 border-t border-[#1e242e] pt-3">
+                                <input
+                                  type="text"
+                                  value={newSubDraft[cat.id] ?? ""}
+                                  onChange={(e) => setNewSubDraft((d) => ({ ...d, [cat.id]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      void createSubcategory(cat.id);
+                                    }
+                                  }}
+                                  placeholder="Nueva subcategoría…"
+                                  className="min-w-[10rem] flex-1 rounded-lg border border-[#30363d] bg-[#0d1117] px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#58a6ff]"
+                                  disabled={busyKey !== null || !(cat.enabled ?? true)}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={busyKey !== null || !(cat.enabled ?? true)}
+                                  className={`${btnGreen} shrink-0 px-3 py-1.5 text-xs`}
+                                  onClick={() => void createSubcategory(cat.id)}
+                                >
+                                  Añadir
+                                </button>
+                              </li>
+                            </ul>
+                          </details>
+                        )}
+                      </SortableCategoryWrapper>
+                    ))}
+                  </SortableContext>
+                  {reservedCategories.length > 0 ? (
+                    <p className={`text-xs leading-relaxed ${settingsMuted}`}>
+                      Categorías reservadas para la aplicación (siempre activas; no aparecen al agregar movimientos a
+                      mano). El color sí se puede personalizar.
+                    </p>
+                  ) : null}
+                  {reservedCategories.map((cat) => (
+                    <div key={cat.id}>
+                      <details
+                        className="group overflow-hidden rounded-2xl border border-dashed border-[#30363d] bg-[#12161d]/60"
+                        style={softCategorySurface(cat.color)}
+                        open={expandedCategoryIds.has(cat.id)}
+                        onToggle={(e) => {
+                          const el = e.currentTarget;
+                          setExpandedCategoryIds((prev) => {
+                            const next = new Set(prev);
+                            if (el.open) next.add(cat.id);
+                            else next.delete(cat.id);
+                            return next;
+                          });
+                        }}
+                      >
+                        <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-[#30363d] px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
+                          <span className="inline-flex h-8 w-8 shrink-0" aria-hidden />
+                          <span
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-[#6b7280] transition-transform duration-200 group-open:rotate-180"
+                            aria-hidden
+                          >
+                            <IconChevronDown className="block h-4 w-4" />
+                          </span>
+                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                            {categoryEdit?.id === cat.id ? (
+                              <>
+                                <p className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: cat.color }}>
+                                  {cat.name}{" "}
+                                  <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
+                                </p>
+                                <span className="shrink-0 rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[#8b949e]">
+                                  Siempre activa
+                                </span>
+                                <input
+                                  type="color"
+                                  value={categoryEdit.color}
+                                  onChange={(e) => setCategoryEdit({ ...categoryEdit, color: e.target.value })}
+                                  className="h-9 w-12 shrink-0 cursor-pointer rounded border border-[#30363d] bg-[#0d1117] p-0.5 shadow-sm"
+                                  title="Color"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={busyKey !== null}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    void saveCategoryEdit();
+                                  }}
+                                  className={`${btnGreen} shrink-0 px-3 py-1.5 text-xs`}
+                                >
+                                  Guardar
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busyKey !== null}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setCategoryEdit(null);
+                                  }}
+                                  className={settingsGhostBtnSm}
+                                >
+                                  Cancelar
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <p className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: cat.color }}>
+                                  {cat.name}{" "}
+                                  <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
+                                </p>
+                                <div className="ml-auto flex h-8 shrink-0 items-center gap-2">
+                                  <span className="shrink-0 rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[#8b949e]">
+                                    Siempre activa
+                                  </span>
+                                  <button
+                                    type="button"
+                                    title="Cambiar color"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8b949e] transition hover:bg-[#1c2129] hover:text-[#e6edf3]"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setCategoryEdit({ id: cat.id, color: cat.color || BANKING_DEFAULT_NEW_CATEGORY_COLOR });
+                                    }}
+                                  >
+                                    <IconPencil className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </summary>
+                        <ul className="list-none space-y-1.5 px-3 py-3 sm:px-4" role="list">
+                          <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={(e) => handleSubcategoriesDragEnd(cat.id, e)}
+                          >
+                            <SortableContext
+                              items={cat.subcategories.map((s) => subSortableId(s.id))}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {cat.subcategories.map((s) => {
+                                const dragDisabled = busyKey !== null;
+                                return (
+                                  <SortableSubcategoryWrapper key={s.id} subId={s.id} disabled={dragDisabled}>
+                                    {(handle) => (
+                                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#1e242e] bg-[#0d1117] px-2 py-2 text-xs text-[#c9d1d9]">
+                                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                                          <CategoryDragHandleButton
+                                            setActivatorNodeRef={handle.setActivatorNodeRef}
+                                            attributes={handle.attributes}
+                                            listeners={handle.listeners}
+                                            disabled={dragDisabled}
+                                            title="Arrastrar para reordenar subcategorías"
+                                            aria-label="Arrastrar para reordenar subcategoría"
+                                            className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent p-0 ${categoryHandleHover} active:cursor-grabbing ${
+                                              dragDisabled ? "cursor-not-allowed opacity-40" : "cursor-grab"
+                                            }`}
+                                          >
+                                            <IconGripVertical className="block h-3.5 w-3.5" />
+                                          </CategoryDragHandleButton>
+                                          <span className="min-w-0 flex-1">{s.name}</span>
+                                        </div>
+                                        <span
+                                          className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-[#6b7280]"
+                                          title="Las subcategorías de esta categoría están siempre activas para la aplicación."
+                                        >
+                                          Activa
+                                        </span>
+                                      </div>
+                                    )}
+                                  </SortableSubcategoryWrapper>
+                                );
+                              })}
+                            </SortableContext>
+                          </DndContext>
+                        </ul>
+                      </details>
+                    </div>
+                  ))}
                 </div>
-              ))}
-                </div>
-              <DragOverlay
-                adjustScale={false}
-                dropAnimation={null}
-                className="z-[90] box-border w-full max-w-[min(100vw-2rem,42rem)] min-w-0"
-              >
-                {activeDragCategory ? (
-                  <CategoryDragPreview
-                    cat={activeDragCategory}
-                    expanded={expandedCategoryIds.has(activeDragCategory.id)}
-                  />
-                ) : null}
-              </DragOverlay>
-            </DndContext>
-          )}
-        </div>
-      </section>
+                <DragOverlay
+                  adjustScale={false}
+                  dropAnimation={null}
+                  className="z-[90] box-border w-full max-w-[min(100vw-2rem,42rem)] min-w-0"
+                >
+                  {activeDragCategory ? (
+                    <CategoryDragPreview
+                      cat={activeDragCategory}
+                      expanded={expandedCategoryIds.has(activeDragCategory.id)}
+                    />
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            )}
+          </div>
+        )}
 
-      <p className={`text-center text-xs ${settingsMuted}`}>
-        <Link
-          to="/banking/transactions"
-          className="font-medium text-indigo-700 hover:text-indigo-900 hover:underline banking-dark:text-amber-400 banking-dark:hover:text-amber-300"
-        >
-          Ir a movimientos
-        </Link>
-      </p>
+        <p className="mt-10 text-center text-xs text-[#6e7681]">
+          <Link to="/banking/transactions" className="font-medium text-[#8FBFA6] hover:underline">
+            Ir a movimientos
+          </Link>
+        </p>
+      </div>
 
       {accountModalOpen && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[2px] banking-dark:bg-black/55"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="banking-product-modal-title"
         >
-          <div className="w-full max-w-lg rounded-xl border border-slate-300 bg-white p-6 shadow-2xl shadow-indigo-900/10 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:shadow-black/40">
-            <h3
-              id="banking-product-modal-title"
-              className="text-base font-semibold text-slate-900 banking-dark:text-zinc-100"
-            >
+          <div className="w-full max-w-lg rounded-2xl border border-[#21262d] bg-[#161b22] p-6 shadow-2xl shadow-black/40">
+            <h3 id="banking-product-modal-title" className="text-base font-semibold text-white">
               {editingAccount ? "Editar producto" : "Nuevo producto"}
             </h3>
             <div className="mt-5 space-y-4">
@@ -1711,15 +1836,15 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                     ))}
                   </select>
                   {bankSbif.trim() !== "" && linkedCheckingOptions.length === 0 ? (
-                    <p className="mt-1.5 text-xs text-amber-800/95 banking-dark:text-amber-200">
+                    <p className="mt-1.5 text-xs text-[#d29922]">
                       No tienes una cuenta corriente en este banco. Agrégala primero y vuelve a editar esta tarjeta.
                     </p>
                   ) : null}
                 </label>
               ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50/90 px-3 py-3 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-800/75">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#30363d] bg-[#0d1117]/60 px-3 py-3 shadow-sm">
                 <div className="min-w-0">
-                  <span className="text-xs font-medium text-slate-800 banking-dark:text-zinc-100">Activa</span>
+                  <span className="text-xs font-medium text-white">Activa</span>
                   <p className={`mt-1 text-[11px] leading-snug ${settingsMuted}`}>
                     Visible al registrar movimientos. Si está desactivado, no aparece al elegir cuenta (solo CLP en el
                     sistema).
@@ -1734,9 +1859,9 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
                 />
               </div>
               {productType !== "tarjeta_credito" ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-300 bg-slate-50/90 px-3 py-3 shadow-sm banking-dark:border-zinc-600 banking-dark:bg-zinc-800/75">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#30363d] bg-[#0d1117]/60 px-3 py-3 shadow-sm">
                   <div className="min-w-0">
-                    <span className="text-xs font-medium text-slate-800 banking-dark:text-zinc-100">En total</span>
+                    <span className="text-xs font-medium text-white">En total</span>
                     <p className={`mt-1 text-[11px] leading-snug ${settingsMuted}`}>
                       Incluir en «Saldo real» del resumen en Movimientos. Si está desactivado, la cuenta no suma en la
                       tarjeta Total (útil para respaldos o transitorias). La deuda de tarjeta asociada a esta cuenta
@@ -1772,19 +1897,13 @@ export function BankingSettingsPage({ onToast }: { onToast: (msg: string | null)
               >
                 Cancelar
               </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void saveAccountModal()}
-                className={btnGreenBanking}
-              >
+              <button type="button" disabled={saving} onClick={() => void saveAccountModal()} className={btnGreen}>
                 {saving ? "Guardando…" : "Guardar"}
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
     </div>
   );
 }

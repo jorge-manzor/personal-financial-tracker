@@ -197,14 +197,14 @@ async def sync_pipeline_prices_and_portfolio(db: Session, force: bool, user_id: 
     from fintual_sync import sync_all_fintual
 
     try:
-        store_today_rate(db, user_id)
+        await asyncio.to_thread(store_today_rate, db, user_id)
     except Exception as e:
         logger.warning("exchange rate fetch: %s", e)
         db.rollback()
 
     try:
-        sync_all_fintual(db, user_id, force_prices=force)
-        ensure_cache(db, user_id, force=force)
+        await asyncio.to_thread(sync_all_fintual, db, user_id, force_prices=force)
+        await asyncio.to_thread(ensure_cache, db, user_id, force=force)
         clear_fintual_reconnect_required(db, user_id)
     except Exception as e:
         if is_likely_fintual_auth_error(e):

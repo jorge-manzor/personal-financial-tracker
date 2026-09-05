@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta, timezone
@@ -368,6 +369,17 @@ def compute_portfolio_history(db: Session, from_date: date, to_date: date, user_
     latest_close_by_ticker = _latest_close_by_ticker(db, tickers)
     tx_by_date = _tx_by_date(db, user_id)
 
+    from fintual_client import fintual_configured
+
+    goal_series_list: list[list[tuple[date, float, float]]] = []
+    if fintual_configured():
+        from chart_goal_fondos import _forward_fill_val_cost, _goal_balance_series_list
+
+        try:
+            goal_series_list = _goal_balance_series_list(db, user_id)
+        except Exception as exc:
+            logger.warning("goal balance series (compute_portfolio_history): %s", exc)
+
     splits_by_date: dict[date, list[StockSplit]] = defaultdict(list)
     for sp in (
         db.query(StockSplit)
@@ -438,6 +450,18 @@ def compute_portfolio_history(db: Session, from_date: date, to_date: date, user_
         manuales_valor = float(b["manuales_usd"])
         fondos_invertido = fondos_afp_state.fondos_usd
         afp_invertido = fondos_afp_state.afp_usd
+
+        if goal_series_list:
+            rate = float(b["exchange_rate_usd_clp"]) or 950.0
+            gv_clp = 0.0
+            gc_clp = 0.0
+            for goal_series in goal_series_list:
+                v, c = _forward_fill_val_cost(goal_series, d)
+                gv_clp += v
+                gc_clp += c
+            fondos_valor += gv_clp / rate
+            fondos_invertido = max(fondos_invertido, gc_clp / rate)
+
         total_valor = acciones_valor + fondos_valor + afp_valor + manuales_valor
         total_invertido = acciones_invertido + fondos_invertido + afp_invertido
 
@@ -461,7 +485,26 @@ def compute_portfolio_history(db: Session, from_date: date, to_date: date, user_
     db.commit()
 
 
+_ensure_cache_locks: dict[int, threading.Lock] = defaultdict(threading.Lock)
+_ensure_cache_locks_guard = threading.Lock()
+
+
+def _ensure_cache_lock_for(user_id: int) -> threading.Lock:
+    with _ensure_cache_locks_guard:
+        return _ensure_cache_locks[user_id]
+
+
 def ensure_cache(db: Session, user_id: int, force: bool = False) -> tuple[bool, date | None]:
+    """
+    Serializado por usuario: dos requests concurrentes (p. ej. `/dashboard-initial` y
+    `/chart-data` al cargar la página) no deben recalcular el historial completo cada
+    una por su cuenta — la segunda espera a la primera y encuentra el caché ya fresco.
+    """
+    with _ensure_cache_lock_for(user_id):
+        return _ensure_cache_impl(db, user_id, force=force)
+
+
+def _ensure_cache_impl(db: Session, user_id: int, force: bool = False) -> tuple[bool, date | None]:
     """Returns (did_compute, last_trading_day)."""
     last_td = get_last_trading_day()
     first_tx = get_first_transaction_date(db, user_id)

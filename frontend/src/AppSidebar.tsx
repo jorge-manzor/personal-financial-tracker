@@ -279,7 +279,7 @@ export function AppSidebar({
         )}
         {investmentsEnabled && (
           <>
-            <SidebarNavLink to="/" end label="Panel">
+            <SidebarNavLink to="/portfolio" label="Panel">
               <IconDashboard className="shrink-0" />
             </SidebarNavLink>
             <SidebarNavLink to="/transactions" label="Transacciones">
