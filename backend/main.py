@@ -39,10 +39,11 @@ from banking_routes import router as banking_router
 from projects_routes import router as projects_router
 from database import Base, SessionLocal, engine, get_db
 from exchange_service import (
+    build_rate_series,
     ensure_exchange_history,
     get_latest_rate,
     get_previous_rate,
-    get_rate_for_date,
+    rate_from_series,
     store_today_rate,
 )
 from fintual_goals_dashboard import fetch_active_goal_cards, fetch_cached_goal_cards, upsert_goal_cache
@@ -1378,6 +1379,7 @@ def chart_data(
     by_date: dict[date, dict[str, PortfolioValueCache]] = {}
     for r in rows:
         by_date.setdefault(r.fecha, {})[r.categoria] = r
+    rate_series = build_rate_series(db)
     out: list[ChartRow] = []
     for d in sorted(by_date.keys()):
         m = by_date[d]
@@ -1388,7 +1390,7 @@ def chart_data(
         tot = m.get("total")
         tv = tot.valor if tot else 0.0
         ti = tot.invertido if tot else 0.0
-        rate = float(get_rate_for_date(db, d))
+        rate = rate_from_series(rate_series, d)
         if rate <= 0:
             rate = 950.0
         out.append(

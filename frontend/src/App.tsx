@@ -156,8 +156,10 @@ export default function App() {
     setDataVersion((v) => v + 1);
   }, []);
 
+  // No depende de `ready`: así el request sale en paralelo con /dashboard-initial en vez de
+  // esperar a que ese termine (ensure_cache ya está serializado por usuario para esto, ver history.py).
   useEffect(() => {
-    if (!ready || !me?.services.investments) return;
+    if (!me?.services.investments) return;
     let cancelled = false;
     setChartLoading(true);
     fetchJson<ChartRow[]>(`/chart-data?period=${period}`)
@@ -171,7 +173,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [period, ready, dataVersion, me?.services.investments]);
+  }, [period, dataVersion, me?.services.investments]);
 
   const beginSync = useCallback((force: boolean, fullScreen = true) => {
     fetchJson<SyncStatus>("/sync-status").then((st) => {

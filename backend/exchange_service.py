@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bisect
 import json
 import logging
 import urllib.request
@@ -191,6 +192,27 @@ def get_rate_for_date(db: Session, d: date) -> float:
     if row:
         return float(row.usd_to_clp)
     return 950.0
+
+
+def build_rate_series(db: Session) -> list[tuple[date, float]]:
+    """Historial completo ordenado por fecha, para lookup en memoria (evita N+1 en loops por día)."""
+    rows = (
+        db.query(ExchangeRateHistory.date, ExchangeRateHistory.usd_to_clp)
+        .order_by(ExchangeRateHistory.date)
+        .all()
+    )
+    return [(r[0], float(r[1])) for r in rows]
+
+
+def rate_from_series(series: list[tuple[date, float]], d: date) -> float:
+    """Mismo fallback que `get_rate_for_date`: último <= d; si no hay, el más reciente global."""
+    if not series:
+        return 950.0
+    dates = [s[0] for s in series]
+    i = bisect.bisect_right(dates, d) - 1
+    if i >= 0:
+        return series[i][1]
+    return series[-1][1]
 
 
 def get_previous_rate(db: Session) -> float | None:
