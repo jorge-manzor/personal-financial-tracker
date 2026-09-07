@@ -33,25 +33,6 @@ function IconProfile({ className }: { className?: string }) {
   );
 }
 
-function IconTransactions({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="28"
-      height="28"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-    </svg>
-  );
-}
-
 function IconBanking({ className }: { className?: string }) {
   return (
     <svg
@@ -73,7 +54,7 @@ function IconBanking({ className }: { className?: string }) {
   );
 }
 
-function IconPersonalOrder({ className }: { className?: string }) {
+function IconProvisions({ className }: { className?: string }) {
   return (
     <svg
       className={className}
@@ -90,6 +71,27 @@ function IconPersonalOrder({ className }: { className?: string }) {
       <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
       <path d="M12 12h.01M12 16h.01M16 12h.01M16 16h.01M9 12h1M9 16h7" />
       <path d="M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v0a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v0z" />
+    </svg>
+  );
+}
+
+function IconSavingsGoal({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -235,8 +237,11 @@ export function AppSidebar({
             <SidebarNavLink to="/banking/transactions" label="Movimientos bancarios">
               <IconBanking className="shrink-0" />
             </SidebarNavLink>
-            <SidebarNavLink to="/banking/personal-order" label="Orden personal">
-              <IconPersonalOrder className="shrink-0" />
+            <SidebarNavLink to="/banking/provisiones" label="Provisiones">
+              <IconProvisions className="shrink-0" />
+            </SidebarNavLink>
+            <SidebarNavLink to="/banking/ahorro-objetivo" label="Ahorro por objetivo">
+              <IconSavingsGoal className="shrink-0" />
             </SidebarNavLink>
             <SidebarNavLink to="/banking/savings-calculator" label="Calculadora ahorros">
               <IconSavingsCalc className="shrink-0" />
@@ -255,19 +260,14 @@ export function AppSidebar({
           <div className="my-2 h-px w-8 self-center bg-[#1a1f2e]" aria-hidden />
         )}
         {investmentsEnabled && (
-          <>
-            <SidebarNavLink to="/portfolio" label="Panel">
-              <IconDashboard className="shrink-0" />
-            </SidebarNavLink>
-            <SidebarNavLink to="/transactions" label="Transacciones">
-              <IconTransactions className="shrink-0" />
-            </SidebarNavLink>
-          </>
+          <SidebarNavLink to="/portfolio" label="Panel">
+            <IconDashboard className="shrink-0" />
+          </SidebarNavLink>
         )}
       </nav>
 
       <div className="mt-auto flex w-full flex-col items-center gap-1 pt-4">
-        {(bankingEnabled || proyectosEnabled) && (
+        {(bankingEnabled || proyectosEnabled || investmentsEnabled) && (
           <div className="group relative flex w-full justify-center">
             <button
               type="button"

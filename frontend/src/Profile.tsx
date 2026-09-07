@@ -74,6 +74,15 @@ function IconBank({ className }: { className?: string }) {
   );
 }
 
+/** Igual a IconBank pero con `currentColor`, para el nav de pestañas (hereda el color activo/inactivo del botón). */
+function IconBankNav({ className }: { className?: string }) {
+  return (
+    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 10 L12 4 L21 10 M4 10 V19 M20 10 V19 M8 10 V19 M16 10 V19 M2 19 H22" />
+    </svg>
+  );
+}
+
 function IconFlag({ className }: { className?: string }) {
   return (
     <svg className={className} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2dd4bf" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -107,8 +116,8 @@ function ServiceToggle({
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={onToggle}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#12161d] disabled:cursor-not-allowed disabled:opacity-50 ${
-        on ? "border-[#166534] bg-[#22c55e]/90" : "border-[#30363d] bg-[#21262d]"
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFFFF] banking-dark:focus-visible:ring-offset-[#12161d] disabled:cursor-not-allowed disabled:opacity-50 ${
+        on ? "border-[#6FA588] bg-[#8FBFA6]" : "border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#EDE7D9] banking-dark:bg-[#21262d]"
       }`}
     >
       <span
@@ -159,11 +168,11 @@ function FintualCredentialsBlock({
   const hasAny = cookie.length > 0 || uid.length > 0;
 
   return (
-    <div className="relative rounded-lg border border-[#21262d] bg-[#0d1117] p-3 pr-12">
+    <div className="relative rounded-lg border border-[#EDE7D9] banking-dark:border-[#21262d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] p-3 pr-12">
       <button
         type="button"
         onClick={onToggleReveal}
-        className="absolute right-2 top-2 rounded-md p-1.5 text-[#8b949e] outline-none hover:bg-[#21262d] hover:text-[#e6edf3] focus-visible:ring-2 focus-visible:ring-[#58a6ff]"
+        className="absolute right-2 top-2 rounded-md p-1.5 text-[#8A8072] banking-dark:text-[#8b949e] outline-none hover:bg-[#EDE7D9] banking-dark:hover:bg-[#21262d] hover:text-[#2B2620] banking-dark:hover:text-[#e6edf3] focus-visible:ring-2 focus-visible:ring-[#58a6ff]"
         aria-pressed={reveal}
         aria-label={reveal ? "Ocultar credenciales" : "Mostrar credenciales"}
         title={reveal ? "Ocultar" : "Mostrar"}
@@ -173,17 +182,17 @@ function FintualCredentialsBlock({
 
       <div className="space-y-3">
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-[#6e7681]">Cookie _fintual_session_cookie</p>
-          <p className="mt-1 break-all font-mono text-xs leading-relaxed text-[#e6edf3]">{showCookie}</p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Cookie _fintual_session_cookie</p>
+          <p className="mt-1 break-all font-mono text-xs leading-relaxed text-[#2B2620] banking-dark:text-[#F3F1EC]">{showCookie}</p>
         </div>
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-wide text-[#6e7681]">UID</p>
-          <p className="mt-1 break-all font-mono text-xs leading-relaxed text-[#e6edf3]">{showUid}</p>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">UID</p>
+          <p className="mt-1 break-all font-mono text-xs leading-relaxed text-[#2B2620] banking-dark:text-[#F3F1EC]">{showUid}</p>
         </div>
       </div>
 
       {!hasAny && (
-        <p className="mt-2 text-xs text-[#8b949e]">Aún no hay credenciales guardadas. Conecta Fintual cuando la app te lo indique o con el botón de abajo.</p>
+        <p className="mt-2 text-xs text-[#8A8072] banking-dark:text-[#8b949e]">Aún no hay credenciales guardadas. Conecta Fintual cuando la app te lo indique o con el botón de abajo.</p>
       )}
     </div>
   );
@@ -229,7 +238,7 @@ export function Profile({
   const proy = me.services.proyectos;
   const initial = me.email.trim().charAt(0).toUpperCase() || "?";
 
-  const navItems = bank ? [...NAV_ITEMS, { id: "banking" as const, label: "Banking", icon: IconBank }] : NAV_ITEMS;
+  const navItems = bank ? [...NAV_ITEMS, { id: "banking" as const, label: "Banking", icon: IconBankNav }] : NAV_ITEMS;
 
   async function setInvestments(next: boolean) {
     if (next === inv) return;
@@ -305,14 +314,16 @@ export function Profile({
   return (
     <div className="mx-auto flex max-w-[940px] gap-10 p-4 pb-28 md:p-6">
       <nav className="w-[190px] shrink-0">
-        <h2 className="mb-5 text-xl font-semibold tracking-tight text-white">Perfil</h2>
+        <h2 className="mb-5 text-xl font-semibold tracking-tight text-[#2B2620] banking-dark:text-[#F3F1EC]">Perfil</h2>
         {navItems.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             type="button"
             onClick={() => setTab(id)}
             className={`mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
-              tab === id ? "bg-[#8FBFA6]/10 text-[#8FBFA6]" : "text-[#8b949e] hover:text-[#c9d1d9]"
+              tab === id
+                ? "bg-[#8FBFA6]/16 banking-dark:bg-[#8FBFA6]/10 text-[#5C7F6C] banking-dark:text-[#8FBFA6]"
+                : "text-[#8A8072] banking-dark:text-[#8b949e] hover:text-[#4A453C] banking-dark:hover:text-[#c9d1d9]"
             }`}
           >
             <Icon className="shrink-0" />
@@ -325,20 +336,20 @@ export function Profile({
         {tab === "cuenta" && (
           <div>
             <div className="mb-5">
-              <h3 className="text-base font-semibold text-white">Cuenta</h3>
-              <p className="mt-1 text-[13px] text-[#8b949e]">Tu identidad en Zendo Finance.</p>
+              <h3 className="text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">Cuenta</h3>
+              <p className="mt-1 text-[13px] text-[#8A8072] banking-dark:text-[#8b949e]">Tu identidad en Zendo Finance.</p>
             </div>
-            <div className="flex items-center gap-4 rounded-2xl border border-[#21262d] bg-[#12161d] p-6">
+            <div className="flex items-center gap-4 rounded-2xl border border-[#EDE7D9] banking-dark:border-[#21262d] bg-[#FFFFFF] banking-dark:bg-[#12161d] p-6">
               <div
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-semibold text-[#0d1117]"
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-semibold text-[#1F2E25]"
                 style={{ background: "linear-gradient(135deg, #8FBFA6, #C79A56)" }}
                 aria-hidden
               >
                 {initial}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-[15px] font-semibold text-[#F3F1EC]">{me.email}</p>
-                <p className="mt-0.5 text-xs text-[#6b7280]">Cuenta Zendo Finance</p>
+                <p className="truncate text-[15px] font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">{me.email}</p>
+                <p className="mt-0.5 text-xs text-[#9A9284] banking-dark:text-[#6b7280]">Cuenta Zendo Finance</p>
               </div>
             </div>
           </div>
@@ -347,15 +358,15 @@ export function Profile({
         {tab === "seguridad" && (
           <div>
             <div className="mb-5">
-              <h3 className="text-base font-semibold text-white">Seguridad</h3>
-              <p className="mt-1 text-[13px] text-[#8b949e]">Cambia tu contraseña de acceso a Zendo Finance.</p>
+              <h3 className="text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">Seguridad</h3>
+              <p className="mt-1 text-[13px] text-[#8A8072] banking-dark:text-[#8b949e]">Cambia tu contraseña de acceso a Zendo Finance.</p>
             </div>
             <form
-              className="rounded-2xl border border-[#21262d] bg-[#12161d] p-6"
+              className="rounded-2xl border border-[#EDE7D9] banking-dark:border-[#21262d] bg-[#FFFFFF] banking-dark:bg-[#12161d] p-6"
               onSubmit={(e) => void onChangePassword(e)}
             >
               <label className="block">
-                <span className="text-xs text-[#8b949e]">Contraseña actual</span>
+                <span className="text-xs text-[#8A8072] banking-dark:text-[#8b949e]">Contraseña actual</span>
                 <input
                   type="password"
                   autoComplete="current-password"
@@ -364,12 +375,12 @@ export function Profile({
                     setCurrentPw(e.target.value);
                     setPwOk(false);
                   }}
-                  className="mt-1.5 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-white outline-none focus:border-[#58a6ff]"
+                  className="mt-1.5 w-full rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] px-3 py-2 text-sm text-[#2B2620] banking-dark:text-[#F3F1EC] outline-none focus:border-[#58a6ff]"
                   disabled={pwSaving}
                 />
               </label>
               <label className="mt-3 block">
-                <span className="text-xs text-[#8b949e]">Nueva contraseña (mín. 6 caracteres)</span>
+                <span className="text-xs text-[#8A8072] banking-dark:text-[#8b949e]">Nueva contraseña (mín. 6 caracteres)</span>
                 <input
                   type="password"
                   autoComplete="new-password"
@@ -378,12 +389,12 @@ export function Profile({
                     setNewPw(e.target.value);
                     setPwOk(false);
                   }}
-                  className="mt-1.5 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-white outline-none focus:border-[#58a6ff]"
+                  className="mt-1.5 w-full rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] px-3 py-2 text-sm text-[#2B2620] banking-dark:text-[#F3F1EC] outline-none focus:border-[#58a6ff]"
                   disabled={pwSaving}
                 />
               </label>
               <label className="mt-3 block">
-                <span className="text-xs text-[#8b949e]">Confirmar nueva contraseña</span>
+                <span className="text-xs text-[#8A8072] banking-dark:text-[#8b949e]">Confirmar nueva contraseña</span>
                 <input
                   type="password"
                   autoComplete="new-password"
@@ -392,18 +403,18 @@ export function Profile({
                     setConfirmPw(e.target.value);
                     setPwOk(false);
                   }}
-                  className="mt-1.5 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-white outline-none focus:border-[#58a6ff]"
+                  className="mt-1.5 w-full rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] px-3 py-2 text-sm text-[#2B2620] banking-dark:text-[#F3F1EC] outline-none focus:border-[#58a6ff]"
                   disabled={pwSaving}
                 />
               </label>
 
-              {pwError && <p className="mt-3 text-sm text-[#f85149]">{pwError}</p>}
-              {pwOk && <p className="mt-3 text-sm text-[#3fb950]">Contraseña actualizada correctamente.</p>}
+              {pwError && <p className="mt-3 text-sm text-[#DC2626] banking-dark:text-[#f85149]">{pwError}</p>}
+              {pwOk && <p className="mt-3 text-sm text-[#15803d] banking-dark:text-[#3fb950]">Contraseña actualizada correctamente.</p>}
 
               <button
                 type="submit"
                 disabled={pwSaving || !currentPw || !newPw || !confirmPw}
-                className="mt-4 rounded-lg border border-[#333a47] bg-[#262c37] px-4 py-2 text-sm font-medium text-white hover:bg-[#30363d] disabled:cursor-not-allowed disabled:opacity-40"
+                className="mt-4 rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#F5F1E8] banking-dark:bg-[#161b22] px-4 py-2 text-sm font-medium text-[#2B2620] banking-dark:text-[#F3F1EC] hover:bg-[#ECE5D6] banking-dark:hover:bg-[#1c2129] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {pwSaving ? "Guardando…" : "Cambiar contraseña"}
               </button>
@@ -414,19 +425,19 @@ export function Profile({
         {tab === "servicios" && (
           <div>
             <div className="mb-5">
-              <h3 className="text-base font-semibold text-white">Servicios</h3>
-              <p className="mt-1 text-[13px] text-[#8b949e]">Activa solo lo que uses.</p>
+              <h3 className="text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">Servicios</h3>
+              <p className="mt-1 text-[13px] text-[#8A8072] banking-dark:text-[#8b949e]">Activa solo lo que uses.</p>
             </div>
 
             <div className="space-y-3.5">
-              <div className="rounded-2xl border border-[#1e242e] bg-[#12161d] p-5">
+              <div className="rounded-2xl border border-[#E8E1D4] banking-dark:border-[#1e242e] bg-[#FFFFFF] banking-dark:bg-[#12161d] p-5">
                 <div className="flex items-start gap-3.5">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-[#8FBFA6]/14">
                     <IconBank />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[#F3F1EC]">Cuentas y movimientos</p>
-                    <p className="mt-1 max-w-md text-xs leading-relaxed text-[#8b949e]">
+                    <p className="text-sm font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">Cuentas y movimientos</p>
+                    <p className="mt-1 max-w-md text-xs leading-relaxed text-[#8A8072] banking-dark:text-[#8b949e]">
                       Registra cuentas (efectivo, banco) y movimientos con categorías, en pesos chilenos.
                       Independiente del portafolio Fintual.
                     </p>
@@ -441,14 +452,14 @@ export function Profile({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[#1e242e] bg-[#12161d] p-5">
+              <div className="rounded-2xl border border-[#E8E1D4] banking-dark:border-[#1e242e] bg-[#FFFFFF] banking-dark:bg-[#12161d] p-5">
                 <div className="flex items-start gap-3.5">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-[#2dd4bf]/14">
                     <IconFlag />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[#F3F1EC]">Proyectos y presupuestos</p>
-                    <p className="mt-1 max-w-md text-xs leading-relaxed text-[#8b949e]">
+                    <p className="text-sm font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">Proyectos y presupuestos</p>
+                    <p className="mt-1 max-w-md text-xs leading-relaxed text-[#8A8072] banking-dark:text-[#8b949e]">
                       Organiza proyectos (matrimonio, muebles, etc.) con aportes, ítems y abonos. Independiente
                       del portafolio y de cuentas bancarias.
                     </p>
@@ -463,14 +474,14 @@ export function Profile({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-[#1e242e] bg-[#12161d] p-5">
+              <div className="rounded-2xl border border-[#E8E1D4] banking-dark:border-[#1e242e] bg-[#FFFFFF] banking-dark:bg-[#12161d] p-5">
                 <div className="flex items-start gap-3.5">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] bg-[#C79A56]/14">
                     <IconChartUp />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[#F3F1EC]">Portafolio de inversiones</p>
-                    <p className="mt-1 max-w-md text-xs leading-relaxed text-[#8b949e]">
+                    <p className="text-sm font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">Portafolio de inversiones</p>
+                    <p className="mt-1 max-w-md text-xs leading-relaxed text-[#8A8072] banking-dark:text-[#8b949e]">
                       Panel, transacciones, sincronización y activos manuales ligados al portafolio Fintual.
                     </p>
                     {inv && <FintualStatusPill me={me} />}
@@ -484,7 +495,7 @@ export function Profile({
                 </div>
 
                 {inv && (
-                  <div className="mt-5 space-y-4 border-t border-[#1e242e] pt-5">
+                  <div className="mt-5 space-y-4 border-t border-[#E8E1D4] banking-dark:border-[#1e242e] pt-5">
                     <FintualCredentialsBlock
                       me={me}
                       reveal={revealFintualSecrets}
@@ -495,13 +506,13 @@ export function Profile({
                       <button
                         type="button"
                         onClick={onRequestFintualConnect}
-                        className="w-full rounded-lg border border-[#30363d] bg-[#21262d] px-4 py-2.5 text-sm font-medium text-[#e6edf3] transition-colors hover:border-[#58a6ff] hover:bg-[#262c36]"
+                        className="w-full rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#EDE7D9] banking-dark:bg-[#21262d] px-4 py-2.5 text-sm font-medium text-[#2B2620] banking-dark:text-[#F3F1EC] transition-colors hover:border-[#58a6ff] hover:bg-[#ECE5D6] banking-dark:hover:bg-[#1c2129]"
                       >
                         Actualizar cookie / UID de Fintual
                       </button>
                     )}
 
-                    <p className="text-xs leading-relaxed text-[#6e7681]">
+                    <p className="text-xs leading-relaxed text-[#9A9284] banking-dark:text-[#6b7280]">
                       Por defecto los valores se muestran ocultos. Solo puedes verlos con la sesión iniciada en Zendo Finance.
                     </p>
                   </div>
@@ -509,24 +520,24 @@ export function Profile({
               </div>
             </div>
 
-            {error && <p className="mt-3 text-sm text-[#f85149]">{error}</p>}
+            {error && <p className="mt-3 text-sm text-[#DC2626] banking-dark:text-[#f85149]">{error}</p>}
           </div>
         )}
 
         {tab === "banking" && bank && (
           <div>
             <div className="mb-5">
-              <h3 className="text-base font-semibold text-white">Banking</h3>
-              <p className="mt-1 text-[13px] text-[#8b949e]">Productos y categorías de cuentas y movimientos.</p>
+              <h3 className="text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">Banking</h3>
+              <p className="mt-1 text-[13px] text-[#8A8072] banking-dark:text-[#8b949e]">Productos y categorías de cuentas y movimientos.</p>
             </div>
-            <Suspense fallback={<p className="text-sm text-[#8b949e]">Cargando…</p>}>
+            <Suspense fallback={<p className="text-sm text-[#8A8072] banking-dark:text-[#8b949e]">Cargando…</p>}>
               <BankingSettingsSection onToast={onToast} />
             </Suspense>
           </div>
         )}
 
-        <p className="mt-10 text-xs text-[#6e7681]">
-          <Link to="/" className="text-[#8FBFA6] hover:underline">
+        <p className="mt-10 text-xs text-[#9A9284] banking-dark:text-[#6b7280]">
+          <Link to="/" className="text-[#5C7F6C] banking-dark:text-[#8FBFA6] hover:underline">
             ← Volver al inicio
           </Link>
         </p>

@@ -183,7 +183,7 @@ body {
   background: #6e7681;
 }
 
-/* Filtros: píldoras en una fila con scroll (Categoría / Tipo) */
+/* Filtros: píldoras en una fila con scroll (Categoría / Tipo) — oscuro (Dashboard, siempre oscuro). */
 .filter-pills-scroll {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
@@ -198,5 +198,22 @@ body {
 }
 .filter-pills-scroll::-webkit-scrollbar-thumb {
   background: #484f58;
+  border-radius: 9999px;
+}
+/** Misma píldora, claro (pestaña Actividad del Panel en modo claro — ver isDark en ActivitySection.tsx). */
+.filter-pills-scroll-light {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #DCD3C2 #F5F1E8;
+}
+.filter-pills-scroll-light::-webkit-scrollbar {
+  height: 5px;
+}
+.filter-pills-scroll-light::-webkit-scrollbar-track {
+  background: #F5F1E8;
+  border-radius: 9999px;
+}
+.filter-pills-scroll-light::-webkit-scrollbar-thumb {
+  background: #DCD3C2;
   border-radius: 9999px;
 }

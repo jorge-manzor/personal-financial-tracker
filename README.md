@@ -142,7 +142,7 @@ personal-financial-tracker/
 │   │   ├── App.tsx, Dashboard.tsx
 │   │   ├── BankingTransactionsPage.tsx (orquestador) + bankingTx*.ts(x) (helpers, filtros, tablas)
 │   │   ├── BankingSettingsPage.tsx, BankingConfirmDialog.tsx
-│   │   ├── BankingPersonalOrderPage.tsx, SavingsCalculatorPage.tsx
+│   │   ├── BankingProvisionsPage.tsx, BankingSavingsGoalsPage.tsx, SavingsCalculatorPage.tsx
 │   │   ├── Login.tsx, Profile.tsx, FintualConnectModal.tsx
 │   │   ├── AppSidebar.tsx, AppHeader.tsx, SyncOverlay.tsx
 │   │   ├── api.ts, auth.ts, types.ts, config.ts, format.ts

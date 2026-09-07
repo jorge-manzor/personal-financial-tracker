@@ -886,9 +886,10 @@ def _backfill_banking_template_ids() -> None:
 def _backfill_banking_category_colors() -> None:
     db = SessionLocal()
     try:
-        from banking_service import backfill_banking_category_colors
+        from banking_service import backfill_banking_category_colors, repalette_legacy_banking_category_colors
 
         backfill_banking_category_colors(db)
+        repalette_legacy_banking_category_colors(db)
     finally:
         db.close()
 

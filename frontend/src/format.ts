@@ -180,18 +180,31 @@ export function formatFxRateClpPerUsd(n: number): string {
   return `${s} CLP/USD`;
 }
 
+/**
+ * Mismo verde/rojo que Movimientos bancarios (docs/design-colors.md): emerald-600/rose-600 en
+ * claro, emerald-400/rose-400 en oscuro. `isDark` explícito (esta pantalla no cuelga de
+ * /banking/* ni /profile) — default `true` para no romper llamadas existentes que no lo pasan.
+ */
 export function formatTxSignedAmount(
   monto: number,
   currency: string,
   tipo: string,
+  isDark = true,
 ): { text: string; signClass: string } {
   const isOut = EGRESO_TIPOS.has(tipo);
   const sign = isOut ? "-" : "+";
   const cur = (currency || "USD").toUpperCase();
   const body = cur === "CLP" ? formatMoneyCLP(Math.abs(monto)) : formatMoneyUSDLabel(Math.abs(monto));
+  const signClass = isOut
+    ? isDark
+      ? "text-rose-400"
+      : "text-rose-600"
+    : isDark
+      ? "text-emerald-400"
+      : "text-emerald-600";
   return {
     text: `${sign}${body}`,
-    signClass: isOut ? "text-[#f87171]" : "text-[#4ade80]",
+    signClass,
   };
 }
 

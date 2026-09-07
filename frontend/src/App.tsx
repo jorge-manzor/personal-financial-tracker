@@ -5,11 +5,10 @@ import { getToken, logoutSession } from "./auth";
 import { Login } from "./Login";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
-import { ActivitySection } from "./ActivitySection";
 import { ManualSnapshotModal } from "./ManualModals";
 import { FintualConnectModal } from "./FintualConnectModal";
 import { NoServicesPage } from "./NoServicesPage";
-import { BankingBodyClassSync, BankingThemeProvider } from "./BankingThemeContext";
+import { BankingBodyClassSync, BankingThemeProvider, useBankingTheme } from "./BankingThemeContext";
 import { runSync, SyncOverlay, type TickerUiState } from "./SyncOverlay";
 import { TransactionModal } from "./TransactionModal";
 import {
@@ -33,8 +32,11 @@ const Profile = lazy(() => import("./Profile").then((m) => ({ default: m.Profile
 const BankingTransactionsPage = lazy(() =>
   import("./BankingTransactionsPage").then((m) => ({ default: m.BankingTransactionsPage })),
 );
-const BankingPersonalOrderPage = lazy(() =>
-  import("./BankingPersonalOrderPage").then((m) => ({ default: m.BankingPersonalOrderPage })),
+const BankingProvisionsPage = lazy(() =>
+  import("./BankingProvisionsPage").then((m) => ({ default: m.BankingProvisionsPage })),
+);
+const BankingSavingsGoalsPage = lazy(() =>
+  import("./BankingSavingsGoalsPage").then((m) => ({ default: m.BankingSavingsGoalsPage })),
 );
 const SavingsCalculatorPage = lazy(() =>
   import("./SavingsCalculatorPage").then((m) => ({ default: m.SavingsCalculatorPage })),
@@ -354,6 +356,8 @@ export default function App() {
   const { pathname } = useLocation();
   /** Banking tiene su propio encabezado dentro de la página; el header global (marca + USD/CLP) es solo para inversiones. */
   const onBankingRoute = pathname.startsWith("/banking");
+  /** Rutas con tema claro/oscuro propio (ver BankingThemeContext): Banking, Perfil y el Panel de inversiones. */
+  const onThemedRoute = onBankingRoute || pathname === "/profile" || pathname === "/" || pathname === "/portfolio";
 
   if (!authed) {
     return <Login onSuccess={() => setAuthed(true)} />;
@@ -418,7 +422,7 @@ export default function App() {
   return (
     <BankingThemeProvider>
       <BankingBodyClassSync />
-      <div className="min-h-full bg-[#0d1117]">
+      <div className={`min-h-full ${onThemedRoute ? "bg-[#FAF7F1] banking-dark:bg-[#0d1117]" : "bg-[#0d1117]"}`}>
       <AppSidebar
         onLogout={() => {
           logoutSession();
@@ -485,24 +489,6 @@ export default function App() {
                 element={investmentsOn ? dashboardElement : <Navigate to="/" replace />}
               />
               <Route
-                path="/transactions"
-                element={
-                  investmentsOn ? (
-                    <TransactionsRoute
-                      dataVersion={dataVersion}
-                      onEdit={(tx) => {
-                        setEditingTx(tx);
-                        setTxOpen(true);
-                      }}
-                      onToast={setToast}
-                      onMutate={loadAll}
-                    />
-                  ) : (
-                    <Navigate to="/" replace />
-                  )
-                }
-              />
-              <Route
                 path="/banking/transactions"
                 element={
                   bankingOn ? (
@@ -513,9 +499,15 @@ export default function App() {
                 }
               />
               <Route
-                path="/banking/personal-order"
+                path="/banking/provisiones"
                 element={
-                  bankingOn ? <BankingPersonalOrderPage onToast={setToast} /> : <Navigate to="/" replace />
+                  bankingOn ? <BankingProvisionsPage onToast={setToast} /> : <Navigate to="/" replace />
+                }
+              />
+              <Route
+                path="/banking/ahorro-objetivo"
+                element={
+                  bankingOn ? <BankingSavingsGoalsPage onToast={setToast} /> : <Navigate to="/" replace />
                 }
               />
               <Route
@@ -588,30 +580,6 @@ export default function App() {
   );
 }
 
-function TransactionsRoute({
-  dataVersion,
-  onEdit,
-  onToast,
-  onMutate,
-}: {
-  dataVersion: number;
-  onEdit: (tx: TransactionRow) => void;
-  onToast: (msg: string | null) => void;
-  onMutate: () => void;
-}) {
-  return (
-    <div className="mx-auto max-w-[1200px] space-y-4 p-4 pb-28 md:p-6">
-      <ActivitySection
-        dataVersion={dataVersion}
-        onEdit={onEdit}
-        onToast={(msg) => onToast(msg)}
-        onMutate={onMutate}
-        showMonthly={false}
-      />
-    </div>
-  );
-}
-
 /** Modal de transacción solo para editar filas existentes (altas vienen de Fintual/sync). */
 function TransactionModalLayer({
   showMain,
@@ -632,6 +600,11 @@ function TransactionModalLayer({
   loadAll: () => Promise<void>;
   setToast: (s: string | null) => void;
 }) {
+  const { pathname } = useLocation();
+  const { isDark: globalIsDark } = useBankingTheme();
+  /** El Panel de inversiones (/, /portfolio) tiene modo claro/oscuro propio; el resto se mantiene oscuro. */
+  const isDark = pathname === "/" || pathname === "/portfolio" ? globalIsDark : true;
+
   if (!showMain || !investmentsEnabled) return null;
 
   return (
@@ -647,6 +620,7 @@ function TransactionModalLayer({
         setToast(wasEdit ? "Transacción actualizada ✅" : "Transacción guardada ✅");
         void loadAll();
       }}
+      isDark={isDark}
     />
   );
 }

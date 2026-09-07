@@ -43,7 +43,7 @@ Guías anidadas: `backend/AGENTS.md`, `frontend/AGENTS.md`.
 | Cliente Fintual | `fintual_client.py`, `fintual_auth_state.py` | `FintualConnectModal.tsx` |
 | FX USD/CLP | `exchange_service.py`, `fx_usd_clp.py` | vía dashboard / API |
 | Banking CRUD | `banking_routes.py`, `banking_service.py`, `banking_banks.py` | `BankingTransactionsPage.tsx` + `bankingTx*.ts(x)`, `BankingConfirmDialog.tsx`, `BankingSettingsPage.tsx` |
-| Orden personal / provisiones | `banking_personal_order_routes.py` | `BankingPersonalOrderPage.tsx` |
+| Provisiones / Ahorro por objetivo | `banking_personal_order_routes.py` | `BankingProvisionsPage.tsx`, `BankingSavingsGoalsPage.tsx`, `bankingPersonalOrderShared.tsx` |
 | Calculadora ahorro | `savings_calculator_routes.py` | `SavingsCalculatorPage.tsx` |
 | Modelos / schemas | `models.py`, `schemas.py` | `types.ts` |
 | Migraciones SQLite al vuelo | `multiuser_migration.py` | — |
@@ -63,7 +63,7 @@ Guías anidadas: `backend/AGENTS.md`, `frontend/AGENTS.md`.
    - `backend/banking_service.py`
    - `backend/main.py`
    - `backend/fintual_sync.py`
-   - `frontend/src/BankingPersonalOrderPage.tsx`
+   - `frontend/src/BankingProvisionsPage.tsx`
 9. **Scope**: cambios mínimos al pedido; no refactors colaterales ni docs no pedidas salvo este árbol AGENTS/docs de agentes.
 
 ## Playbooks rápidos
@@ -111,6 +111,7 @@ Ver `docs/adding-a-feature.md` y `backend/AGENTS.md`. Checklist: modelo → migr
 | `docs/domain-banking.md` | Dominio banking |
 | `docs/domain-investments.md` | Dominio inversiones |
 | `docs/adding-a-feature.md` | Playbook completo |
+| `docs/design-colors.md` | Paleta de colores (pastel: salvia/dorado, claro/oscuro, ingresos/egresos) |
 | `docs/api-cheat-sheet.md` | Endpoints críticos |
 | `docs/github-branch-protection.md` | Cómo proteger `main` + required checks |
 | `docs/deploy-render.md` / `docs/deploy-railway.md` | Deploy |
