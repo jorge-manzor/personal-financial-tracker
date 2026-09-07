@@ -48,13 +48,22 @@ export function useBankingTheme(): BankingThemeContextValue {
   return ctx;
 }
 
-/** Activa `body.banking-dark` en rutas `/banking/*` para que portales (modales) hereden `banking-dark:*`. */
+/**
+ * Activa `body.banking-dark` en rutas `/banking/*`, `/profile` y el Panel de inversiones
+ * (`/`, `/portfolio`) — todas usan clases `banking-dark:*` o CSS de scrollbar condicionado a esa
+ * clase (ver `.tx-scroll` / `.filter-pills-scroll` en index.css) para que portales (modales, menús)
+ * hereden el tema correcto.
+ */
 export function BankingBodyClassSync() {
   const { isDark } = useBankingTheme();
   const { pathname } = useLocation();
 
   useEffect(() => {
-    const onBanking = pathname.startsWith("/banking");
+    const onBanking =
+      pathname.startsWith("/banking") ||
+      pathname === "/profile" ||
+      pathname === "/" ||
+      pathname === "/portfolio";
     if (onBanking && isDark) document.body.classList.add("banking-dark");
     else document.body.classList.remove("banking-dark");
     return () => document.body.classList.remove("banking-dark");

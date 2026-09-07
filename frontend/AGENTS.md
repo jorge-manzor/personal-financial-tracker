@@ -15,7 +15,8 @@ Complementa el `AGENTS.md` raíz. Trabaja aquí al editar `frontend/src/`.
 | `/profile` | `Profile.tsx` | auth |
 | `/banking/transactions` | `BankingTransactionsPage.tsx` (orquestador) | banking |
 | `/banking/settings` | `BankingSettingsPage.tsx` | banking |
-| `/banking/personal-order` | `BankingPersonalOrderPage.tsx` | banking |
+| `/banking/provisiones` | `BankingProvisionsPage.tsx` | banking |
+| `/banking/ahorro-objetivo` | `BankingSavingsGoalsPage.tsx` | banking |
 | `/banking/savings-calculator` | `SavingsCalculatorPage.tsx` | banking |
 
 Navegación: `AppSidebar.tsx`, `AppHeader.tsx`.
@@ -56,7 +57,7 @@ Tests: `src/**/*.test.ts` vía `npm test` (Vitest).
 No reescribir de cero sin pedido explícito:
 
 - `BankingTransactionsPage.tsx` (orquestador + modal)
-- `BankingPersonalOrderPage.tsx`
+- `BankingProvisionsPage.tsx`
 - `BankingSettingsPage.tsx`
 - `Dashboard.tsx`
 - `App.tsx` (solo tocar routing/estado global con cuidado)

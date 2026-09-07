@@ -259,40 +259,40 @@ export const BANKING_TX_COLUMN_KEYS = Object.keys(BANKING_TX_COLUMN_LABELS) as B
 
 /** Filtros popover — inputs sobre fondo claro (fintech pastel). */
 export const bankingMainTxFilterInputClass =
-  "mt-1 w-full rounded-xl border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/25 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:placeholder:text-zinc-500 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
+  "mt-1 w-full rounded-xl border border-[#DCD3C2] bg-white px-2.5 py-2 text-sm text-[#2B2620] shadow-sm outline-none transition placeholder:text-[#9A9284] focus:border-[#8FBFA6] focus:ring-2 focus:ring-[#8FBFA6]/25 [color-scheme:light] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:placeholder:text-[#6b7280] banking-dark:focus:border-[#8FBFA6] banking-dark:focus:ring-[#8FBFA6]/15";
 
 /** Modal nuevo/editar movimiento y toolbars secundarios — controles sobre blanco. */
 export const bankingModalControlClass =
-  "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
+  "mt-1.5 w-full rounded-xl border border-[#DCD3C2] bg-white px-3 py-2 text-sm text-[#2B2620] shadow-sm outline-none transition focus:border-[#8FBFA6] focus:ring-2 focus:ring-[#8FBFA6]/25 [color-scheme:light] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:focus:border-[#8FBFA6] banking-dark:focus:ring-[#8FBFA6]/15";
 /** Etiquetas de campo en modal nuevo/editar movimiento — contraste legible en oscuro. */
 export const bankingModalFieldLabelClass =
-  "text-xs font-medium text-slate-600 banking-dark:text-zinc-300";
+  "text-xs font-medium text-[#4A453C] banking-dark:text-[#c9d1d9]";
 export const bankingModalHelperTextClass =
-  "text-[12px] leading-snug text-slate-500 banking-dark:text-zinc-500";
+  "text-[12px] leading-snug text-[#8A8072] banking-dark:text-[#8b949e]";
 /** Fechas en barra de período — alineado con `dateInputClass` del modal (sin mt / w-full). */
 export const bankingToolbarDateInputClass =
-  "rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
+  "rounded-xl border border-[#DCD3C2] bg-white px-3 py-2 text-sm text-[#2B2620] shadow-sm outline-none focus:border-[#8FBFA6] focus:ring-2 focus:ring-[#8FBFA6]/20 [color-scheme:light] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:focus:border-[#8FBFA6] banking-dark:focus:ring-[#8FBFA6]/15";
 export const bankingModalCategoryTriggerClass =
-  "flex w-full items-center justify-between gap-2 overflow-hidden rounded-xl border border-slate-300 bg-white py-2 pl-3 pr-3 text-left text-sm outline-none shadow-sm transition hover:border-indigo-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25 disabled:cursor-not-allowed disabled:opacity-40 [color-scheme:light] banking-dark:border-amber-900/45 banking-dark:bg-zinc-800 banking-dark:text-zinc-100 banking-dark:shadow-[inset_0_1px_0_0_rgba(254,243,199,0.06)] banking-dark:hover:border-amber-700/55 banking-dark:hover:bg-zinc-700/90 banking-dark:focus:border-amber-500/55 banking-dark:focus:ring-amber-500/25";
+  "flex w-full items-center justify-between gap-2 overflow-hidden rounded-xl border border-[#DCD3C2] bg-white py-2 pl-3 pr-3 text-left text-sm outline-none shadow-sm transition hover:border-[#8FBFA6] focus:border-[#8FBFA6] focus:ring-2 focus:ring-[#8FBFA6]/25 disabled:cursor-not-allowed disabled:opacity-40 [color-scheme:light] banking-dark:border-[#30363d] banking-dark:bg-[#0d1117] banking-dark:text-[#F3F1EC] banking-dark:hover:border-[#8FBFA6]/60 banking-dark:focus:border-[#8FBFA6] banking-dark:focus:ring-[#8FBFA6]/25";
 /** Campo buscar en desplegables categoría / subcategoría (modal movimiento). */
 export const bankingPickerSearchInputClass =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/25 [color-scheme:light] banking-dark:border-amber-800/45 banking-dark:bg-zinc-950 banking-dark:text-zinc-100 banking-dark:placeholder:text-zinc-500 banking-dark:focus:border-amber-500/55 banking-dark:focus:ring-amber-500/20";
+  "w-full rounded-lg border border-[#DCD3C2] bg-white px-3 py-2 text-sm text-[#2B2620] shadow-sm outline-none transition placeholder:text-[#9A9284] focus:border-[#8FBFA6] focus:ring-2 focus:ring-[#8FBFA6]/25 [color-scheme:light] banking-dark:border-[#30363d] banking-dark:bg-[#0d1117] banking-dark:text-[#F3F1EC] banking-dark:placeholder:text-[#6b7280] banking-dark:focus:border-[#8FBFA6] banking-dark:focus:ring-[#8FBFA6]/20";
 /** Lista del panel (el padre debe llevar `.banking-theme` para scrollbar claro en portales). */
 export const bankingPickerListScrollClass =
   "tx-scroll max-h-[min(55vh,22rem)] min-h-0 flex-1 overflow-y-auto overscroll-y-contain scroll-py-1 [-webkit-overflow-scrolling:touch]";
 export const bankingToolbarGhostBtnClass =
-  "rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800";
+  "rounded-lg border border-[#DCD3C2] bg-white px-2.5 py-1 text-xs font-medium text-[#2B2620] shadow-sm transition hover:border-[#8FBFA6] hover:bg-[#F5F1E8] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:hover:border-[#8FBFA6]/60 banking-dark:hover:bg-[#1c2129]";
 export const bankingToolbarGhostBtnMdClass =
-  "rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800";
+  "rounded-lg border border-[#DCD3C2] bg-white px-3 py-1.5 text-xs font-medium text-[#2B2620] shadow-sm transition hover:border-[#8FBFA6] hover:bg-[#F5F1E8] disabled:cursor-not-allowed disabled:opacity-35 banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:hover:border-[#8FBFA6]/60 banking-dark:hover:bg-[#1c2129]";
 export const bankingAuxActionBtnClass =
-  "rounded-lg border border-slate-800 bg-slate-900 px-2 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-40 banking-dark:border-amber-600/45 banking-dark:bg-amber-600 banking-dark:text-zinc-950 banking-dark:shadow-[0_1px_2px_rgba(0,0,0,0.28)] banking-dark:hover:border-amber-500/55 banking-dark:hover:bg-amber-500";
+  "rounded-lg border border-[#6FA588] bg-[#8FBFA6] px-2 py-1 text-[11px] font-semibold text-[#1F2E25] shadow-sm transition hover:bg-[#7FB097] disabled:cursor-wait disabled:opacity-40";
 export const bankingAuxBulkBtnClass =
-  "rounded-xl border border-slate-800 bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 banking-dark:border-amber-600/45 banking-dark:bg-amber-600 banking-dark:text-zinc-950 banking-dark:shadow-[0_1px_2px_rgba(0,0,0,0.28)] banking-dark:hover:border-amber-500/55 banking-dark:hover:bg-amber-500";
+  "rounded-xl border border-[#6FA588] bg-[#8FBFA6] px-3.5 py-2 text-sm font-semibold text-[#1F2E25] shadow-sm transition hover:bg-[#7FB097] disabled:cursor-not-allowed disabled:opacity-40";
 
 /** Track de un toggle `role="switch"` estilo iOS: pastilla grande sin borde, sin marco fino de "checkbox viejo". */
 export function bankingSwitchTrackClass(on: boolean): string {
-  return `relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 banking-dark:focus-visible:ring-amber-500/40 banking-dark:focus-visible:ring-offset-zinc-950 ${
-    on ? "bg-indigo-600 banking-dark:bg-amber-600" : "bg-slate-200 banking-dark:bg-zinc-700"
+  return `relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8FBFA6]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:opacity-50 banking-dark:focus-visible:ring-[#8FBFA6]/40 banking-dark:focus-visible:ring-offset-[#0d1117] ${
+    on ? "bg-[#8FBFA6]" : "bg-[#EDE7D9] banking-dark:bg-[#21262d]"
   }`;
 }
 /** Thumb del toggle: círculo blanco con sombra que se desliza según el estado `on`. */
@@ -304,65 +304,65 @@ export function bankingSwitchThumbClass(on: boolean): string {
 
 /** Tabla principal — estilo fintech: bordes suaves, esquinas más redondeadas, sombra leve. */
 export const BANKING_MAIN_TX_CARD_CLASS =
-  "overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm banking-dark:border-zinc-800 banking-dark:bg-zinc-950 banking-dark:shadow-none";
+  "overflow-hidden rounded-2xl border border-[#E8E1D4] bg-white shadow-sm banking-dark:border-[#1e242e] banking-dark:bg-[#0d1117] banking-dark:shadow-none";
 /** Igual que BANKING_MAIN_TX_CARD_CLASS pero sin `overflow-hidden`: para cápsulas que alojan popovers (fechas, filtros) que no deben recortarse. */
 export const BANKING_FILTER_CAPSULE_CLASS =
-  "rounded-2xl border border-slate-200 bg-white shadow-sm banking-dark:border-zinc-800 banking-dark:bg-zinc-950 banking-dark:shadow-none";
+  "rounded-2xl border border-[#E8E1D4] bg-white shadow-sm banking-dark:border-[#1e242e] banking-dark:bg-[#0d1117] banking-dark:shadow-none";
 export const BANKING_MAIN_TX_THEAD_CLASS =
-  "border-b border-slate-100 bg-slate-50/60 banking-dark:border-zinc-800 banking-dark:bg-zinc-950";
+  "border-b border-[#F0EAE0] bg-[#FBFAF7] banking-dark:border-[#1e242e] banking-dark:bg-[#0d1117]";
 /** Separador por fila (`border-b`): la tabla virtualizada usa `<tr>` de padding sin esta clase — no usar `divide-y` en `<tbody>`. */
 export const BANKING_MAIN_TX_TR_CLASS =
-  "border-b border-slate-100 bg-white text-slate-800 transition-colors hover:bg-slate-50 banking-dark:border-zinc-800/90 banking-dark:bg-zinc-950 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-900/85";
+  "border-b border-[#F0EAE0] bg-white text-[#2B2620] transition-colors hover:bg-[#FBFAF7] banking-dark:border-[#1a1f2e] banking-dark:bg-[#0d1117] banking-dark:text-[#c9d1d9] banking-dark:hover:bg-[#12161d]";
 /** Fila de la lista de movimientos (div, no tabla) — mismo lenguaje visual que BANKING_MAIN_TX_TR_CLASS. */
 export const BANKING_MAIN_TX_ROW_CLASS =
-  "flex items-center gap-3 border-b border-slate-100 bg-white px-4 py-2.5 transition-colors hover:bg-slate-50 banking-dark:border-zinc-800/90 banking-dark:bg-zinc-950 banking-dark:hover:bg-zinc-900/85";
+  "flex items-center gap-3 border-b border-[#F0EAE0] bg-white px-4 py-2.5 transition-colors hover:bg-[#FBFAF7] banking-dark:border-[#1a1f2e] banking-dark:bg-[#0d1117] banking-dark:hover:bg-[#12161d]";
 export const BANKING_MAIN_TX_FOOTER_CLASS =
-  "flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 bg-white px-4 py-3 banking-dark:border-zinc-800 banking-dark:bg-zinc-950 banking-dark:text-zinc-400";
+  "flex flex-wrap items-center justify-between gap-3 border-t border-[#F0EAE0] bg-white px-4 py-3 banking-dark:border-[#1e242e] banking-dark:bg-[#0d1117] banking-dark:text-[#8b949e]";
 
 /** Pendientes TC / compartido / provisiones — mismo contenedor visual que la tabla principal. */
 export const BANKING_AUX_TX_CARD_CLASS =
-  "banking-table-scroll overflow-x-auto rounded-2xl border border-slate-200 bg-white pb-2 shadow-sm banking-dark:border-zinc-800 banking-dark:bg-zinc-950 banking-dark:shadow-none";
+  "banking-table-scroll overflow-x-auto rounded-2xl border border-[#E8E1D4] bg-white pb-2 shadow-sm banking-dark:border-[#1e242e] banking-dark:bg-[#0d1117] banking-dark:shadow-none";
 export const BANKING_AUX_TX_THEAD_CLASS =
-  "border-b border-slate-100 bg-slate-50/60 banking-dark:border-zinc-800 banking-dark:bg-zinc-950";
+  "border-b border-[#F0EAE0] bg-[#FBFAF7] banking-dark:border-[#1e242e] banking-dark:bg-[#0d1117]";
 export const BANKING_AUX_TX_TR_CLASS =
-  "border-b border-slate-100 bg-white text-slate-800 transition-colors hover:bg-slate-50 banking-dark:border-zinc-800/90 banking-dark:bg-zinc-950 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-900/85";
+  "border-b border-[#F0EAE0] bg-white text-[#2B2620] transition-colors hover:bg-[#FBFAF7] banking-dark:border-[#1a1f2e] banking-dark:bg-[#0d1117] banking-dark:text-[#c9d1d9] banking-dark:hover:bg-[#12161d]";
 export const BANKING_AUX_TX_TH_TEXT_CLASS =
-  "text-[12px] font-semibold uppercase tracking-wide text-slate-600 banking-dark:text-zinc-300";
+  "text-[12px] font-semibold uppercase tracking-wide text-[#4A453C] banking-dark:text-[#c9d1d9]";
 export const BANKING_AUX_SECTION_HEADING_CLASS =
-  "text-sm font-semibold text-slate-700 banking-dark:text-zinc-200";
+  "text-sm font-semibold text-[#4A453C] banking-dark:text-[#c9d1d9]";
 
-/** Banda tipo “ticket” cuando hay selección de movimientos: menta/teal en claro, ámbar en oscuro. */
+/** Banda tipo “ticket” cuando hay selección de movimientos: salvia en claro y oscuro. */
 export const BANKING_SELECTION_SUMMARY_TICKET_ACTIVE_CLASS =
-  "border border-teal-300/90 bg-gradient-to-r from-teal-50 via-emerald-50/95 to-teal-50/85 ring-1 ring-teal-200/85 shadow-sm banking-dark:border-amber-900/50 banking-dark:bg-gradient-to-r banking-dark:from-amber-950/48 banking-dark:via-amber-950/28 banking-dark:to-zinc-950 banking-dark:ring-amber-950/38 banking-dark:shadow-[0_0_34px_-12px_rgba(245,158,11,0.22)]";
+  "border border-[#8FBFA6] bg-[#8FBFA6]/[0.14] ring-1 ring-[#8FBFA6]/30 shadow-sm banking-dark:bg-[#8FBFA6]/10 banking-dark:ring-[#8FBFA6]/25";
 export const BANKING_SELECTION_SUMMARY_TICKET_IDLE_CLASS =
-  "border border-slate-300 bg-slate-50 text-slate-600 shadow-sm banking-dark:border-zinc-700 banking-dark:bg-zinc-900/75 banking-dark:text-zinc-300 banking-dark:shadow-black/25";
+  "border border-[#DCD3C2] bg-[#F5F1E8] text-[#4A453C] shadow-sm banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#c9d1d9] banking-dark:shadow-black/25";
 /**
  * Ticket de selección moderno: card plana con acento índigo a la izquierda (mismo lenguaje de
  * BankingNonCreditTotalBalanceCard), en vez del verde/ámbar "chillón" de la versión anterior.
  */
 export const BANKING_SELECTION_TICKET_ACCENT_CLASS =
-  "border border-slate-200 border-l-[3px] border-l-indigo-700 bg-white shadow-sm banking-dark:border-zinc-700 banking-dark:border-l-indigo-500 banking-dark:bg-zinc-900";
-/** Píldora índigo compacta: acciones por fila (Pagado, Reversar). */
+  "border border-[#E8E1D4] border-l-[3px] border-l-[#6FA588] bg-white shadow-sm banking-dark:border-[#1e242e] banking-dark:border-l-[#8FBFA6] banking-dark:bg-[#12161d]";
+/** Píldora salvia compacta: acciones por fila (Pagado, Reversar). */
 export const bankingAuxIndigoPillBtnClass =
-  "inline-flex shrink-0 items-center gap-1 rounded-full border border-indigo-800 bg-indigo-800 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition hover:border-indigo-700 hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-50 banking-dark:border-indigo-600/70 banking-dark:bg-indigo-700/90 banking-dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)] banking-dark:hover:border-indigo-500 banking-dark:hover:bg-indigo-600";
-/** Píldora índigo grande: acciones en lote (Marcar como pagados, Crear reversas). */
+  "inline-flex shrink-0 items-center gap-1 rounded-full bg-[#8FBFA6] px-3 py-1 text-[11px] font-semibold text-[#1F2E25] shadow-sm transition hover:bg-[#7FB097] disabled:cursor-wait disabled:opacity-50";
+/** Píldora salvia grande: acciones en lote (Marcar como pagados, Crear reversas). */
 export const bankingAuxIndigoBulkBtnClass =
-  "inline-flex shrink-0 items-center gap-1.5 rounded-full border border-indigo-800 bg-indigo-800 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:border-indigo-700 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 banking-dark:border-indigo-600/70 banking-dark:bg-indigo-700/90 banking-dark:shadow-[0_1px_2px_rgba(0,0,0,0.35)] banking-dark:hover:border-indigo-500 banking-dark:hover:bg-indigo-600";
+  "inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#8FBFA6] px-4 py-2 text-[13px] font-semibold text-[#1F2E25] shadow-sm transition hover:bg-[#7FB097] disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Contenedor sección «Movimientos» (pestañas + contenido) — sin caja propia; solo la tabla de abajo lleva borde. */
 export const BANKING_MOVEMENTS_SECTION_CLASS = "space-y-3 md:space-y-4";
 /** Pestañas tipo píldora flotante (segmented control), separada del contenido — estilo fintech. */
 export const BANKING_MOVEMENTS_TAB_BAR_CLASS =
-  "inline-flex flex-wrap gap-1 rounded-full border border-slate-200 bg-white p-1.5 shadow-sm banking-dark:border-zinc-800 banking-dark:bg-zinc-900";
+  "inline-flex flex-wrap gap-1 rounded-full border border-[#E8E1D4] bg-white p-1.5 shadow-sm banking-dark:border-[#1e242e] banking-dark:bg-[#12161d]";
 export const BANKING_MOVEMENTS_TAB_BTN_BASE =
-  "relative min-h-[2.25rem] rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition outline-none focus-visible:z-[2] focus-visible:ring-2 focus-visible:ring-indigo-400/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:px-4 banking-dark:focus-visible:ring-amber-500/35 banking-dark:focus-visible:ring-offset-zinc-950";
-export const BANKING_MOVEMENTS_TAB_BTN_ACTIVE = `${BANKING_MOVEMENTS_TAB_BTN_BASE} bg-slate-900 text-white banking-dark:bg-amber-500 banking-dark:text-zinc-950`;
-export const BANKING_MOVEMENTS_TAB_BTN_IDLE = `${BANKING_MOVEMENTS_TAB_BTN_BASE} bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 banking-dark:bg-zinc-900 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-200`;
+  "relative min-h-[2.25rem] rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition outline-none focus-visible:z-[2] focus-visible:ring-2 focus-visible:ring-[#8FBFA6]/45 focus-visible:ring-offset-2 focus-visible:ring-offset-white md:px-4 banking-dark:focus-visible:ring-[#8FBFA6]/35 banking-dark:focus-visible:ring-offset-[#0d1117]";
+export const BANKING_MOVEMENTS_TAB_BTN_ACTIVE = `${BANKING_MOVEMENTS_TAB_BTN_BASE} bg-[#8FBFA6] text-[#1F2E25]`;
+export const BANKING_MOVEMENTS_TAB_BTN_IDLE = `${BANKING_MOVEMENTS_TAB_BTN_BASE} bg-[#F5F1E8] text-[#4A453C] hover:bg-[#E8E1D4] banking-dark:bg-[#161b22] banking-dark:text-[#c9d1d9] banking-dark:hover:bg-[#1c2129] banking-dark:hover:text-[#F3F1EC]`;
 
 /** Botones ícono filas auxiliares. */
 export const txIconBtnAux =
-  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-500 transition hover:border-slate-400 hover:bg-slate-100 hover:text-slate-800 banking-dark:text-zinc-500 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-200";
-export const txIconBtnAuxDanger = `${txIconBtnAux} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 banking-dark:hover:border-rose-900/60 banking-dark:hover:bg-rose-950/50 banking-dark:hover:text-rose-300`;
+  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[#8A8072] transition hover:border-[#DCD3C2] hover:bg-[#F5F1E8] hover:text-[#2B2620] banking-dark:text-[#8b949e] banking-dark:hover:border-[#30363d] banking-dark:hover:bg-[#161b22] banking-dark:hover:text-[#F3F1EC]";
+export const txIconBtnAuxDanger = `${txIconBtnAux} hover:border-[#dba7b4] hover:bg-[#FDF2F5] hover:text-[#A65568] banking-dark:hover:border-[#6b3a44] banking-dark:hover:bg-[#2a1216]/70 banking-dark:hover:text-[#cc8e9e]`;
 
 /** Siempre visibles; no se pueden ocultar (sí se pueden reordenar). */
 export const BANKING_TX_REQUIRED_COLUMNS: readonly BankingTxColumnKey[] = ["fecha", "monto"];
@@ -565,7 +565,7 @@ export function sharedPendingPerPersonClp(row: BankingTransactionRow): number {
 }
 
 export const dateInputClass =
-  "mt-1.5 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
+  "mt-1.5 w-full rounded-xl border border-[#DCD3C2] bg-white px-3 py-2 text-sm text-[#2B2620] shadow-sm outline-none focus:border-[#8FBFA6] focus:ring-2 focus:ring-[#8FBFA6]/20 [color-scheme:light] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:focus:border-[#8FBFA6] banking-dark:focus:ring-[#8FBFA6]/15";
 
 export function pickDate(e: ReactMouseEvent<HTMLInputElement>) {
   const el = e.currentTarget;

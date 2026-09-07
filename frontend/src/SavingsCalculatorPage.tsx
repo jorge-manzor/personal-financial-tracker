@@ -12,9 +12,12 @@ import { apiFetch, fetchJson, patchJson, postJson } from "./api";
 import { useBankingTheme } from "./BankingThemeContext";
 import { formatClpDots } from "./format";
 
-/** Misma línea visual que fecha en el modal «Nuevo movimiento»; para `type="month"`. */
-const BANKING_MONTH_INPUT_CLASS =
-  "mt-1.5 w-full cursor-pointer rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-700/55 banking-dark:focus:ring-amber-500/15";
+/** `isDark` explícito (como el resto del archivo) para `type="month"`, en vez de la variante `banking-dark:`. */
+function bankingMonthInputClass(isDark: boolean): string {
+  return isDark
+    ? "mt-1.5 w-full cursor-pointer rounded-xl border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-[#F3F1EC] shadow-sm outline-none focus:border-[#8FBFA6] focus:ring-2 focus:ring-[#8FBFA6]/20"
+    : "mt-1.5 w-full cursor-pointer rounded-xl border border-[#DCD3C2] bg-white px-3 py-2 text-sm text-[#2B2620] shadow-sm outline-none focus:border-[#8FBFA6] focus:ring-2 focus:ring-[#8FBFA6]/20 [color-scheme:light]";
+}
 
 function openBankingMonthPicker(e: MouseEvent<HTMLInputElement>) {
   e.currentTarget.showPicker?.();
@@ -83,22 +86,22 @@ type SavingsCalculatorPlanOut = {
 /** Paneles y tipografía según `isDark` explícito (evita bandas del fondo #0d1117 de la app y desajustes de variant). */
 function panelCard(isDark: boolean): string {
   return isDark
-    ? "rounded-2xl border border-zinc-700 bg-zinc-900/95 p-5 shadow-none ring-1 ring-white/5"
-    : "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/[0.04]";
+    ? "rounded-2xl border border-[#1e242e] bg-[#12161d] p-5 shadow-none"
+    : "rounded-2xl border border-[#E8E1D4] bg-white p-5 shadow-sm shadow-[#2B2620]/[0.04]";
 }
 
 function fieldLabel(isDark: boolean): string {
   return `block text-[10px] font-semibold uppercase tracking-wide ${
-    isDark ? "text-zinc-400" : "text-slate-500"
+    isDark ? "text-[#8b949e]" : "text-[#8A8072]"
   }`;
 }
 
 function fieldInput(isDark: boolean): string {
   return [
-    "mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none ring-indigo-400/0 transition focus:ring-2",
+    "mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none ring-[#8FBFA6]/0 transition focus:ring-2",
     isDark
-      ? "border-zinc-600 bg-zinc-950 text-zinc-100 focus:border-amber-500 focus:ring-amber-500/35"
-      : "border-slate-300 bg-white text-slate-900 focus:border-indigo-400 focus:ring-indigo-400/35 [color-scheme:light]",
+      ? "border-[#30363d] bg-[#0d1117] text-[#F3F1EC] focus:border-[#8FBFA6] focus:ring-[#8FBFA6]/35"
+      : "border-[#DCD3C2] bg-white text-[#2B2620] focus:border-[#8FBFA6] focus:ring-[#8FBFA6]/35 [color-scheme:light]",
   ].join(" ");
 }
 
@@ -106,8 +109,8 @@ function primaryBtn(isDark: boolean): string {
   return [
     "rounded-lg px-4 py-2 text-sm font-semibold shadow-sm disabled:opacity-50",
     isDark
-      ? "bg-amber-500 text-zinc-950 shadow-md hover:bg-amber-400 disabled:opacity-45"
-      : "bg-indigo-600 text-white hover:bg-indigo-700",
+      ? "bg-[#8FBFA6] text-[#1F2E25] shadow-md hover:bg-[#7FB097] disabled:opacity-45"
+      : "bg-[#8FBFA6] text-[#1F2E25] hover:bg-[#7FB097]",
   ].join(" ");
 }
 
@@ -115,8 +118,8 @@ function secondaryBtn(isDark: boolean): string {
   return [
     "rounded-lg border px-4 py-2 text-sm font-medium shadow-sm transition-colors duration-150",
     isDark
-      ? "border-zinc-500 bg-zinc-900 text-zinc-100 hover:border-indigo-400/55 hover:bg-indigo-950/35"
-      : "border-slate-300 bg-white text-slate-800 hover:border-indigo-400 hover:bg-indigo-50",
+      ? "border-[#30363d] bg-[#161b22] text-[#F3F1EC] hover:border-[#8FBFA6]/55 hover:bg-[#8FBFA6]/10"
+      : "border-[#DCD3C2] bg-white text-[#2B2620] hover:border-[#8FBFA6] hover:bg-[#8FBFA6]/10",
   ].join(" ");
 }
 
@@ -124,28 +127,35 @@ function dangerBtn(isDark: boolean): string {
   return [
     "rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors duration-150",
     isDark
-      ? "border-rose-500/50 bg-rose-950/35 text-rose-400 hover:border-rose-400/80 hover:bg-rose-950/55"
-      : "border-rose-300 bg-rose-50 text-rose-800 hover:border-rose-400 hover:bg-rose-100",
+      ? "border-[#6b3a44] bg-[#2a1216] text-[#cc8e9e] hover:border-[#8a4c58] hover:bg-[#331a1f]"
+      : "border-[#E9C6D0] bg-[#FDF2F5] text-[#A65568] hover:border-[#dba7b4] hover:bg-[#fbe6ec]",
   ].join(" ");
 }
 
 function formTabBtn(active: boolean, isDark: boolean): string {
   const base = "rounded-lg px-3 py-1.5 text-sm font-medium transition ";
   if (active) {
-    return base + (isDark ? "bg-amber-500 text-zinc-950" : "bg-indigo-600 text-white");
+    return base + "bg-[#8FBFA6] text-[#1F2E25]";
   }
   return (
     base +
-    (isDark ? "bg-zinc-800 text-zinc-300 hover:bg-zinc-700" : "bg-slate-100 text-slate-700 hover:bg-slate-200")
+    (isDark
+      ? "bg-[#161b22] text-[#c9d1d9] hover:bg-[#1e242e]"
+      : "bg-[#F5F1E8] text-[#4A453C] hover:bg-[#E8E1D4]")
   );
 }
 
 function modeBadge(mode: SavingsMode, isDark: boolean): string {
   const base = "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ";
   if (mode === "end_date") {
-    return base + (isDark ? "bg-amber-950/60 text-amber-200" : "bg-indigo-100 text-indigo-900");
+    return (
+      base +
+      (isDark ? "bg-[#8FBFA6]/15 text-[#8FBFA6]" : "bg-[#8FBFA6]/[0.18] text-[#5C7F6C]")
+    );
   }
-  return base + (isDark ? "bg-zinc-800 text-violet-300" : "bg-violet-100 text-violet-900");
+  return (
+    base + (isDark ? "bg-[#C79A56]/15 text-[#C79A56]" : "bg-[#C79A56]/[0.18] text-[#8A6631]")
+  );
 }
 
 function PlanChart({ plan, isDark }: { plan: SavingsCalculatorPlanOut; isDark: boolean }) {
@@ -158,13 +168,13 @@ function PlanChart({ plan, isDark }: { plan: SavingsCalculatorPlanOut; isDark: b
     [plan.chart],
   );
 
-  const axisColor = isDark ? "#a1a1aa" : "#64748b";
-  const gridColor = isDark ? "#3f3f46" : "#e2e8f0";
-  const stroke = isDark ? "#fbbf24" : "#4f46e5";
+  const axisColor = isDark ? "#8b949e" : "#8A8072";
+  const gridColor = isDark ? "#1e242e" : "#E8E1D4";
+  const stroke = "#8FBFA6";
 
   if (data.length === 0) {
     return (
-      <p className={isDark ? "text-xs text-zinc-500" : "text-xs text-slate-500"}>Sin puntos para graficar.</p>
+      <p className={isDark ? "text-xs text-[#8b949e]" : "text-xs text-[#8A8072]"}>Sin puntos para graficar.</p>
     );
   }
 
@@ -172,8 +182,8 @@ function PlanChart({ plan, isDark }: { plan: SavingsCalculatorPlanOut; isDark: b
     <div
       className={
         isDark
-          ? "mt-4 rounded-xl border border-zinc-700/80 bg-zinc-950/50 p-3"
-          : "mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3"
+          ? "mt-4 rounded-xl border border-[#1e242e] bg-[#0d1117] p-3"
+          : "mt-4 rounded-xl border border-[#E8E1D4] bg-[#FBFAF7] p-3"
       }
     >
       <div className="h-[220px] w-full">
@@ -188,11 +198,11 @@ function PlanChart({ plan, isDark }: { plan: SavingsCalculatorPlanOut; isDark: b
           />
           <Tooltip
             contentStyle={{
-              backgroundColor: isDark ? "#18181b" : "#fff",
-              border: isDark ? "1px solid #52525b" : "1px solid #e2e8f0",
+              backgroundColor: isDark ? "#12161d" : "#fff",
+              border: isDark ? "1px solid #1e242e" : "1px solid #E8E1D4",
               borderRadius: "8px",
               fontSize: "12px",
-              color: isDark ? "#f4f4f5" : "#0f172a",
+              color: isDark ? "#F3F1EC" : "#2B2620",
             }}
             formatter={(value) => {
               if (value === undefined || value === null) return ["", ""];
@@ -255,8 +265,8 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
 
   const pageShell = `banking-theme w-full min-h-[calc(100dvh-3.5rem)] ${
     isDark
-      ? "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(251,191,36,0.055),transparent_52%),linear-gradient(to_bottom,#0d0d0d,#070707)] text-zinc-300"
-      : "bg-slate-100 bg-gradient-to-br from-slate-100 via-white to-slate-100 text-slate-800"
+      ? "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(143,191,166,0.06),transparent_52%),linear-gradient(to_bottom,#0d1117,#0a0d12)] text-[#c9d1d9]"
+      : "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(199,154,86,0.09),transparent_52%),linear-gradient(to_bottom,#FAF7F1,#F5F1E8)] text-[#4A453C]"
   }`;
 
   const innerClass = "mx-auto max-w-[920px] space-y-10 p-4 pb-28 md:p-6";
@@ -418,7 +428,7 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
     return (
       <div className={pageShell}>
         <div className={innerClass}>
-          <p className={isDark ? "text-sm text-zinc-400" : "text-sm text-slate-600"}>Cargando…</p>
+          <p className={isDark ? "text-sm text-[#8b949e]" : "text-sm text-[#4A453C]"}>Cargando…</p>
         </div>
       </div>
     );
@@ -430,13 +440,13 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1
-              className={`text-2xl font-bold tracking-tight ${isDark ? "text-zinc-50" : "text-slate-900"}`}
+              className={`text-2xl font-bold tracking-tight ${isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}`}
             >
               Calculadora de ahorros
             </h1>
             <p
               className={`mt-1 max-w-2xl text-sm leading-relaxed ${
-                isDark ? "text-zinc-400" : "text-slate-600"
+                isDark ? "text-[#c9d1d9]" : "text-[#4A453C]"
               }`}
             >
               Simula cuánto acumulas aportando un monto fijo cada mes, o cuántos meses necesitas para llegar a una meta.
@@ -448,11 +458,11 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
         <section className={panelCard(isDark)} aria-labelledby="new-plan-heading">
           <h2
             id="new-plan-heading"
-            className={`text-lg font-semibold ${isDark ? "text-zinc-100" : "text-slate-900"}`}
+            className={`text-lg font-semibold ${isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}`}
           >
             Nuevo plan
           </h2>
-          <p className={`mt-1 text-xs ${isDark ? "text-zinc-500" : "text-slate-500"}`}>
+          <p className={`mt-1 text-xs ${isDark ? "text-[#8b949e]" : "text-[#8A8072]"}`}>
             En «Por meses», mes inicial y mes final (ambos incluidos). En «Meta en pesos», mes de inicio y meta. Opcional:
             saldo inicial (dinero que ya tienes antes del primer aporte). Sin intereses.
           </p>
@@ -487,7 +497,7 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
             <label>
               <span className={fieldLabel(isDark)}>Mes inicial</span>
               <input
-                className={BANKING_MONTH_INPUT_CLASS}
+                className={bankingMonthInputClass(isDark)}
                 type="month"
                 value={newStart}
                 onChange={(e) => setNewStart(e.target.value)}
@@ -498,7 +508,7 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
               <label>
                 <span className={fieldLabel(isDark)}>Mes final</span>
                 <input
-                  className={BANKING_MONTH_INPUT_CLASS}
+                  className={bankingMonthInputClass(isDark)}
                   type="month"
                   value={newEnd}
                   onChange={(e) => setNewEnd(e.target.value)}
@@ -549,13 +559,13 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
         <section aria-labelledby="plans-heading">
           <h2
             id="plans-heading"
-            className={`mb-4 text-lg font-semibold ${isDark ? "text-zinc-100" : "text-slate-900"}`}
+            className={`mb-4 text-lg font-semibold ${isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}`}
           >
             Tus planes guardados
           </h2>
 
           {plans.length === 0 ? (
-            <p className={isDark ? "text-sm text-zinc-500" : "text-sm text-slate-500"}>
+            <p className={isDark ? "text-sm text-[#8b949e]" : "text-sm text-[#8A8072]"}>
               Aún no hay planes. Crea uno arriba para ver la proyección y el gráfico.
             </p>
           ) : (
@@ -565,54 +575,54 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <h3 className={`text-base font-semibold ${isDark ? "text-zinc-100" : "text-slate-900"}`}>
+                        <h3 className={`text-base font-semibold ${isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}`}>
                           {p.name}
                         </h3>
                         <span className={modeBadge(p.mode, isDark)}>
                           {p.mode === "end_date" ? "Por meses" : "Meta en $"}
                         </span>
                       </div>
-                      <p className={`mt-2 text-sm ${isDark ? "text-zinc-400" : "text-slate-600"}`}>
+                      <p className={`mt-2 text-sm ${isDark ? "text-[#c9d1d9]" : "text-[#4A453C]"}`}>
                         Desde{" "}
-                        <strong className={isDark ? "text-zinc-200" : "text-slate-800"}>
+                        <strong className={isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}>
                           {formatMonthLabelEs(p.start_date)}
                         </strong>
                         {p.mode === "end_date" && p.end_date ? (
                           <>
                             {" "}
                             hasta{" "}
-                            <strong className={isDark ? "text-zinc-200" : "text-slate-800"}>
+                            <strong className={isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}>
                               {formatMonthLabelEs(p.end_date)}
                             </strong>
                           </>
                         ) : null}
                         {" · "}
-                        <strong className={isDark ? "text-zinc-200" : "text-slate-800"}>
+                        <strong className={isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}>
                           {formatClpDots(p.monthly_amount_clp)}
                         </strong>
                         /mes
                       </p>
                       {(p.initial_balance_clp ?? 0) > 0 ? (
-                        <p className={`mt-1 text-xs ${isDark ? "text-zinc-500" : "text-slate-500"}`}>
+                        <p className={`mt-1 text-xs ${isDark ? "text-[#8b949e]" : "text-[#8A8072]"}`}>
                           Saldo inicial al arrancar el plan:{" "}
-                          <strong className={isDark ? "text-zinc-300" : "text-slate-700"}>
+                          <strong className={isDark ? "text-[#c9d1d9]" : "text-[#4A453C]"}>
                             {formatClpDots(p.initial_balance_clp)}
                           </strong>
                         </p>
                       ) : null}
                       {p.mode === "end_date" ? (
-                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-amber-200" : "text-indigo-800"}`}>
+                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-[#8FBFA6]" : "text-[#4C7A64]"}`}>
                           En {p.months_count ?? "—"} meses acumulas{" "}
                           <strong>{formatClpDots(p.total_projected_clp ?? 0)}</strong>
                         </p>
                       ) : p.months_needed === 0 ? (
-                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-amber-200" : "text-indigo-800"}`}>
+                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-[#8FBFA6]" : "text-[#4C7A64]"}`}>
                           Con saldo inicial de{" "}
                           <strong>{formatClpDots(p.initial_balance_clp ?? 0)}</strong> ya cumples la meta de{" "}
                           <strong>{formatClpDots(p.target_amount_clp ?? 0)}</strong> (sin meses de aporte adicional).
                         </p>
                       ) : (
-                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-amber-200" : "text-indigo-800"}`}>
+                        <p className={`mt-2 text-sm font-medium ${isDark ? "text-[#8FBFA6]" : "text-[#4C7A64]"}`}>
                           Para juntar <strong>{formatClpDots(p.target_amount_clp ?? 0)}</strong> necesitas{" "}
                           <strong>{p.months_needed ?? "—"}</strong> mes(es) de aporte · total al cerrar{" "}
                           <strong>{formatClpDots(p.total_at_goal_clp ?? 0)}</strong>
@@ -633,9 +643,9 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
 
                   {editId === p.id ? (
                     <div
-                      className={`mt-6 border-t pt-4 ${isDark ? "border-zinc-700" : "border-slate-200"}`}
+                      className={`mt-6 border-t pt-4 ${isDark ? "border-[#1e242e]" : "border-[#E8E1D4]"}`}
                     >
-                      <p className={`mb-3 text-sm font-medium ${isDark ? "text-zinc-200" : "text-slate-800"}`}>
+                      <p className={`mb-3 text-sm font-medium ${isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}`}>
                         Editar plan
                       </p>
                       <div className="grid gap-3 sm:grid-cols-2">
@@ -650,7 +660,7 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
                         <label>
                           <span className={fieldLabel(isDark)}>Mes inicial</span>
                           <input
-                            className={BANKING_MONTH_INPUT_CLASS}
+                            className={bankingMonthInputClass(isDark)}
                             type="month"
                             value={editStart}
                             onChange={(e) => setEditStart(e.target.value)}
@@ -661,7 +671,7 @@ export function SavingsCalculatorPage({ onToast }: { onToast: (msg: string | nul
                           <label>
                             <span className={fieldLabel(isDark)}>Mes final</span>
                             <input
-                              className={BANKING_MONTH_INPUT_CLASS}
+                              className={bankingMonthInputClass(isDark)}
                               type="month"
                               value={editEnd}
                               onChange={(e) => setEditEnd(e.target.value)}

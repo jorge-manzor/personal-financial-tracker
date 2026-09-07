@@ -18,6 +18,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from "@dnd-kit/utilities";
 import { apiFetch, fetchJson, patchJson, postJson } from "./api";
 import { IconDotsHorizontal } from "./bankingTxIcons";
+import { useBankingTheme } from "./BankingThemeContext";
 import type {
   BankingAccountRow,
   BankingBankRow,
@@ -28,6 +29,64 @@ import type {
 
 /** Coincide con `backend` `_BANK_CAT_DEFAULT`: acento verde del nuevo estilo, para categorías nuevas. */
 const BANKING_DEFAULT_NEW_CATEGORY_COLOR = "#4B7B63";
+
+function hexToHsl(hex: string): { h: number; s: number; l: number } | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l: l * 100 };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === r) h = ((g - b) / d) % 6;
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  h *= 60;
+  if (h < 0) h += 360;
+  return { h, s: s * 100, l: l * 100 };
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const sNorm = s / 100;
+  const lNorm = l / 100;
+  const c = (1 - Math.abs(2 * lNorm - 1)) * sNorm;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = lNorm - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (h < 60) [r, g, b] = [c, x, 0];
+  else if (h < 120) [r, g, b] = [x, c, 0];
+  else if (h < 180) [r, g, b] = [0, c, x];
+  else if (h < 240) [r, g, b] = [0, x, c];
+  else if (h < 300) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const toHex = (v: number) =>
+    Math.round((v + m) * 255)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+/**
+ * Color de categoría para usar como texto: en modo claro, los pasteles pensados para fondo
+ * oscuro (p. ej. #8FBFA6, #C79A56) casi no contrastan sobre blanco/crema — se limita el
+ * lightness a un máximo legible. En oscuro se usa el color tal cual (ahí sí contrasta bien).
+ */
+function categoryTextColor(hex: string, isDark: boolean): string {
+  if (isDark) return hex;
+  const hsl = hexToHsl(hex);
+  if (!hsl) return hex;
+  const cappedL = Math.min(hsl.l, 42);
+  if (cappedL === hsl.l) return hex;
+  return hslToHex(hsl.h, hsl.s, cappedL);
+}
 
 function IconPencil({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -97,8 +156,8 @@ function BankingEnabledToggle({
         e.stopPropagation();
         if (!disabled) onChange(!enabled);
       }}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#12161d] disabled:cursor-not-allowed disabled:opacity-50 ${
-        enabled ? "border-[#166534] bg-[#22c55e]/90" : "border-[#30363d] bg-[#21262d]"
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#58a6ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FFFFFF] banking-dark:focus-visible:ring-offset-[#12161d] disabled:cursor-not-allowed disabled:opacity-50 ${
+        enabled ? "border-[#6FA588] bg-[#8FBFA6]" : "border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#EDE7D9] banking-dark:bg-[#21262d]"
       }`}
     >
       <span
@@ -177,7 +236,7 @@ function BankingSettingsMenu({ items, ariaLabel }: { items: SettingsMenuItem[]; 
           e.stopPropagation();
           toggle();
         }}
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8b949e] transition-colors hover:bg-[#1c2129] hover:text-[#e6edf3]"
+        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8A8072] banking-dark:text-[#8b949e] transition-colors hover:bg-[#ECE5D6] banking-dark:hover:bg-[#1c2129] hover:text-[#2B2620] banking-dark:hover:text-[#F3F1EC]"
       >
         <IconDotsHorizontal className="h-4 w-4" />
       </button>
@@ -187,7 +246,7 @@ function BankingSettingsMenu({ items, ariaLabel }: { items: SettingsMenuItem[]; 
               ref={menuRef}
               role="menu"
               aria-label={ariaLabel}
-              className="fixed z-[90] w-44 overflow-hidden rounded-xl border border-[#21262d] bg-[#161b22] py-1 shadow-2xl shadow-black/40"
+              className="fixed z-[90] w-44 overflow-hidden rounded-xl border border-[#EDE7D9] banking-dark:border-[#21262d] bg-[#F5F1E8] banking-dark:bg-[#161b22] py-1 shadow-2xl shadow-black/12 banking-dark:shadow-black/40"
               style={{ top: pos.top, left: pos.left }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -205,7 +264,7 @@ function BankingSettingsMenu({ items, ariaLabel }: { items: SettingsMenuItem[]; 
                     it.onClick();
                   }}
                   className={`flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] transition disabled:cursor-not-allowed disabled:opacity-40 ${
-                    it.danger ? "text-[#f85149] hover:bg-[#f85149]/10" : "text-[#c9d1d9] hover:bg-[#1c2129]"
+                    it.danger ? "text-[#DC2626] banking-dark:text-[#f85149] hover:bg-[#DC2626]/10 banking-dark:hover:bg-[#f85149]/10" : "text-[#4A453C] banking-dark:text-[#c9d1d9] hover:bg-[#ECE5D6] banking-dark:hover:bg-[#1c2129]"
                   }`}
                 >
                   {it.icon}
@@ -222,17 +281,21 @@ function BankingSettingsMenu({ items, ariaLabel }: { items: SettingsMenuItem[]; 
 
 /** Vista flotante mientras se arrastra: mismo ancho que la lista y altura similar si está expandida. */
 function CategoryDragPreview({ cat, expanded }: { cat: BankingCategoryRow; expanded: boolean }) {
+  const { isDark } = useBankingTheme();
   return (
-    <div className="pointer-events-none box-border w-full min-w-[min(100%,42rem)] max-w-full cursor-grabbing overflow-hidden rounded-xl border border-[#8FBFA6]/40 bg-[#161b22] shadow-2xl shadow-black/50 ring-2 ring-[#8FBFA6]/25">
+    <div className="pointer-events-none box-border w-full min-w-[min(100%,42rem)] max-w-full cursor-grabbing overflow-hidden rounded-xl border border-[#8FBFA6]/40 bg-[#F5F1E8] banking-dark:bg-[#161b22] shadow-2xl shadow-black/15 banking-dark:shadow-black/50 ring-2 ring-[#8FBFA6]/25">
       <div className="flex items-center gap-2 px-4 py-2.5">
-        <IconGripVertical className="h-4 w-4 shrink-0 text-[#6b7280]" />
-        <span className="min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: cat.color }}>
+        <IconGripVertical className="h-4 w-4 shrink-0 text-[#9A9284] banking-dark:text-[#6b7280]" />
+        <span
+          className="min-w-0 flex-1 text-sm font-medium leading-snug"
+          style={{ color: categoryTextColor(cat.color, isDark) }}
+        >
           {cat.name}
         </span>
-        <span className="shrink-0 text-xs text-[#6b7280]">({cat.subcategories.length})</span>
+        <span className="shrink-0 text-xs text-[#9A9284] banking-dark:text-[#6b7280]">({cat.subcategories.length})</span>
       </div>
       {expanded ? (
-        <div className="border-t border-[#21262d] px-4 py-2.5 text-[11px] leading-relaxed text-[#6b7280]">
+        <div className="border-t border-[#EDE7D9] banking-dark:border-[#21262d] px-4 py-2.5 text-[11px] leading-relaxed text-[#9A9284] banking-dark:text-[#6b7280]">
           {cat.subcategories.length} subcategorías · arrastra el asa ⋮⋮ para orden (también en movimientos)
         </div>
       ) : null}
@@ -390,23 +453,23 @@ function CategoryDragHandleButton({
 }
 
 const btnGreen =
-  "inline-flex items-center gap-1.5 rounded-lg bg-[#22c55e] px-3.5 py-2 text-sm font-semibold text-[#0d1117] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center gap-1.5 rounded-lg bg-[#8FBFA6] px-3.5 py-2 text-sm font-semibold text-[#1F2E25] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50";
 
 const selectFieldClass =
-  "mt-1.5 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-white shadow-sm outline-none transition focus:border-[#58a6ff] focus:ring-2 focus:ring-[#58a6ff]/20 [color-scheme:dark]";
+  "mt-1.5 w-full rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] px-3 py-2 text-sm text-[#2B2620] banking-dark:text-[#F3F1EC] shadow-sm outline-none transition focus:border-[#58a6ff] focus:ring-2 focus:ring-[#58a6ff]/20 [color-scheme:light] banking-dark:[color-scheme:dark]";
 
-const bankingSettingsCardClass = "rounded-2xl border border-[#1e242e] bg-[#12161d] p-5";
+const bankingSettingsCardClass = "rounded-2xl border border-[#E8E1D4] banking-dark:border-[#1e242e] bg-[#FFFFFF] banking-dark:bg-[#12161d] p-5";
 
-const settingsMuted = "text-[#8b949e]";
+const settingsMuted = "text-[#8A8072] banking-dark:text-[#8b949e]";
 
 const settingsGhostBtn =
-  "rounded-lg border border-[#30363d] bg-[#161b22] px-4 py-2 text-sm text-[#c9d1d9] transition hover:bg-[#1c2129]";
+  "rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#F5F1E8] banking-dark:bg-[#161b22] px-4 py-2 text-sm text-[#4A453C] banking-dark:text-[#c9d1d9] transition hover:bg-[#ECE5D6] banking-dark:hover:bg-[#1c2129]";
 
 const settingsGhostBtnSm =
-  "shrink-0 rounded-lg border border-[#30363d] bg-[#161b22] px-3 py-1.5 text-xs text-[#c9d1d9] transition hover:bg-[#1c2129]";
+  "shrink-0 rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#F5F1E8] banking-dark:bg-[#161b22] px-3 py-1.5 text-xs text-[#4A453C] banking-dark:text-[#c9d1d9] transition hover:bg-[#ECE5D6] banking-dark:hover:bg-[#1c2129]";
 
 /** Asa de arrastre / chevron en filas de categoría. */
-const categoryHandleHover = "text-[#6b7280] hover:bg-[#1c2129] hover:text-[#8FBFA6]";
+const categoryHandleHover = "text-[#9A9284] banking-dark:text-[#6b7280] hover:bg-[#ECE5D6] banking-dark:hover:bg-[#1c2129] hover:text-[#5C7F6C] banking-dark:hover:text-[#8FBFA6]";
 
 /**
  * Reordena para mostrar visibles primero y ocultas (`enabled === false`) al final,
@@ -465,6 +528,7 @@ const NAV_ITEMS: { id: SettingsTab; label: string; icon: (p: { className?: strin
  * para no anidar dos columnas de navegación dentro del layout de Perfil.
  */
 export function BankingSettingsSection({ onToast }: { onToast: (msg: string | null) => void }) {
+  const { isDark } = useBankingTheme();
   const [tab, setTab] = useState<SettingsTab>("productos");
   const [accounts, setAccounts] = useState<BankingAccountRow[]>([]);
   const [banks, setBanks] = useState<BankingBankRow[]>([]);
@@ -958,15 +1022,17 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
   }
 
   return (
-    <div>
-      <div className="mb-5 flex flex-wrap items-center gap-1.5 border-b border-[#1e242e] pb-3">
+    <div className={`rounded-2xl bg-[#FAF7F1] p-5 banking-dark:bg-[#0d1117] ${isDark ? "banking-dark" : ""}`}>
+      <div className="mb-5 flex flex-wrap items-center gap-1.5 border-b border-[#E8E1D4] banking-dark:border-[#1e242e] pb-3">
         {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             type="button"
             onClick={() => setTab(id)}
             className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              tab === id ? "bg-[#8FBFA6]/10 text-[#8FBFA6]" : "text-[#8b949e] hover:text-[#c9d1d9]"
+              tab === id
+                ? "bg-[#8FBFA6]/16 banking-dark:bg-[#8FBFA6]/10 text-[#5C7F6C] banking-dark:text-[#8FBFA6]"
+                : "text-[#8A8072] banking-dark:text-[#8b949e] hover:text-[#4A453C] banking-dark:hover:text-[#c9d1d9]"
             }`}
           >
             <Icon className="shrink-0" />
@@ -980,8 +1046,8 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
           <div>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h3 className="text-base font-semibold text-white">Productos</h3>
-                <p className="mt-1 text-sm text-[#8b949e]">
+                <h3 className="text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">Productos</h3>
+                <p className="mt-1 text-sm text-[#8A8072] banking-dark:text-[#8b949e]">
                   Activa la visibilidad en «Nuevo movimiento» y, en cuentas líquidas, si suman en el «Saldo real» del
                   resumen en Movimientos.
                 </p>
@@ -1000,11 +1066,11 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
               ) : accounts.length === 0 ? (
                 <p className={`p-5 text-sm ${settingsMuted}`}>No hay productos todavía. Usa «Agregar producto».</p>
               ) : (
-                <ul className="divide-y divide-[#1a1f2e]" role="list">
+                <ul className="divide-y divide-[#F0EAE0] banking-dark:divide-[#1a1f2e]" role="list">
                   {accounts.map((a) => (
                     <li key={a.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-[#F3F1EC]">{a.name}</p>
+                        <p className="text-sm font-medium text-[#2B2620] banking-dark:text-[#F3F1EC]">{a.name}</p>
                         <p className={`text-xs ${settingsMuted}`}>
                           {productTypeLabel(a.product_type)}
                           {a.bank_name ? ` · ${a.bank_name}` : ""}
@@ -1021,7 +1087,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                             e.stopPropagation();
                           }}
                         >
-                          <span className="text-[9.5px] font-semibold uppercase tracking-wide text-[#6b7280]">Activa</span>
+                          <span className="text-[9.5px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Activa</span>
                           <BankingEnabledToggle
                             enabled={a.enabled ?? true}
                             disabled={busyKey !== null}
@@ -1042,7 +1108,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                               e.stopPropagation();
                             }}
                           >
-                            <span className="text-[9.5px] font-semibold uppercase tracking-wide text-[#6b7280]">En total</span>
+                            <span className="text-[9.5px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">En total</span>
                             <BankingEnabledToggle
                               enabled={a.include_in_total_balance !== false}
                               disabled={busyKey !== null}
@@ -1089,7 +1155,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
           <div>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h3 className="text-base font-semibold text-white">Categorías y subcategorías</h3>
+                <h3 className="text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">Categorías y subcategorías</h3>
                 <p className={`mt-1 text-sm ${settingsMuted}`}>
                   Categorías iniciales desde el servidor; puedes añadir las tuyas, editar nombre y color (salvo
                   plantilla fijada) y crear subcategorías en cualquier categoría manual o de plantilla. Arrastra ⋮⋮
@@ -1132,7 +1198,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                     type="color"
                     value={newCategoryForm.color}
                     onChange={(e) => setNewCategoryForm({ ...newCategoryForm, color: e.target.value })}
-                    className="h-10 w-14 cursor-pointer rounded-lg border border-[#30363d] bg-[#0d1117] p-1 shadow-sm"
+                    className="h-10 w-14 cursor-pointer rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] p-1 shadow-sm"
                     title="Color de la categoría"
                   />
                 </label>
@@ -1188,8 +1254,8 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                       <SortableCategoryWrapper id={cat.id} disabled={busyKey !== null}>
                         {(handle) => (
                           <details
-                            className={`group overflow-hidden rounded-2xl border bg-[#12161d] ${
-                              catHidden ? "border-dashed border-[#30363d] opacity-70" : "border-[#1e242e]"
+                            className={`group overflow-hidden rounded-2xl border bg-[#FFFFFF] banking-dark:bg-[#12161d] ${
+                              catHidden ? "border-dashed border-[#DCD3C2] banking-dark:border-[#30363d] opacity-70" : "border-[#E8E1D4] banking-dark:border-[#1e242e]"
                             }`}
                             open={expandedCategoryIds.has(cat.id)}
                             onToggle={(e) => {
@@ -1202,7 +1268,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                               });
                             }}
                           >
-                            <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-[#1e242e] px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
+                            <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-[#E8E1D4] banking-dark:border-[#1e242e] px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
                               <CategoryDragHandleButton
                                 setActivatorNodeRef={handle.setActivatorNodeRef}
                                 attributes={handle.attributes}
@@ -1217,7 +1283,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                 <IconGripVertical className="block h-4 w-4" />
                               </CategoryDragHandleButton>
                               <span
-                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-[#6b7280] transition-transform duration-200 group-open:rotate-180"
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-[#9A9284] banking-dark:text-[#6b7280] transition-transform duration-200 group-open:rotate-180"
                                 aria-hidden
                               >
                                 <IconChevronDown className="block h-4 w-4" />
@@ -1227,7 +1293,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                   <>
                                     <input
                                       type="text"
-                                      className="min-w-[10rem] flex-1 rounded-lg border border-[#30363d] bg-[#0d1117] px-2 py-1.5 text-sm font-medium text-white shadow-sm outline-none focus:border-[#58a6ff] focus:ring-2 focus:ring-[#58a6ff]/20"
+                                      className="min-w-[10rem] flex-1 rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] px-2 py-1.5 text-sm font-medium text-[#2B2620] banking-dark:text-[#F3F1EC] shadow-sm outline-none focus:border-[#58a6ff] focus:ring-2 focus:ring-[#58a6ff]/20"
                                       value={categoryFullEdit.name}
                                       onChange={(e) =>
                                         setCategoryFullEdit({ ...categoryFullEdit, name: e.target.value })
@@ -1260,7 +1326,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                       onChange={(e) =>
                                         setCategoryFullEdit({ ...categoryFullEdit, color: e.target.value })
                                       }
-                                      className="h-9 w-12 shrink-0 cursor-pointer rounded border border-[#30363d] bg-[#0d1117] p-0.5 shadow-sm"
+                                      className="h-9 w-12 shrink-0 cursor-pointer rounded border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] p-0.5 shadow-sm"
                                       title="Color"
                                       onClick={(e) => e.stopPropagation()}
                                     />
@@ -1298,13 +1364,13 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                     />
                                     <p
                                       className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug"
-                                      style={{ color: cat.color }}
+                                      style={{ color: categoryTextColor(cat.color, isDark) }}
                                     >
                                       {cat.name}{" "}
                                       <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
                                     </p>
                                     {catHidden ? (
-                                      <span className="shrink-0 rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[#8b949e]">
+                                      <span className="shrink-0 rounded-md border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[#8A8072] banking-dark:text-[#8b949e]">
                                         Oculta
                                       </span>
                                     ) : null}
@@ -1389,10 +1455,10 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                       <SortableSubcategoryWrapper subId={s.id} disabled={dragDisabled}>
                                         {(handle) =>
                                           isEditingThis ? (
-                                            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#8FBFA6]/50 bg-[#0d1117] p-2">
+                                            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#8FBFA6]/50 bg-[#FBFAF7] banking-dark:bg-[#0d1117] p-2">
                                               <input
                                                 type="text"
-                                                className="min-w-[8rem] flex-1 rounded-md border border-[#30363d] bg-[#12161d] px-2.5 py-1.5 text-sm text-white outline-none focus:border-[#8FBFA6]"
+                                                className="min-w-[8rem] flex-1 rounded-md border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FFFFFF] banking-dark:bg-[#12161d] px-2.5 py-1.5 text-sm text-[#2B2620] banking-dark:text-[#F3F1EC] outline-none focus:border-[#8FBFA6]"
                                                 value={subNameEdit.name}
                                                 onChange={(e) => setSubNameEdit({ ...subNameEdit, name: e.target.value })}
                                                 onClick={(e) => e.stopPropagation()}
@@ -1403,7 +1469,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                                 <button
                                                   type="button"
                                                   disabled={busyKey !== null}
-                                                  className="rounded-md bg-[#22c55e] px-3 py-1.5 text-xs font-semibold text-[#0d1117] hover:brightness-110 disabled:opacity-40"
+                                                  className="rounded-md bg-[#8FBFA6] px-3 py-1.5 text-xs font-semibold text-[#1F2E25] hover:brightness-110 disabled:opacity-40"
                                                   onClick={(e) => {
                                                     e.stopPropagation();
                                                     void saveSubNameEdit();
@@ -1414,7 +1480,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                                 <button
                                                   type="button"
                                                   disabled={busyKey !== null}
-                                                  className="rounded-md border border-[#30363d] px-3 py-1.5 text-xs text-[#8b949e] hover:bg-[#1c2129]"
+                                                  className="rounded-md border border-[#DCD3C2] banking-dark:border-[#30363d] px-3 py-1.5 text-xs text-[#8A8072] banking-dark:text-[#8b949e] hover:bg-[#ECE5D6] banking-dark:hover:bg-[#1c2129]"
                                                   onClick={(e) => {
                                                     e.stopPropagation();
                                                     setSubNameEdit(null);
@@ -1428,10 +1494,10 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                             <div
                                               className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-2 py-2 text-xs ${
                                                 !parentEnabled
-                                                  ? "cursor-not-allowed border-[#1e242e] bg-[#0d1117]/60 text-[#6b7280]"
+                                                  ? "cursor-not-allowed border-[#E8E1D4] banking-dark:border-[#1e242e] bg-[#F3EEE3] banking-dark:bg-[#0d1117]/60 text-[#9A9284] banking-dark:text-[#6b7280]"
                                                   : subHidden
-                                                    ? "border-dashed border-[#30363d] bg-[#0d1117]/70 text-[#8b949e]"
-                                                    : "border-[#1e242e] bg-[#0d1117] text-[#c9d1d9]"
+                                                    ? "border-dashed border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#F3EEE3] banking-dark:bg-[#0d1117]/60 text-[#8A8072] banking-dark:text-[#8b949e]"
+                                                    : "border-[#E8E1D4] banking-dark:border-[#1e242e] bg-[#FBFAF7] banking-dark:bg-[#0d1117] text-[#4A453C] banking-dark:text-[#c9d1d9]"
                                               }`}
                                               aria-disabled={!parentEnabled}
                                             >
@@ -1504,7 +1570,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                   })}
                                 </SortableContext>
                               </DndContext>
-                              <li className="mt-2 flex list-none flex-wrap items-center gap-2 border-t border-[#1e242e] pt-3">
+                              <li className="mt-2 flex list-none flex-wrap items-center gap-2 border-t border-[#E8E1D4] banking-dark:border-[#1e242e] pt-3">
                                 <input
                                   type="text"
                                   value={newSubDraft[cat.id] ?? ""}
@@ -1516,7 +1582,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                     }
                                   }}
                                   placeholder="Nueva subcategoría…"
-                                  className="min-w-[10rem] flex-1 rounded-lg border border-[#30363d] bg-[#0d1117] px-2.5 py-1.5 text-xs text-white outline-none focus:border-[#58a6ff]"
+                                  className="min-w-[10rem] flex-1 rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] px-2.5 py-1.5 text-xs text-[#2B2620] banking-dark:text-[#F3F1EC] outline-none focus:border-[#58a6ff]"
                                   disabled={busyKey !== null || !(cat.enabled ?? true)}
                                 />
                                 <button
@@ -1545,7 +1611,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                   {reservedCategories.map((cat) => (
                     <div key={cat.id}>
                       <details
-                        className="group overflow-hidden rounded-2xl border border-dashed border-[#30363d] bg-[#12161d]/60"
+                        className="group overflow-hidden rounded-2xl border border-dashed border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FDFCF9] banking-dark:bg-[#12161d]/60"
                         open={expandedCategoryIds.has(cat.id)}
                         onToggle={(e) => {
                           const el = e.currentTarget;
@@ -1557,10 +1623,10 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                           });
                         }}
                       >
-                        <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-[#30363d] px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
+                        <summary className="flex cursor-pointer list-none items-center gap-2 border-b border-[#DCD3C2] banking-dark:border-[#30363d] px-3 py-2.5 marker:content-none sm:px-4 [&::-webkit-details-marker]:hidden">
                           <span className="inline-flex h-8 w-8 shrink-0" aria-hidden />
                           <span
-                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-[#6b7280] transition-transform duration-200 group-open:rotate-180"
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center text-[#9A9284] banking-dark:text-[#6b7280] transition-transform duration-200 group-open:rotate-180"
                             aria-hidden
                           >
                             <IconChevronDown className="block h-4 w-4" />
@@ -1569,18 +1635,18 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                             {categoryEdit?.id === cat.id ? (
                               <>
                                 <span className="h-3 w-3 shrink-0 rounded" style={{ background: cat.color }} aria-hidden />
-                                <p className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: cat.color }}>
+                                <p className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: categoryTextColor(cat.color, isDark) }}>
                                   {cat.name}{" "}
                                   <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
                                 </p>
-                                <span className="shrink-0 rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[#8b949e]">
+                                <span className="shrink-0 rounded-md border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[#8A8072] banking-dark:text-[#8b949e]">
                                   Siempre activa
                                 </span>
                                 <input
                                   type="color"
                                   value={categoryEdit.color}
                                   onChange={(e) => setCategoryEdit({ ...categoryEdit, color: e.target.value })}
-                                  className="h-9 w-12 shrink-0 cursor-pointer rounded border border-[#30363d] bg-[#0d1117] p-0.5 shadow-sm"
+                                  className="h-9 w-12 shrink-0 cursor-pointer rounded border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] p-0.5 shadow-sm"
                                   title="Color"
                                   onClick={(e) => e.stopPropagation()}
                                 />
@@ -1612,18 +1678,18 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                             ) : (
                               <>
                                 <span className="h-3 w-3 shrink-0 rounded" style={{ background: cat.color }} aria-hidden />
-                                <p className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: cat.color }}>
+                                <p className="m-0 min-w-0 flex-1 text-sm font-medium leading-snug" style={{ color: categoryTextColor(cat.color, isDark) }}>
                                   {cat.name}{" "}
                                   <span className={`font-normal ${settingsMuted}`}>({cat.subcategories.length})</span>
                                 </p>
                                 <div className="ml-auto flex h-8 shrink-0 items-center gap-2">
-                                  <span className="shrink-0 rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[#8b949e]">
+                                  <span className="shrink-0 rounded-md border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#FBFAF7] banking-dark:bg-[#0d1117] px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-[#8A8072] banking-dark:text-[#8b949e]">
                                     Siempre activa
                                   </span>
                                   <button
                                     type="button"
                                     title="Cambiar color"
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8b949e] transition hover:bg-[#1c2129] hover:text-[#e6edf3]"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#8A8072] banking-dark:text-[#8b949e] transition hover:bg-[#ECE5D6] banking-dark:hover:bg-[#1c2129] hover:text-[#2B2620] banking-dark:hover:text-[#F3F1EC]"
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
@@ -1652,7 +1718,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                 return (
                                   <SortableSubcategoryWrapper key={s.id} subId={s.id} disabled={dragDisabled}>
                                     {(handle) => (
-                                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#1e242e] bg-[#0d1117] px-2 py-2 text-xs text-[#c9d1d9]">
+                                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#E8E1D4] banking-dark:border-[#1e242e] bg-[#FBFAF7] banking-dark:bg-[#0d1117] px-2 py-2 text-xs text-[#4A453C] banking-dark:text-[#c9d1d9]">
                                         <div className="flex min-w-0 flex-1 items-center gap-2">
                                           <CategoryDragHandleButton
                                             setActivatorNodeRef={handle.setActivatorNodeRef}
@@ -1670,7 +1736,7 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                                           <span className="min-w-0 flex-1">{s.name}</span>
                                         </div>
                                         <span
-                                          className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-[#6b7280]"
+                                          className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]"
                                           title="Las subcategorías de esta categoría están siempre activas para la aplicación."
                                         >
                                           Activa
@@ -1704,8 +1770,8 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
           </div>
         )}
 
-        <p className="mt-10 text-center text-xs text-[#6e7681]">
-          <Link to="/banking/transactions" className="font-medium text-[#8FBFA6] hover:underline">
+        <p className="mt-10 text-center text-xs text-[#9A9284] banking-dark:text-[#6b7280]">
+          <Link to="/banking/transactions" className="font-medium text-[#5C7F6C] banking-dark:text-[#8FBFA6] hover:underline">
             Ir a movimientos
           </Link>
         </p>
@@ -1718,8 +1784,8 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
           aria-modal="true"
           aria-labelledby="banking-product-modal-title"
         >
-          <div className="w-full max-w-lg rounded-2xl border border-[#21262d] bg-[#161b22] p-6 shadow-2xl shadow-black/40">
-            <h3 id="banking-product-modal-title" className="text-base font-semibold text-white">
+          <div className="w-full max-w-lg rounded-2xl border border-[#EDE7D9] banking-dark:border-[#21262d] bg-[#F5F1E8] banking-dark:bg-[#161b22] p-6 shadow-2xl shadow-black/12 banking-dark:shadow-black/40">
+            <h3 id="banking-product-modal-title" className="text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">
               {editingAccount ? "Editar producto" : "Nuevo producto"}
             </h3>
             <div className="mt-5 space-y-4">
@@ -1787,15 +1853,15 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                     ))}
                   </select>
                   {bankSbif.trim() !== "" && linkedCheckingOptions.length === 0 ? (
-                    <p className="mt-1.5 text-xs text-[#d29922]">
+                    <p className="mt-1.5 text-xs text-[#B45309] banking-dark:text-[#d29922]">
                       No tienes una cuenta corriente en este banco. Agrégala primero y vuelve a editar esta tarjeta.
                     </p>
                   ) : null}
                 </label>
               ) : null}
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#30363d] bg-[#0d1117]/60 px-3 py-3 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#F3EEE3] banking-dark:bg-[#0d1117]/60 px-3 py-3 shadow-sm">
                 <div className="min-w-0">
-                  <span className="text-xs font-medium text-white">Activa</span>
+                  <span className="text-xs font-medium text-[#2B2620] banking-dark:text-[#F3F1EC]">Activa</span>
                   <p className={`mt-1 text-[11px] leading-snug ${settingsMuted}`}>
                     Visible al registrar movimientos. Si está desactivado, no aparece al elegir cuenta (solo CLP en el
                     sistema).
@@ -1810,9 +1876,9 @@ export function BankingSettingsSection({ onToast }: { onToast: (msg: string | nu
                 />
               </div>
               {productType !== "tarjeta_credito" ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#30363d] bg-[#0d1117]/60 px-3 py-3 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#DCD3C2] banking-dark:border-[#30363d] bg-[#F3EEE3] banking-dark:bg-[#0d1117]/60 px-3 py-3 shadow-sm">
                   <div className="min-w-0">
-                    <span className="text-xs font-medium text-white">En total</span>
+                    <span className="text-xs font-medium text-[#2B2620] banking-dark:text-[#F3F1EC]">En total</span>
                     <p className={`mt-1 text-[11px] leading-snug ${settingsMuted}`}>
                       Incluir en «Saldo real» del resumen en Movimientos. Si está desactivado, la cuenta no suma en la
                       tarjeta Total (útil para respaldos o transitorias). La deuda de tarjeta asociada a esta cuenta

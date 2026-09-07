@@ -78,13 +78,32 @@ export function PortfolioChart({
   loading,
   /** Si true, el área del gráfico crece con el contenedor (p. ej. alineado a la tarjeta Valor Total). */
   fillHeight = false,
+  isDark,
 }: {
   chart: ChartRow[];
   period: Period;
   currency: ChartCurrency;
   loading?: boolean;
   fillHeight?: boolean;
+  isDark: boolean;
 }) {
+  const gridStroke = isDark ? "#2d333b" : "#F0EAE0";
+  const axisStroke = isDark ? "#30363d" : "#DCD3C2";
+  const axisTickFill = isDark ? "#8b949e" : "#8A8072";
+  const tooltipCardClass = isDark
+    ? "border-[#30363d] bg-[#161b22]"
+    : "border-[#E8E1D4] bg-white";
+  const tooltipTitleClass = isDark ? "text-[#e6edf3]" : "text-[#2B2620]";
+  const tooltipValueClass = isDark ? "text-white" : "text-[#2B2620]";
+  const tooltipMutedClass = isDark ? "text-[#8b949e]" : "text-[#8A8072]";
+  const tooltipDividerClass = isDark ? "border-[#21262d]" : "border-[#F0EAE0]";
+  const legendDividerClass = isDark ? "border-[#21262d]" : "border-[#F0EAE0]";
+  const legendTextClass = isDark ? "text-[#e6edf3]" : "text-[#2B2620]";
+  const legendMutedClass = isDark ? "text-[#8b949e]" : "text-[#8A8072]";
+  const emptyBorderClass = isDark ? "border-[#30363d]" : "border-[#DCD3C2]";
+  const emptyTextClass = isDark ? "text-[#8b949e]" : "text-[#8A8072]";
+  const emptySubTextClass = isDark ? "text-[#6e7681]" : "text-[#9A9284]";
+  const loadingBgClass = isDark ? "bg-[#21262d]/80" : "bg-[#F5F1E8]";
   const data = useMemo(
     () =>
       chart.map((r) => {
@@ -135,33 +154,33 @@ export function PortfolioChart({
       const fi = row._fondos_inv;
 
       return (
-        <div className="max-w-xs rounded-lg border border-[#30363d] bg-[#161b22] px-3 py-2 text-xs shadow-xl">
-          <p className="mb-2 font-medium text-[#e6edf3]">{dateStr}</p>
+        <div className={`max-w-xs rounded-lg border ${tooltipCardClass} px-3 py-2 text-xs shadow-xl`}>
+          <p className={`mb-2 font-medium ${tooltipTitleClass}`}>{dateStr}</p>
           <p className="text-[10px] font-semibold uppercase tracking-wide text-[#fbbf24]">Valor total</p>
           <p className="mt-0.5 font-semibold text-[#fbbf24]">
             Valor: {formatMonthlyTooltipValue(ptfV, cur)}
           </p>
           <p className="mt-1 text-[#f59e0b]">Invertido: {formatMonthlyTooltipValue(ptfInv, cur)}</p>
-          <p className={`mt-1 font-medium ${ptfPos ? "text-[#22c55e]" : "text-[#ef4444]"}`}>
+          <p className={`mt-1 font-medium ${ptfPos ? (isDark ? "text-emerald-400" : "text-emerald-600") : isDark ? "text-rose-400" : "text-rose-600"}`}>
             Resultado: {ptfPos ? "+" : ""}
             {formatMonthlyTooltipValue(ptfGain, cur)} ({formatPct(ptfPct)})
           </p>
-          <div className="mt-2 border-t border-[#21262d] pt-2">
+          <div className={`mt-2 border-t ${tooltipDividerClass} pt-2`}>
             <p className="text-[10px] font-semibold uppercase tracking-wide text-[#a855f7]">Acciones (US)</p>
-            <p className="mt-0.5 text-white">Valor: {formatMonthlyTooltipValue(av, cur)}</p>
-            <p className="mt-0.5 text-[#8b949e]">Invertido: {formatMonthlyTooltipValue(ai, cur)}</p>
+            <p className={`mt-0.5 ${tooltipValueClass}`}>Valor: {formatMonthlyTooltipValue(av, cur)}</p>
+            <p className={`mt-0.5 ${tooltipMutedClass}`}>Invertido: {formatMonthlyTooltipValue(ai, cur)}</p>
           </div>
-          <div className="mt-2 border-t border-[#21262d] pt-2">
+          <div className={`mt-2 border-t ${tooltipDividerClass} pt-2`}>
             <p className="text-[10px] font-semibold uppercase tracking-wide text-[#4ade80]">Fondos</p>
-            <p className="mt-0.5 text-white">
+            <p className={`mt-0.5 ${tooltipValueClass}`}>
               Valor: {formatMonthlyTooltipValue(fv, cur)}
             </p>
-            <p className="mt-0.5 text-[#8b949e]">Invertido: {formatMonthlyTooltipValue(fi, cur)}</p>
+            <p className={`mt-0.5 ${tooltipMutedClass}`}>Invertido: {formatMonthlyTooltipValue(fi, cur)}</p>
           </div>
         </div>
       );
     },
-    [period, currency],
+    [period, currency, isDark, tooltipCardClass, tooltipTitleClass, tooltipValueClass, tooltipMutedClass, tooltipDividerClass],
   );
 
   const plotShell = fillHeight
@@ -173,8 +192,8 @@ export function PortfolioChart({
       <div
         className={
           fillHeight
-            ? "flex min-h-[200px] flex-1 animate-pulse rounded-lg bg-[#21262d]/80"
-            : "h-[320px] w-full shrink-0 animate-pulse rounded-lg bg-[#21262d]/80"
+            ? `flex min-h-[200px] flex-1 animate-pulse rounded-lg ${loadingBgClass}`
+            : `h-[320px] w-full shrink-0 animate-pulse rounded-lg ${loadingBgClass}`
         }
         aria-busy="true"
         aria-label="Cargando gráfico"
@@ -185,12 +204,12 @@ export function PortfolioChart({
   if (chart.length === 0) {
     return (
       <div
-        className={`flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#30363d] px-4 text-center text-sm text-[#8b949e] ${
+        className={`flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed ${emptyBorderClass} px-4 text-center text-sm ${emptyTextClass} ${
           fillHeight ? "min-h-[200px] flex-1" : "min-h-[240px]"
         }`}
       >
         <p>No hay datos en este periodo.</p>
-        <p className="max-w-md text-xs text-[#6e7681]">
+        <p className={`max-w-md text-xs ${emptySubTextClass}`}>
           Agrega movimientos o sincroniza precios para ver el historial del portafolio.
         </p>
       </div>
@@ -212,20 +231,20 @@ export function PortfolioChart({
                 <stop offset="100%" stopColor={ACCIONES_LINE} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="#2d333b" strokeDasharray="4 4" vertical={false} />
+            <CartesianGrid stroke={gridStroke} strokeDasharray="4 4" vertical={false} />
             <XAxis
               dataKey="date"
-              tick={{ fill: "#8b949e", fontSize: 11 }}
+              tick={{ fill: axisTickFill, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "#30363d" }}
+              axisLine={{ stroke: axisStroke }}
               tickFormatter={(v) => chartDateLabel(String(v), period)}
               minTickGap={24}
             />
             <YAxis
               domain={[0, "auto"]}
-              tick={{ fill: "#8b949e", fontSize: 11 }}
+              tick={{ fill: axisTickFill, fontSize: 11 }}
               tickLine={false}
-              axisLine={{ stroke: "#30363d" }}
+              axisLine={{ stroke: axisStroke }}
               tickFormatter={(v) => axisFmt(Number(v))}
               width={64}
             />
@@ -308,13 +327,13 @@ export function PortfolioChart({
       </div>
 
       <div
-        className={`flex shrink-0 flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-[#21262d] text-[11px] text-[#8b949e] ${
+        className={`flex shrink-0 flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t ${legendDividerClass} text-[11px] ${legendMutedClass} ${
           fillHeight ? "mt-3 pt-3" : "pt-4"
         }`}
       >
         <span className="inline-flex items-center gap-2">
           <span className="h-0.5 w-6 rounded-full bg-[#a855f7]" aria-hidden />
-          <span className="text-[#e6edf3]">Acciones</span>
+          <span className={legendTextClass}>Acciones</span>
         </span>
         <span className="inline-flex items-center gap-2">
           <span
@@ -322,11 +341,11 @@ export function PortfolioChart({
             style={{ opacity: 0.92 }}
             aria-hidden
           />
-          <span className="text-[#e6edf3]">Acciones Inv.</span>
+          <span className={legendTextClass}>Acciones Inv.</span>
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="h-0.5 w-6 rounded-full bg-[#22c55e]" aria-hidden />
-          <span className="text-[#e6edf3]">Fondos</span>
+          <span className={legendTextClass}>Fondos</span>
         </span>
         <span className="inline-flex items-center gap-2">
           <span
@@ -334,11 +353,11 @@ export function PortfolioChart({
             style={{ opacity: 0.92 }}
             aria-hidden
           />
-          <span className="text-[#e6edf3]">Fondos Inv.</span>
+          <span className={legendTextClass}>Fondos Inv.</span>
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="h-0.5 w-6 rounded-full bg-[#fbbf24]" aria-hidden />
-          <span className="text-[#e6edf3]">Total</span>
+          <span className={legendTextClass}>Total</span>
         </span>
         <span className="inline-flex items-center gap-2">
           <span
@@ -346,7 +365,7 @@ export function PortfolioChart({
             style={{ opacity: 0.92 }}
             aria-hidden
           />
-          <span className="text-[#e6edf3]">Total Inv.</span>
+          <span className={legendTextClass}>Total Inv.</span>
         </span>
       </div>
     </div>

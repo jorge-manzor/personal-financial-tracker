@@ -93,33 +93,33 @@ type ProjectDetailRow = {
   items: ProjectItemRow[];
 };
 
-/** Misma paleta que las páginas de banking (indigo claro / ámbar oscuro), vía `isDark` explícito. */
+/** Paleta pastel de la app (salvia/dorado/rosa), vía `isDark` explícito. */
 function pageShell(isDark: boolean): string {
   return `w-full min-h-[calc(100dvh-3.5rem)] ${
     isDark
-      ? "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(251,191,36,0.055),transparent_52%),linear-gradient(to_bottom,#0d0d0d,#070707)] text-zinc-300"
-      : "bg-slate-100 bg-gradient-to-br from-slate-100 via-white to-slate-100 text-slate-800"
+      ? "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(143,191,166,0.06),transparent_52%),linear-gradient(to_bottom,#0d1117,#0a0d12)] text-[#c9d1d9]"
+      : "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(199,154,86,0.09),transparent_52%),linear-gradient(to_bottom,#FAF7F1,#F5F1E8)] text-[#4A453C]"
   }`;
 }
 
 function panelCard(isDark: boolean): string {
   return isDark
-    ? "rounded-2xl border border-zinc-700 bg-zinc-900/95 p-5 shadow-none ring-1 ring-white/5"
-    : "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-900/[0.04]";
+    ? "rounded-2xl border border-[#1e242e] bg-[#12161d] p-5 shadow-none"
+    : "rounded-2xl border border-[#E8E1D4] bg-white p-5 shadow-sm shadow-[#2B2620]/[0.04]";
 }
 
 function fieldLabel(isDark: boolean): string {
   return `block text-[10px] font-semibold uppercase tracking-wide ${
-    isDark ? "text-zinc-400" : "text-slate-500"
+    isDark ? "text-[#8b949e]" : "text-[#8A8072]"
   }`;
 }
 
 function fieldInput(isDark: boolean): string {
   return [
-    "mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none ring-indigo-400/0 transition focus:ring-2",
+    "mt-1 w-full rounded-lg border px-3 py-2 text-sm outline-none ring-[#8FBFA6]/0 transition focus:ring-2",
     isDark
-      ? "border-zinc-600 bg-zinc-950 text-zinc-100 focus:border-amber-500 focus:ring-amber-500/35"
-      : "border-slate-300 bg-white text-slate-900 focus:border-indigo-400 focus:ring-indigo-400/35 [color-scheme:light]",
+      ? "border-[#30363d] bg-[#0d1117] text-[#F3F1EC] focus:border-[#8FBFA6] focus:ring-[#8FBFA6]/35"
+      : "border-[#DCD3C2] bg-white text-[#2B2620] focus:border-[#8FBFA6] focus:ring-[#8FBFA6]/35 [color-scheme:light]",
   ].join(" ");
 }
 
@@ -128,26 +128,22 @@ function compactInput(isDark: boolean): string {
   return [
     "w-full rounded-lg border px-2.5 py-1.5 text-xs outline-none transition focus:ring-2",
     isDark
-      ? "border-zinc-600 bg-zinc-950 text-zinc-100 focus:border-amber-500 focus:ring-amber-500/35"
-      : "border-slate-300 bg-white text-slate-900 focus:border-indigo-400 focus:ring-indigo-400/35 [color-scheme:light]",
+      ? "border-[#30363d] bg-[#0d1117] text-[#F3F1EC] focus:border-[#8FBFA6] focus:ring-[#8FBFA6]/35"
+      : "border-[#DCD3C2] bg-white text-[#2B2620] focus:border-[#8FBFA6] focus:ring-[#8FBFA6]/35 [color-scheme:light]",
   ].join(" ");
 }
 
 function primaryBtn(isDark: boolean): string {
-  return [
-    "rounded-lg px-4 py-2 text-sm font-semibold shadow-sm disabled:cursor-not-allowed disabled:opacity-50",
-    isDark
-      ? "bg-amber-500 text-zinc-950 shadow-md hover:bg-amber-400 disabled:opacity-45"
-      : "bg-indigo-600 text-white hover:bg-indigo-700",
-  ].join(" ");
+  void isDark;
+  return "rounded-lg bg-[#8FBFA6] px-4 py-2 text-sm font-semibold text-[#1F2E25] shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50";
 }
 
 function secondaryBtn(isDark: boolean): string {
   return [
     "rounded-lg border px-4 py-2 text-sm font-medium shadow-sm transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50",
     isDark
-      ? "border-zinc-500 bg-zinc-900 text-zinc-100 hover:border-indigo-400/55 hover:bg-indigo-950/35"
-      : "border-slate-300 bg-white text-slate-800 hover:border-indigo-400 hover:bg-indigo-50",
+      ? "border-[#30363d] bg-[#161b22] text-[#F3F1EC] hover:border-[#6FA588]/55 hover:bg-[#8FBFA6]/10"
+      : "border-[#DCD3C2] bg-white text-[#2B2620] hover:border-[#8FBFA6] hover:bg-[#8FBFA6]/10",
   ].join(" ");
 }
 
@@ -155,108 +151,106 @@ function dangerBtn(isDark: boolean): string {
   return [
     "rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50",
     isDark
-      ? "border-rose-500/50 bg-rose-950/35 text-rose-400 hover:border-rose-400/80 hover:bg-rose-950/55"
-      : "border-rose-300 bg-rose-50 text-rose-800 hover:border-rose-400 hover:bg-rose-100",
+      ? "border-[#6b3a44] bg-[#2a1216] text-[#cc8e9e] hover:border-[#8a4c58] hover:bg-[#331519]"
+      : "border-[#E9C6D0] bg-[#FDF2F5] text-[#A65568] hover:border-[#dba9b6] hover:bg-[#fbe6ec]",
   ].join(" ");
 }
 
 /** Botón «+ Nuevo …», mismo estilo que «+ Nuevo movimiento» en movimientos bancarios. */
 function newBtn(isDark: boolean): string {
-  return isDark
-    ? "rounded-xl border border-amber-600/45 bg-amber-600 px-4 py-2 text-xs font-semibold text-zinc-950 shadow-sm transition hover:border-amber-500/55 hover:bg-amber-500"
-    : "rounded-xl border border-slate-800 bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800";
+  void isDark;
+  return "rounded-xl border border-[#6FA588] bg-[#8FBFA6] px-4 py-2 text-xs font-semibold text-[#1F2E25] shadow-sm transition hover:brightness-110";
 }
 
 function modalOverlay(isDark: boolean): string {
   return isDark
     ? "fixed inset-0 z-[80] flex items-center justify-center bg-black/65 p-4 backdrop-blur-[3px]"
-    : "fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[2px]";
+    : "fixed inset-0 z-[80] flex items-center justify-center bg-[#2B2620]/25 p-4 backdrop-blur-[2px]";
 }
 
 function modalBox(isDark: boolean): string {
   return isDark
-    ? "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-700 bg-zinc-950 shadow-2xl shadow-black/50"
-    : "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15";
+    ? "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#1e242e] bg-[#0d1117] shadow-2xl shadow-black/50"
+    : "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#E8E1D4] bg-white shadow-2xl shadow-[#2B2620]/15";
 }
 
 function modalHeader(isDark: boolean): string {
   return `flex items-center justify-between gap-3 border-b px-6 py-4 ${
-    isDark ? "border-zinc-800" : "border-slate-100"
+    isDark ? "border-[#1e242e]" : "border-[#F0EAE0]"
   }`;
 }
 
 function modalTitle(isDark: boolean): string {
-  return `text-base font-semibold ${isDark ? "text-zinc-100" : "text-slate-900"}`;
+  return `text-base font-semibold ${isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}`;
 }
 
 function modalCloseBtn(isDark: boolean): string {
   return isDark
-    ? "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200 disabled:pointer-events-none disabled:opacity-40"
-    : "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:pointer-events-none disabled:opacity-40";
+    ? "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#6b7280] transition hover:bg-[#161b22] hover:text-[#c9d1d9] disabled:pointer-events-none disabled:opacity-40"
+    : "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9A9284] transition hover:bg-[#F5F1E8] hover:text-[#2B2620] disabled:pointer-events-none disabled:opacity-40";
 }
 
 function modalFooter(isDark: boolean): string {
-  return `flex justify-end gap-2 border-t px-6 py-4 ${isDark ? "border-zinc-800" : "border-slate-100"}`;
+  return `flex justify-end gap-2 border-t px-6 py-4 ${isDark ? "border-[#1e242e]" : "border-[#F0EAE0]"}`;
 }
 
 function modalSecondaryBtn(isDark: boolean): string {
   return isDark
-    ? "rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm font-medium text-zinc-200 shadow-sm transition hover:border-zinc-600 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
-    : "rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50";
+    ? "rounded-xl border border-[#30363d] bg-[#161b22] px-4 py-2 text-sm font-medium text-[#F3F1EC] shadow-sm transition hover:border-[#3a4149] hover:bg-[#1c2129] disabled:cursor-not-allowed disabled:opacity-50"
+    : "rounded-xl border border-[#DCD3C2] bg-white px-4 py-2 text-sm font-medium text-[#2B2620] shadow-sm transition hover:border-[#c9bfa8] hover:bg-[#F5F1E8] disabled:cursor-not-allowed disabled:opacity-50";
 }
 
 function modalPrimaryBtn(isDark: boolean): string {
-  return isDark
-    ? "rounded-xl border border-amber-600/45 bg-amber-600 px-4 py-2 text-sm font-semibold text-zinc-950 shadow-sm transition hover:border-amber-500/55 hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-40"
-    : "rounded-xl border border-indigo-800 bg-indigo-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-indigo-700 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40";
+  void isDark;
+  return "rounded-xl border border-[#6FA588] bg-[#8FBFA6] px-4 py-2 text-sm font-semibold text-[#1F2E25] shadow-sm transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40";
 }
 
 function modalDangerBtn(isDark: boolean): string {
-  return isDark
-    ? "rounded-xl border border-rose-600/60 bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-rose-500/70 hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
-    : "rounded-xl border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-rose-500 hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-40";
+  void isDark;
+  return "rounded-xl border border-[#a5677a] bg-[#cc8e9e] px-4 py-2 text-sm font-semibold text-[#2a1216] shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40";
 }
 
 function ghostBtn(isDark: boolean): string {
   return isDark
-    ? "text-xs font-semibold text-amber-300 hover:text-amber-200"
-    : "text-xs font-semibold text-indigo-600 hover:text-indigo-700";
+    ? "text-xs font-semibold text-[#8FBFA6] hover:text-[#a8d0bb]"
+    : "text-xs font-semibold text-[#5C7F6C] hover:text-[#4a6b5a]";
 }
 
 function heading1(isDark: boolean): string {
-  return `text-2xl font-bold tracking-tight ${isDark ? "text-zinc-50" : "text-slate-900"}`;
+  return `text-2xl font-bold tracking-tight ${isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}`;
 }
 
 function heading2(isDark: boolean): string {
-  return `text-lg font-semibold ${isDark ? "text-zinc-100" : "text-slate-900"}`;
+  return `text-lg font-semibold ${isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}`;
 }
 
 function heading3(isDark: boolean): string {
-  return `text-base font-semibold ${isDark ? "text-zinc-100" : "text-slate-900"}`;
+  return `text-base font-semibold ${isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}`;
 }
 
 function bodyText(isDark: boolean): string {
-  return `text-sm ${isDark ? "text-zinc-400" : "text-slate-600"}`;
+  return `text-sm ${isDark ? "text-[#c9d1d9]" : "text-[#4A453C]"}`;
 }
 
 function mutedText(isDark: boolean): string {
-  return `text-xs ${isDark ? "text-zinc-500" : "text-slate-500"}`;
+  return `text-xs ${isDark ? "text-[#8b949e]" : "text-[#8A8072]"}`;
 }
 
 function warningText(isDark: boolean): string {
-  return `text-xs ${isDark ? "text-amber-400" : "text-amber-700"}`;
+  return `text-xs ${isDark ? "text-[#ccc78e]" : "text-[#7A6B2E]"}`;
 }
 
 function strongText(isDark: boolean): string {
-  return isDark ? "text-zinc-100" : "text-slate-900";
+  return isDark ? "text-[#F3F1EC]" : "text-[#2B2620]";
 }
 
 function positiveText(isDark: boolean): string {
-  return isDark ? "text-emerald-400" : "text-emerald-700";
+  return isDark ? "text-[#8FBFA6]" : "text-[#4C7A64]";
 }
 
+/** Mismo verde/rojo que ingresos/egresos en Movimientos bancarios (bankingTxMainTable.tsx). */
 function accentText(isDark: boolean): string {
-  return isDark ? "text-amber-300" : "text-indigo-700";
+  return isDark ? "text-emerald-400" : "text-emerald-600";
 }
 
 function negativeText(isDark: boolean): string {
@@ -265,14 +259,14 @@ function negativeText(isDark: boolean): string {
 
 function badgeClass(isDark: boolean): string {
   return isDark
-    ? "rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400"
-    : "rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500";
+    ? "rounded-full bg-[#161b22] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8b949e]"
+    : "rounded-full bg-[#F5F1E8] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8A8072]";
 }
 
 function completedBadgeClass(isDark: boolean): string {
   return isDark
-    ? "rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-400"
-    : "rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700";
+    ? "rounded-full bg-[#8FBFA6]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8FBFA6]"
+    : "rounded-full bg-[#8FBFA6]/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#3F6B52]";
 }
 
 /** Un proyecto se considera completado cuando lo comprometido en ítems ya fue pagado en su totalidad. */
@@ -282,8 +276,8 @@ function isProjectCompleted(comprometido: number, pagado: number): boolean {
 
 function overdueBadgeClass(isDark: boolean): string {
   return isDark
-    ? "rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-400"
-    : "rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700";
+    ? "rounded-full bg-[#cc8e9e]/18 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#cc8e9e]"
+    : "rounded-full bg-[#cc8e9e]/25 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#A65568]";
 }
 
 /** Vencido: tiene fecha límite pasada y aún queda algo por pagar. */
@@ -299,39 +293,39 @@ function sortArrow(active: boolean, dir: "asc" | "desc"): string {
 
 function bigAmountInput(isDark: boolean): string {
   return `w-full min-w-0 bg-transparent text-2xl font-bold tracking-tight outline-none placeholder:font-bold ${
-    isDark ? "text-zinc-50 placeholder:text-zinc-700" : "text-slate-900 placeholder:text-slate-300"
+    isDark ? "text-[#F3F1EC] placeholder:text-[#30363d]" : "text-[#2B2620] placeholder:text-[#DCD3C2]"
   }`;
 }
 
 /** Línea inferior que resalta al enfocar el input de monto (afordancia de campo sin encajonarlo). */
 function amountFieldWrap(isDark: boolean): string {
   return isDark
-    ? "border-b-2 border-zinc-700 transition-colors focus-within:border-amber-500"
-    : "border-b-2 border-slate-200 transition-colors focus-within:border-indigo-500";
+    ? "border-b-2 border-[#30363d] transition-colors focus-within:border-[#8FBFA6]"
+    : "border-b-2 border-[#EDE7D9] transition-colors focus-within:border-[#8FBFA6]";
 }
 
 /** Fila de historial estilo lista de movimientos (icono + detalle + monto), más cercana a Revolut que una tabla. */
 function historyRow(isDark: boolean): string {
   return isDark
-    ? "group flex items-center gap-2.5 rounded-xl px-2 py-2 transition hover:bg-zinc-800/60"
-    : "group flex items-center gap-2.5 rounded-xl px-2 py-2 transition hover:bg-slate-50";
+    ? "group flex items-center gap-2.5 rounded-xl px-2 py-2 transition hover:bg-[#1c2129]"
+    : "group flex items-center gap-2.5 rounded-xl px-2 py-2 transition hover:bg-[#FBFAF7]";
 }
 
 function historyRowEditing(isDark: boolean): string {
   return isDark
-    ? "flex flex-col items-stretch gap-2 rounded-xl bg-zinc-800/60 px-2 py-2.5"
-    : "flex flex-col items-stretch gap-2 rounded-xl bg-slate-50 px-2 py-2.5";
+    ? "flex flex-col items-stretch gap-2 rounded-xl bg-[#1c2129] px-2 py-2.5"
+    : "flex flex-col items-stretch gap-2 rounded-xl bg-[#FBFAF7] px-2 py-2.5";
 }
 
 function historyIconBadge(isDark: boolean, kind: "in" | "out"): string {
   if (kind === "out") {
     return isDark
-      ? "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-500/15 text-rose-400"
+      ? "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-500/15 text-rose-300"
       : "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600";
   }
   return isDark
-    ? "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-300"
-    : "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600";
+    ? "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300"
+    : "flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600";
 }
 
 function IconArrowUp({ className }: { className?: string }) {
@@ -353,17 +347,17 @@ function IconArrowDown({ className }: { className?: string }) {
 /** Misma línea visual que la tabla de movimientos bancarios: card contenedor + cabecera + filas con hover. */
 function tableWrapper(isDark: boolean): string {
   return isDark
-    ? "overflow-x-auto rounded-2xl border border-zinc-700 bg-zinc-900/95 shadow-none ring-1 ring-white/5"
-    : "overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-900/[0.04]";
+    ? "overflow-x-auto rounded-2xl border border-[#1e242e] bg-[#12161d] shadow-none"
+    : "overflow-x-auto rounded-2xl border border-[#E8E1D4] bg-white shadow-sm shadow-[#2B2620]/[0.04]";
 }
 
 function theadRow(isDark: boolean): string {
-  return isDark ? "border-b border-zinc-700 bg-zinc-950/60" : "border-b border-slate-200 bg-slate-50";
+  return isDark ? "border-b border-[#1e242e] bg-[#161b22]" : "border-b border-[#E8E1D4] bg-[#F5F1E8]";
 }
 
 function thCell(isDark: boolean): string {
   return `whitespace-nowrap px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-wide ${
-    isDark ? "text-zinc-400" : "text-slate-500"
+    isDark ? "text-[#8b949e]" : "text-[#8A8072]"
   }`;
 }
 
@@ -371,7 +365,7 @@ function tbodyRow(isDark: boolean, clickable: boolean): string {
   return [
     "border-b transition-colors last:border-b-0",
     clickable ? "cursor-pointer" : "",
-    isDark ? "border-zinc-800/90 hover:bg-zinc-900/70" : "border-slate-100 hover:bg-slate-50",
+    isDark ? "border-[#1a1f2e] hover:bg-[#1c2129]" : "border-[#F0EAE0] hover:bg-[#FBFAF7]",
   ].join(" ");
 }
 
@@ -382,16 +376,17 @@ const compactTdCellClass = "px-3 py-1.5 align-middle text-xs";
 
 function compactThCell(isDark: boolean): string {
   return `whitespace-nowrap px-3 py-1.5 text-left text-[9px] font-semibold uppercase tracking-wide ${
-    isDark ? "text-zinc-400" : "text-slate-500"
+    isDark ? "text-[#8b949e]" : "text-[#8A8072]"
   }`;
 }
 
 function progressTrack(isDark: boolean): string {
-  return isDark ? "h-1.5 w-16 overflow-hidden rounded-full bg-zinc-700" : "h-1.5 w-16 overflow-hidden rounded-full bg-slate-200";
+  return isDark ? "h-1.5 w-16 overflow-hidden rounded-full bg-[#21262d]" : "h-1.5 w-16 overflow-hidden rounded-full bg-[#EDE7D9]";
 }
 
 function progressFill(isDark: boolean, pct: number): string {
-  const color = pct >= 100 ? (isDark ? "bg-emerald-400" : "bg-emerald-500") : isDark ? "bg-amber-500" : "bg-indigo-600";
+  void isDark;
+  const color = pct >= 100 ? "bg-[#7fbd84]" : "bg-[#8FBFA6]";
   return `h-full rounded-full ${color}`;
 }
 
@@ -404,12 +399,12 @@ function iconBtn(isDark: boolean, variant: "danger" | "neutral" = "neutral"): st
   const base = "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition disabled:pointer-events-none disabled:opacity-40";
   if (variant === "danger") {
     return isDark
-      ? `${base} text-rose-400 hover:bg-rose-950/45 hover:text-rose-300`
-      : `${base} text-rose-600 hover:bg-rose-50 hover:text-rose-700`;
+      ? `${base} text-[#cc8e9e] hover:bg-[#cc8e9e]/10 hover:text-[#e0aebb]`
+      : `${base} text-[#A65568] hover:bg-[#FBEFF2] hover:text-[#8a4356]`;
   }
   return isDark
-    ? `${base} text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200`
-    : `${base} text-slate-400 hover:bg-slate-100 hover:text-slate-700`;
+    ? `${base} text-[#6b7280] hover:bg-[#161b22] hover:text-[#c9d1d9]`
+    : `${base} text-[#9A9284] hover:bg-[#F5F1E8] hover:text-[#2B2620]`;
 }
 
 /** Botón «volver», mismo lenguaje visual que los botones secundarios de la página. */
@@ -417,8 +412,8 @@ function backBtn(isDark: boolean): string {
   return [
     "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium shadow-sm transition-colors duration-150",
     isDark
-      ? "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-amber-500/55 hover:bg-amber-950/25 hover:text-amber-200"
-      : "border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700",
+      ? "border-[#1e242e] bg-[#12161d] text-[#c9d1d9] hover:border-[#6FA588]/55 hover:bg-[#8FBFA6]/10 hover:text-[#8FBFA6]"
+      : "border-[#E8E1D4] bg-white text-[#4A453C] hover:border-[#8FBFA6] hover:bg-[#8FBFA6]/10 hover:text-[#5C7F6C]",
   ].join(" ");
 }
 
@@ -1981,7 +1976,7 @@ function ProjectDetail({
                 </div>
 
                 {managingItem.payments.length > 0 && (
-                  <div className={`border-t pt-4 ${isDark ? "border-zinc-800" : "border-slate-100"}`}>
+                  <div className={`border-t pt-4 ${isDark ? "border-[#1e242e]" : "border-[#F0EAE0]"}`}>
                     <p className={`mb-3 ${heading3(isDark)}`}>
                       Historial ({managingItem.payments.length})
                     </p>

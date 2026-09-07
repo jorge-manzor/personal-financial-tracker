@@ -34,19 +34,19 @@ function AuxSelectAllChip({
   ariaLabel: string;
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-white py-1 pl-1.5 pr-2.5 shadow-sm banking-dark:border-zinc-700 banking-dark:bg-zinc-900">
+    <div className="flex shrink-0 items-center gap-1.5 rounded-full border border-[#E8E1D4] bg-white py-1 pl-1.5 pr-2.5 shadow-sm banking-dark:border-[#1e242e] banking-dark:bg-[#12161d]">
       <BankingAuxRoundCheckbox
         checked={allSelected}
         indeterminate={someSelected && !allSelected}
         onChange={onToggle}
-        color="indigo"
+        color="sage"
         title={title}
         aria-label={ariaLabel}
       />
       <button
         type="button"
         onClick={onToggle}
-        className="text-[11px] font-semibold text-slate-500 transition hover:text-slate-800 banking-dark:text-zinc-400 banking-dark:hover:text-zinc-100"
+        className="text-[11px] font-semibold text-[#8A8072] transition hover:text-[#2B2620] banking-dark:text-[#8b949e] banking-dark:hover:text-[#F3F1EC]"
       >
         Todos
       </button>
@@ -73,10 +73,10 @@ function AuxRowTitleBlock({ row, showProducto }: { row: BankingTransactionRow; s
   const title = row.description?.trim() || row.category_name;
   return (
     <div className="min-w-0 flex-1">
-      <p className="line-clamp-2 break-words text-[13px] font-semibold leading-snug text-slate-800 [overflow-wrap:anywhere] banking-dark:text-zinc-100">
+      <p className="line-clamp-2 break-words text-[13px] font-semibold leading-snug text-[#2B2620] [overflow-wrap:anywhere] banking-dark:text-[#F3F1EC]">
         {title}
       </p>
-      <p className="mt-0.5 truncate text-[11.5px] text-slate-400 banking-dark:text-zinc-500">
+      <p className="mt-0.5 truncate text-[11.5px] text-[#9A9284] banking-dark:text-[#6b7280]">
         {row.fecha.slice(0, 10)}
         {showProducto ? ` · ${row.account_name}` : ""}
       </p>
@@ -88,10 +88,10 @@ function AuxRowTitleBlock({ row, showProducto }: { row: BankingTransactionRow; s
 function AuxRowCategoryBlock({ row }: { row: BankingTransactionRow }) {
   return (
     <div className="hidden w-40 min-w-0 shrink-0 text-right sm:block">
-      <p className="line-clamp-2 break-words text-[12px] font-medium leading-snug text-slate-600 [overflow-wrap:anywhere] banking-dark:text-zinc-300">
+      <p className="line-clamp-2 break-words text-[12px] font-medium leading-snug text-[#4A453C] [overflow-wrap:anywhere] banking-dark:text-[#c9d1d9]">
         {row.category_name}
       </p>
-      <p className="line-clamp-2 break-words text-[11px] leading-snug text-slate-400 [overflow-wrap:anywhere] banking-dark:text-zinc-500">
+      <p className="line-clamp-2 break-words text-[11px] leading-snug text-[#9A9284] [overflow-wrap:anywhere] banking-dark:text-[#6b7280]">
         {row.subcategory_name}
       </p>
     </div>
@@ -103,7 +103,7 @@ function AuxRowAmount({ row }: { row: BankingTransactionRow }) {
   const income = row.amount >= 0;
   const signClass = income
     ? "text-emerald-600 banking-dark:text-emerald-400"
-    : "text-slate-900 banking-dark:text-zinc-100";
+    : "text-[#2B2620] banking-dark:text-[#F3F1EC]";
   const amountText = `${income ? "+" : "-"}${formatBankingClpSigned(row.amount)}`;
   return (
     <div className="w-24 shrink-0 text-right">
@@ -198,17 +198,17 @@ export function BankingCcPendingChargesTable({
           <p className="min-w-0 flex-1">
             {selectedIds.size > 0 ? (
               <>
-                <span className="text-slate-500 banking-dark:text-zinc-400">
+                <span className="text-[#8A8072] banking-dark:text-[#8b949e]">
                   Suma seleccionada (cuadrar con pago al banco):{" "}
                 </span>
-                <strong className="tabular-nums text-indigo-800 banking-dark:text-indigo-300">{formatClpDots(selectedSumClp)}</strong>
-                <span className="text-slate-500 banking-dark:text-zinc-400">
+                <strong className="tabular-nums text-[#3F6B52] banking-dark:text-[#8FBFA6]">{formatClpDots(selectedSumClp)}</strong>
+                <span className="text-[#8A8072] banking-dark:text-[#8b949e]">
                   {" "}
                   · {selectedIds.size} movimiento(s)
                 </span>
               </>
             ) : (
-              <span className="text-slate-400 banking-dark:text-zinc-500">
+              <span className="text-[#9A9284] banking-dark:text-[#6b7280]">
                 Marca movimientos para ver la suma neta (devoluciones restan) y alinearla con lo que liquidarás desde la cuenta corriente asociada.
               </span>
             )}
@@ -271,7 +271,7 @@ function BankingCcPendingChargeRow({
       <BankingAuxRoundCheckbox
         checked={checked}
         onChange={onToggle}
-        color="indigo"
+        color="sage"
         aria-label={`Seleccionar cargo ${row.description ?? row.id}`}
       />
       <AuxRowAvatar row={row} />
@@ -356,11 +356,11 @@ export function BankingSharedPendingChargesTable({
           />
           <p className="min-w-0 flex-1">
             {someSelected ? (
-              <span className="text-slate-500 banking-dark:text-zinc-400">
+              <span className="text-[#8A8072] banking-dark:text-[#8b949e]">
                 {selectedInSection} movimiento(s) seleccionado(s)
               </span>
             ) : (
-              <span className="text-slate-400 banking-dark:text-zinc-500">
+              <span className="text-[#9A9284] banking-dark:text-[#6b7280]">
                 Marca movimientos para liquidarlos en lote con «Marcar como pagados».
               </span>
             )}
@@ -425,7 +425,7 @@ function BankingSharedPendingRow({
       <BankingAuxRoundCheckbox
         checked={checked}
         onChange={onToggle}
-        color="indigo"
+        color="sage"
         aria-label={`Seleccionar movimiento ${row.description ?? row.id}`}
       />
       <AuxRowAvatar row={row} />
@@ -508,11 +508,11 @@ export function BankingProvisionPendingTable({
           />
           <p className="min-w-0 flex-1">
             {someSelected ? (
-              <span className="text-slate-500 banking-dark:text-zinc-400">
+              <span className="text-[#8A8072] banking-dark:text-[#8b949e]">
                 {selectedInSection} provisión(es) seleccionada(s)
               </span>
             ) : (
-              <span className="text-slate-400 banking-dark:text-zinc-500">
+              <span className="text-[#9A9284] banking-dark:text-[#6b7280]">
                 Marca provisiones para crear sus reversas contables en lote.
               </span>
             )}
@@ -577,7 +577,7 @@ function BankingProvisionPendingRow({
       <BankingAuxRoundCheckbox
         checked={checked}
         onChange={onToggle}
-        color="indigo"
+        color="sage"
         aria-label={`Seleccionar provisión ${row.description ?? row.id}`}
       />
       <AuxRowAvatar row={row} />

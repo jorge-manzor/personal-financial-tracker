@@ -66,7 +66,7 @@ Auth: header `Authorization: Bearer <token>` salvo SSE.
 | GET | `/banking/provisions/pending-reversal-grouped` |
 | GET | `/banking/shared/unsettled-grouped` |
 
-### Orden personal
+### Orden personal (Provisiones / Ahorro por objetivo)
 
 | Método | Path |
 |--------|------|

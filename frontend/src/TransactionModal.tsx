@@ -15,6 +15,7 @@ interface Props {
   editing: TransactionRow | null;
   onClose: () => void;
   onSaved: () => void;
+  isDark: boolean;
 }
 
 function parseDecimal(s: string): number {
@@ -26,7 +27,7 @@ function isTipo(t: string): t is Tipo {
   return t === "compra" || t === "venta" || t === "dividendo";
 }
 
-export function TransactionModal({ open, editing, onClose, onSaved }: Props) {
+export function TransactionModal({ open, editing, onClose, onSaved, isDark }: Props) {
   const today = useMemo(() => localDateISOString(), []);
   const [fecha, setFecha] = useState(today);
   const [tipo, setTipo] = useState<Tipo>("compra");
@@ -129,30 +130,34 @@ export function TransactionModal({ open, editing, onClose, onSaved }: Props) {
   const unitLabel = currency === "CLP" ? "Precio unitario (CLP)" : "Precio unitario (USD)";
   const totalLabel = currency === "CLP" ? "Monto total (CLP)" : "Monto total (USD)";
 
+  const cardClass = isDark
+    ? "w-full max-w-md rounded-xl border border-[#30363d] bg-[#161b22] p-6 shadow-xl"
+    : "w-full max-w-md rounded-xl border border-[#E8E1D4] bg-white p-6 shadow-xl";
+  const titleClass = isDark ? "text-[#F3F1EC]" : "text-[#2B2620]";
+  const labelClass = `text-sm ${isDark ? "text-[#8b949e]" : "text-[#4A453C]"}`;
+  const controlClass = isDark
+    ? "mt-1 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-[#F3F1EC] placeholder:text-[#484f58]"
+    : "mt-1 w-full rounded-lg border border-[#DCD3C2] bg-white px-3 py-2 text-[#2B2620] placeholder:text-[#9A9284]";
+  const outputClass = isDark
+    ? "mt-1 block w-full rounded-lg border border-[#30363d] bg-[#21262d] px-3 py-2 text-base tabular-nums text-[#F3F1EC]"
+    : "mt-1 block w-full rounded-lg border border-[#DCD3C2] bg-[#F5F1E8] px-3 py-2 text-base tabular-nums text-[#2B2620]";
+  const helperClass = isDark ? "mt-1 text-xs text-[#6e7681]" : "mt-1 text-xs text-[#9A9284]";
+  const cancelBtnClass = isDark
+    ? "rounded-lg border border-[#30363d] px-4 py-2 text-sm text-[#8b949e] hover:bg-[#21262d]"
+    : "rounded-lg border border-[#DCD3C2] px-4 py-2 text-sm text-[#4A453C] hover:bg-[#F5F1E8]";
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
-      <div
-        className="w-full max-w-md rounded-xl border border-[#30363d] bg-[#161b22] p-6 shadow-xl"
-        role="dialog"
-      >
-        <h2 className="mb-4 text-lg font-semibold text-white">{title}</h2>
+      <div className={cardClass} role="dialog">
+        <h2 className={`mb-4 text-lg font-semibold ${titleClass}`}>{title}</h2>
         <div className="flex flex-col gap-3">
-          <label className="text-sm text-[#8b949e]">
+          <label className={labelClass}>
             Fecha
-            <input
-              type="date"
-              className="mt-1 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-white"
-              value={fecha}
-              onChange={(e) => setFecha(e.target.value)}
-            />
+            <input type="date" className={controlClass} value={fecha} onChange={(e) => setFecha(e.target.value)} />
           </label>
-          <label className="text-sm text-[#8b949e]">
+          <label className={labelClass}>
             Tipo
-            <select
-              className="mt-1 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-white"
-              value={tipo}
-              onChange={(e) => setTipo(e.target.value as Tipo)}
-            >
+            <select className={controlClass} value={tipo} onChange={(e) => setTipo(e.target.value as Tipo)}>
               {TIPOS.map((t) => (
                 <option key={t} value={t}>
                   {t}
@@ -160,10 +165,10 @@ export function TransactionModal({ open, editing, onClose, onSaved }: Props) {
               ))}
             </select>
           </label>
-          <label className="text-sm text-[#8b949e]">
+          <label className={labelClass}>
             Categoría
             <select
-              className="mt-1 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-white"
+              className={controlClass}
               value={categoria}
               onChange={(e) => setCategoria(e.target.value as CategoriaType)}
             >
@@ -174,13 +179,9 @@ export function TransactionModal({ open, editing, onClose, onSaved }: Props) {
               ))}
             </select>
           </label>
-          <label className="text-sm text-[#8b949e]">
+          <label className={labelClass}>
             Moneda
-            <select
-              className="mt-1 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-white"
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value as CurrencyType)}
-            >
+            <select className={controlClass} value={currency} onChange={(e) => setCurrency(e.target.value as CurrencyType)}>
               {MONEDAS.map((c) => (
                 <option key={c} value={c}>
                   {c}
@@ -188,67 +189,60 @@ export function TransactionModal({ open, editing, onClose, onSaved }: Props) {
               ))}
             </select>
           </label>
-          <label className="text-sm text-[#8b949e]">
+          <label className={labelClass}>
             Activo (ticker / código)
             <input
-              className="mt-1 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 uppercase text-white placeholder:text-[#484f58]"
+              className={`${controlClass} uppercase`}
               placeholder="Ej: AAPL, FONDO_BCH"
               value={activo}
               onChange={(e) => setActivo(e.target.value.toUpperCase())}
             />
           </label>
-          <label className="text-sm text-[#8b949e]">
+          <label className={labelClass}>
             Nombre del activo (opcional, fondos / AFP)
             <input
-              className="mt-1 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-white placeholder:text-[#484f58]"
+              className={controlClass}
               placeholder="Ej: Fondo Mutuo Banchile"
               value={nombreActivo}
               onChange={(e) => setNombreActivo(e.target.value)}
             />
           </label>
-          <label className="text-sm text-[#8b949e]">
+          <label className={labelClass}>
             N° acciones / unidades
             <input
-              className="mt-1 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-white"
+              className={controlClass}
               inputMode="decimal"
               autoComplete="off"
               value={acciones}
               onChange={(e) => setAcciones(e.target.value)}
             />
           </label>
-          <label className="text-sm text-[#8b949e]">
+          <label className={labelClass}>
             {unitLabel}
             <input
-              className="mt-1 w-full rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-white"
+              className={controlClass}
               inputMode="decimal"
               autoComplete="off"
               value={precio}
               onChange={(e) => setPrecio(e.target.value)}
             />
           </label>
-          <div className="text-sm text-[#8b949e]">
+          <div className={labelClass}>
             {totalLabel}
-            <output
-              className="mt-1 block w-full rounded-lg border border-[#30363d] bg-[#21262d] px-3 py-2 text-base tabular-nums text-white"
-              aria-live="polite"
-            >
+            <output className={outputClass} aria-live="polite">
               {montoDisplay ?? "—"}
             </output>
-            <p className="mt-1 text-xs text-[#6e7681]">acciones × precio unitario</p>
+            <p className={helperClass}>acciones × precio unitario</p>
           </div>
         </div>
-        {error && <p className="mt-3 text-sm text-[#ef4444]">{error}</p>}
+        {error && <p className={`mt-3 text-sm ${isDark ? "text-[#f87171]" : "text-rose-600"}`}>{error}</p>}
         <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            className="rounded-lg border border-[#30363d] px-4 py-2 text-sm text-[#8b949e] hover:bg-[#21262d]"
-            onClick={onClose}
-          >
+          <button type="button" className={cancelBtnClass} onClick={onClose}>
             Cancelar
           </button>
           <button
             type="button"
-            className="rounded-lg bg-[#22c55e] px-4 py-2 text-sm font-medium text-[#0d1117] disabled:opacity-50"
+            className="rounded-lg bg-[#8FBFA6] px-4 py-2 text-sm font-medium text-[#1F2E25] hover:bg-[#7FB097] disabled:opacity-50"
             disabled={saving}
             onClick={() => void handleSubmit()}
           >

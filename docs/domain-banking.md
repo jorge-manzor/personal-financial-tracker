@@ -13,7 +13,7 @@ Servicio opt-in `banking`. Moneda principal: **CLP**. Independiente del portafol
 | Deuda | `GET /banking/debt-totals` |
 | TC cargos pendientes | `GET /banking/credit-card/unpaid-grouped`, provisiones |
 | Gastos compartidos | `GET /banking/shared/unsettled-grouped` + bulk settled |
-| Orden personal | Provisiones y metas de ahorro (`BankingPersonal*`) |
+| Provisiones / Ahorro por objetivo | Recordatorios y metas de ahorro (`BankingPersonal*`), hoy en dos páginas separadas |
 | Calculadora | `SavingsCalculatorPlan` — planes what-if |
 
 ## UI
@@ -22,7 +22,8 @@ Servicio opt-in `banking`. Moneda principal: **CLP**. Independiente del portafol
 |------|---------|-----|
 | `/banking/transactions` | `BankingTransactionsPage.tsx` | Tabla principal (muy grande) |
 | `/profile#banking` | `Profile.tsx` (pestaña «Banking» → `BankingSettingsSection` en `BankingSettingsPage.tsx`) | Cuentas / categorías — embebido en Perfil, sin ruta propia |
-| `/banking/personal-order` | `BankingPersonalOrderPage.tsx` | Provisiones y ahorro personal |
+| `/banking/provisiones` | `BankingProvisionsPage.tsx` | Recordatorios de provisiones |
+| `/banking/ahorro-objetivo` | `BankingSavingsGoalsPage.tsx` | Metas de ahorro |
 | `/banking/savings-calculator` | `SavingsCalculatorPage.tsx` | Planes calculadora |
 | Tema | `BankingThemeContext.tsx` | Clase/tema banking |
 

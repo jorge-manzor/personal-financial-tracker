@@ -98,15 +98,15 @@ export function useBankingTxFilterUICtx(): BankingTxFilterUICtxValue {
 function bankingTxFilterChipClass(selected: boolean): string {
   return `rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition ${
     selected
-      ? "border-indigo-300 bg-indigo-50 text-indigo-700 banking-dark:border-indigo-500/40 banking-dark:bg-indigo-500/15 banking-dark:text-indigo-300"
-      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:bg-zinc-800"
+      ? "border-[#8FBFA6] bg-[#8FBFA6]/15 text-[#3F6B52] banking-dark:border-[#8FBFA6]/40 banking-dark:bg-[#8FBFA6]/12 banking-dark:text-[#8FBFA6]"
+      : "border-[#E8E1D4] bg-white text-[#4A453C] hover:border-[#DCD3C2] hover:bg-[#F5F1E8] banking-dark:border-[#1e242e] banking-dark:bg-[#12161d] banking-dark:text-[#c9d1d9] banking-dark:hover:bg-[#161b22]"
   }`;
 }
 
 const bankingTxFilterClearBtnClass =
-  "rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:text-zinc-300 banking-dark:hover:bg-zinc-800";
+  "rounded-full border border-[#E8E1D4] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#4A453C] transition hover:border-[#DCD3C2] hover:bg-[#F5F1E8] banking-dark:border-[#1e242e] banking-dark:bg-[#12161d] banking-dark:text-[#c9d1d9] banking-dark:hover:bg-[#161b22]";
 const bankingTxFilterApplyBtnClass =
-  "rounded-full bg-slate-900 px-4 py-1.5 text-[12px] font-semibold text-white shadow-sm transition hover:bg-slate-800 banking-dark:bg-amber-600 banking-dark:text-zinc-950 banking-dark:hover:bg-amber-500";
+  "rounded-full bg-[#8FBFA6] px-4 py-1.5 text-[12px] font-semibold text-[#1F2E25] shadow-sm transition hover:bg-[#7FB097]";
 
 /** Pie común: Borrar (limpia y aplica) + Aplicar. */
 function BankingTxFilterApplyBar({
@@ -120,7 +120,7 @@ function BankingTxFilterApplyBar({
   onApply?: () => void;
 }) {
   return (
-    <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3 banking-dark:border-zinc-800">
+    <div className="flex items-center justify-end gap-2 border-t border-[#F0EAE0] pt-3 banking-dark:border-[#1e242e]">
       <button type="button" onClick={onClear} className={bankingTxFilterClearBtnClass}>
         Borrar
       </button>
@@ -159,9 +159,9 @@ export function BankingTxCategoryFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Categorías (varias)</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Categorías (varias)</span>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Buscar categoría</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Buscar categoría</span>
           <input
             type="search"
             value={query}
@@ -179,8 +179,8 @@ export function BankingTxCategoryFilterBody() {
                 key={c.id}
                 type="button"
                 onClick={() => setDraftIds((prev) => toggleNumInSortedList(prev, c.id))}
-                className={`flex w-full items-center rounded-xl border px-3 py-2 text-left text-sm font-medium text-slate-800 transition banking-dark:text-zinc-100 ${
-                  picked ? "border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200 banking-dark:border-indigo-500/40 banking-dark:bg-indigo-500/15 banking-dark:ring-indigo-500/25" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:hover:bg-zinc-800"
+                className={`flex w-full items-center rounded-xl border px-3 py-2 text-left text-sm font-medium text-[#2B2620] transition banking-dark:text-[#F3F1EC] ${
+                  picked ? "border-[#8FBFA6] bg-[#8FBFA6]/12 ring-1 ring-[#8FBFA6]/35 banking-dark:border-[#8FBFA6]/45 banking-dark:bg-[#8FBFA6]/12 banking-dark:ring-[#8FBFA6]/30" : "border-[#E8E1D4] bg-white hover:border-[#DCD3C2] hover:bg-[#F5F1E8] banking-dark:border-[#1e242e] banking-dark:bg-[#12161d] banking-dark:hover:bg-[#161b22]"
                 }`}
               >
                 {c.name}
@@ -189,9 +189,9 @@ export function BankingTxCategoryFilterBody() {
           })}
         </div>
         {ctx.filterCategoriesSorted.length === 0 ? (
-          <p className="text-[12px] leading-snug text-slate-500">No hay categorías disponibles.</p>
+          <p className="text-[12px] leading-snug text-[#8A8072]">No hay categorías disponibles.</p>
         ) : filtered.length === 0 ? (
-          <p className="text-[12px] leading-snug text-slate-500">
+          <p className="text-[12px] leading-snug text-[#8A8072]">
             Ninguna categoría coincide con «{query.trim()}».
           </p>
         ) : null}
@@ -224,9 +224,9 @@ export function BankingTxSubcategoryFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Subcategorías (varias)</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Subcategorías (varias)</span>
         <label className="block">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Buscar subcategoría</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Buscar subcategoría</span>
           <input
             type="search"
             value={query}
@@ -246,8 +246,8 @@ export function BankingTxSubcategoryFilterBody() {
                 key={r.id}
                 type="button"
                 onClick={() => setDraftIds((prev) => toggleNumInSortedList(prev, r.id))}
-                className={`flex w-full items-center rounded-xl border px-3 py-2 text-left text-sm font-medium text-slate-800 transition banking-dark:text-zinc-100 ${
-                  picked ? "border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200 banking-dark:border-indigo-500/40 banking-dark:bg-indigo-500/15 banking-dark:ring-indigo-500/25" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:hover:bg-zinc-800"
+                className={`flex w-full items-center rounded-xl border px-3 py-2 text-left text-sm font-medium text-[#2B2620] transition banking-dark:text-[#F3F1EC] ${
+                  picked ? "border-[#8FBFA6] bg-[#8FBFA6]/12 ring-1 ring-[#8FBFA6]/35 banking-dark:border-[#8FBFA6]/45 banking-dark:bg-[#8FBFA6]/12 banking-dark:ring-[#8FBFA6]/30" : "border-[#E8E1D4] bg-white hover:border-[#DCD3C2] hover:bg-[#F5F1E8] banking-dark:border-[#1e242e] banking-dark:bg-[#12161d] banking-dark:hover:bg-[#161b22]"
                 }`}
               >
                 {shortLabel}
@@ -256,12 +256,12 @@ export function BankingTxSubcategoryFilterBody() {
           })}
         </div>
         {ctx.filterSubcategoryDropdownRows.length === 0 ? (
-          <p className="text-[12px] leading-snug text-slate-500">
+          <p className="text-[12px] leading-snug text-[#8A8072]">
             No hay subcategorías disponibles
             {ctx.filterCategoryIds.length > 0 ? " para las categorías seleccionadas." : "."}
           </p>
         ) : filtered.length === 0 ? (
-          <p className="text-[12px] leading-snug text-slate-500">
+          <p className="text-[12px] leading-snug text-[#8A8072]">
             Ninguna subcategoría coincide con «{query.trim()}».
           </p>
         ) : null}
@@ -296,7 +296,7 @@ export function BankingTxDescriptionFilterBody() {
       }}
     >
       <label className="block">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Contiene texto</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Contiene texto</span>
         <input
           type="search"
           value={draft}
@@ -338,7 +338,7 @@ export function BankingTxDateFilterBody() {
       }}
     >
       <label className="block">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Fecha desde</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Fecha desde</span>
         <input
           type="date"
           value={draftFrom}
@@ -347,7 +347,7 @@ export function BankingTxDateFilterBody() {
         />
       </label>
       <label className="block">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Fecha hasta</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Fecha hasta</span>
         <input
           type="date"
           value={draftTo}
@@ -391,7 +391,7 @@ export function BankingTxAmountFilterBody() {
       }}
     >
       <label className="block">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Monto mínimo</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Monto mínimo</span>
         <input
           inputMode="decimal"
           value={draftMin}
@@ -401,7 +401,7 @@ export function BankingTxAmountFilterBody() {
         />
       </label>
       <label className="block">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Monto máximo</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Monto máximo</span>
         <input
           inputMode="decimal"
           value={draftMax}
@@ -431,7 +431,7 @@ export function BankingTxProductFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Productos (varios)</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Productos (varios)</span>
         <div className="mt-1 max-h-[min(50vh,280px)] space-y-1 overflow-y-auto pr-0.5 tx-scroll">
           {ctx.filterAccountsSorted.map((a) => {
             const picked = draftIds.includes(a.id);
@@ -440,11 +440,11 @@ export function BankingTxProductFilterBody() {
                 key={a.id}
                 type="button"
                 onClick={() => setDraftIds((prev) => toggleNumInSortedList(prev, a.id))}
-                className={`flex w-full items-center rounded-xl border px-3 py-2 text-left text-sm transition banking-dark:text-zinc-100 ${
-                  picked ? "border-indigo-300 bg-indigo-50 ring-1 ring-indigo-200 banking-dark:border-indigo-500/40 banking-dark:bg-indigo-500/15 banking-dark:ring-indigo-500/25" : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:hover:bg-zinc-800"
+                className={`flex w-full items-center rounded-xl border px-3 py-2 text-left text-sm transition banking-dark:text-[#F3F1EC] ${
+                  picked ? "border-[#8FBFA6] bg-[#8FBFA6]/12 ring-1 ring-[#8FBFA6]/35 banking-dark:border-[#8FBFA6]/45 banking-dark:bg-[#8FBFA6]/12 banking-dark:ring-[#8FBFA6]/30" : "border-[#E8E1D4] bg-white hover:border-[#DCD3C2] hover:bg-[#F5F1E8] banking-dark:border-[#1e242e] banking-dark:bg-[#12161d] banking-dark:hover:bg-[#161b22]"
                 }`}
               >
-                <span className={picked ? "font-semibold text-indigo-700 banking-dark:text-indigo-300" : "text-slate-800 banking-dark:text-zinc-100"}>{a.name}</span>
+                <span className={picked ? "font-semibold text-[#3F6B52] banking-dark:text-[#8FBFA6]" : "text-[#2B2620] banking-dark:text-[#F3F1EC]"}>{a.name}</span>
               </button>
             );
           })}
@@ -471,7 +471,7 @@ export function BankingTxSharedScopeFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Tipo (varios)</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Tipo (varios)</span>
         <div className="mt-1 flex flex-wrap gap-2">
           <button
             type="button"
@@ -488,7 +488,7 @@ export function BankingTxSharedScopeFilterBody() {
             Solo compartido
           </button>
         </div>
-        <p className="text-[11px] text-slate-400 banking-dark:text-zinc-500">Sin selección = mostrar todos. Varios = unión (cualquiera).</p>
+        <p className="text-[11px] text-[#9A9284] banking-dark:text-[#6b7280]">Sin selección = mostrar todos. Varios = unión (cualquiera).</p>
       </div>
       <BankingTxFilterApplyBar onClear={clear} onApply={apply} />
     </div>
@@ -511,7 +511,7 @@ export function BankingTxLiquidadoFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Valor en tabla (varios)</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Valor en tabla (varios)</span>
         <div className="mt-1 flex flex-wrap gap-2">
           {(
             [
@@ -530,7 +530,7 @@ export function BankingTxLiquidadoFilterBody() {
             </button>
           ))}
         </div>
-        <p className="text-[11px] text-slate-400 banking-dark:text-zinc-500">Sin selección = todos. Varios = unión.</p>
+        <p className="text-[11px] text-[#9A9284] banking-dark:text-[#6b7280]">Sin selección = todos. Varios = unión.</p>
       </div>
       <BankingTxFilterApplyBar onClear={clear} onApply={apply} />
     </div>
@@ -553,7 +553,7 @@ export function BankingTxTcPaidFilterBody() {
   return (
     <div className="space-y-3">
       <div className="space-y-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">Valor en tabla (varios)</span>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">Valor en tabla (varios)</span>
         <div className="mt-1 flex flex-wrap gap-2">
           {(
             [
@@ -572,7 +572,7 @@ export function BankingTxTcPaidFilterBody() {
             </button>
           ))}
         </div>
-        <p className="text-[11px] text-slate-400 banking-dark:text-zinc-500">Sin selección = todos. Varios = unión.</p>
+        <p className="text-[11px] text-[#9A9284] banking-dark:text-[#6b7280]">Sin selección = todos. Varios = unión.</p>
       </div>
       <BankingTxFilterApplyBar onClear={clear} onApply={apply} />
     </div>
@@ -599,18 +599,18 @@ export function BankingTxColumnHeader({ colKey }: { colKey: BankingTxColumnKey }
         aria-haspopup="dialog"
         className={`w-full px-2 py-2.5 text-center transition sm:px-2.5 ${
           open
-            ? "bg-slate-100 ring-1 ring-inset ring-slate-300 banking-dark:bg-zinc-900 banking-dark:ring-zinc-600"
-            : "hover:bg-slate-50 banking-dark:hover:bg-zinc-900/80"
+            ? "bg-[#F5F1E8] ring-1 ring-inset ring-[#DCD3C2] banking-dark:bg-[#12161d] banking-dark:ring-[#30363d]"
+            : "hover:bg-[#F5F1E8] banking-dark:hover:bg-[#12161d]/80"
         }`}
       >
         <span
-          className={`block ${titleSize} font-semibold uppercase tracking-wide text-slate-700 banking-dark:text-zinc-200`}
+          className={`block ${titleSize} font-semibold uppercase tracking-wide text-[#4A453C] banking-dark:text-[#c9d1d9]`}
         >
           {label}
         </span>
         <span
           className={`mt-0.5 block text-[9px] font-medium normal-case tracking-normal ${
-            active ? "text-slate-600 banking-dark:text-zinc-400" : "text-slate-400 banking-dark:text-zinc-500"
+            active ? "text-[#4A453C] banking-dark:text-[#8b949e]" : "text-[#9A9284] banking-dark:text-[#6b7280]"
           }`}
         >
           {active ? "Filtro activo" : "Filtrar"}
@@ -681,12 +681,12 @@ export function BankingTxFiltersPanelButton() {
         aria-haspopup="dialog"
         aria-controls="banking-tx-filters-panel"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800"
+        className="inline-flex items-center gap-2 rounded-xl border border-[#DCD3C2] bg-white px-3.5 py-2 text-xs font-semibold text-[#4A453C] shadow-sm transition hover:border-[#8FBFA6] hover:bg-[#F5F1E8] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:hover:border-[#8FBFA6]/60 banking-dark:hover:bg-[#1c2129]"
       >
-        <IconFilter className="h-4 w-4 text-slate-400 banking-dark:text-zinc-500" />
+        <IconFilter className="h-4 w-4 text-[#9A9284] banking-dark:text-[#6b7280]" />
         Filtros
         {activeCount > 0 ? (
-          <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-slate-900 px-1 text-[10px] font-bold leading-none text-white banking-dark:bg-amber-500 banking-dark:text-zinc-950">
+          <span className="inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-[#8FBFA6] px-1 text-[10px] font-bold leading-none text-[#1F2E25]">
             {activeCount}
           </span>
         ) : null}
@@ -696,7 +696,7 @@ export function BankingTxFiltersPanelButton() {
           id="banking-tx-filters-panel"
           role="dialog"
           aria-label="Filtros de movimientos"
-          className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(calc(100vw-2rem),22rem)] max-h-[min(75vh,32rem)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-300/30 tx-scroll banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:shadow-black/40"
+          className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(calc(100vw-2rem),22rem)] max-h-[min(75vh,32rem)] overflow-y-auto rounded-2xl border border-[#E8E1D4] bg-white p-3 shadow-xl shadow-[#2B2620]/10 tx-scroll banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-black/40"
         >
           <ul className="space-y-1">
             {BANKING_TX_COLUMN_KEYS.map((k) => {
@@ -710,13 +710,13 @@ export function BankingTxFiltersPanelButton() {
                     aria-expanded={isOpen}
                     className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium transition ${
                       isOpen
-                        ? "bg-slate-100 text-slate-900 banking-dark:bg-zinc-800 banking-dark:text-zinc-100"
-                        : "text-slate-700 hover:bg-slate-50 banking-dark:text-zinc-300 banking-dark:hover:bg-zinc-900/70"
+                        ? "bg-[#F5F1E8] text-[#2B2620] banking-dark:bg-[#1c2129] banking-dark:text-[#F3F1EC]"
+                        : "text-[#4A453C] hover:bg-[#F5F1E8] banking-dark:text-[#c9d1d9] banking-dark:hover:bg-[#12161d]/70"
                     }`}
                   >
                     <span>{BANKING_TX_COLUMN_LABELS[k]}</span>
                     {active ? (
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-500 banking-dark:bg-indigo-400" aria-hidden />
+                      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#8FBFA6]" aria-hidden />
                     ) : null}
                   </button>
                   {isOpen ? (
@@ -738,7 +738,7 @@ export function BankingTxFiltersPanelButton() {
 export function BankingTxSiNoDashBadge({ text }: { text: string }) {
   if (text === "—") {
     return (
-      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold tabular-nums text-slate-400 banking-dark:bg-zinc-800 banking-dark:text-zinc-500">
+      <span className="inline-flex min-w-[2rem] justify-center rounded-full bg-[#F5F1E8] px-2 py-0.5 text-[11px] font-bold tabular-nums text-[#9A9284] banking-dark:bg-[#161b22] banking-dark:text-[#6b7280]">
         —
       </span>
     );
@@ -757,7 +757,7 @@ export function BankingTxSiNoDashBadge({ text }: { text: string }) {
       </span>
     );
   }
-  return <span className="text-[12px] text-slate-500 banking-dark:text-zinc-400">{text}</span>;
+  return <span className="text-[12px] text-[#8A8072] banking-dark:text-[#8b949e]">{text}</span>;
 }
 
 export function SortableBankingTxColumnPickerRow({
@@ -785,20 +785,20 @@ export function SortableBankingTxColumnPickerRow({
 
   return (
     <li ref={setNodeRef} style={style} className="list-none">
-      <div className="flex items-center gap-2 rounded-lg border border-transparent px-1 py-1.5 transition hover:border-slate-300 hover:bg-slate-50 banking-dark:hover:border-zinc-700 banking-dark:hover:bg-zinc-900/70">
+      <div className="flex items-center gap-2 rounded-lg border border-transparent px-1 py-1.5 transition hover:border-[#DCD3C2] hover:bg-[#F5F1E8] banking-dark:hover:border-[#1e242e] banking-dark:hover:bg-[#12161d]/70">
         <button
           type="button"
           ref={setActivatorNodeRef}
-          className="inline-flex shrink-0 cursor-grab touch-manipulation rounded-md p-1 text-slate-400 hover:bg-slate-200/80 hover:text-slate-800 active:cursor-grabbing banking-dark:text-zinc-500 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-200"
+          className="inline-flex shrink-0 cursor-grab touch-manipulation rounded-md p-1 text-[#9A9284] hover:bg-[#E8E1D4]/80 hover:text-[#2B2620] active:cursor-grabbing banking-dark:text-[#6b7280] banking-dark:hover:bg-[#161b22] banking-dark:hover:text-[#F3F1EC]"
           aria-label={`Arrastrar ${label}`}
           {...attributes}
           {...listeners}
         >
           <IconGripVertical className="h-4 w-4" />
         </button>
-        <span className="min-w-0 flex-1 text-sm leading-snug text-slate-800 banking-dark:text-zinc-200">{label}</span>
+        <span className="min-w-0 flex-1 text-sm leading-snug text-[#2B2620] banking-dark:text-[#c9d1d9]">{label}</span>
         {requiredCol ? (
-          <span className="shrink-0 rounded-md border border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-400">
+          <span className="shrink-0 rounded-md border border-[#DCD3C2] bg-[#F5F1E8] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#8A8072] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#8b949e]">
             Fija
           </span>
         ) : null}

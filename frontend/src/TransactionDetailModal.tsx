@@ -26,16 +26,20 @@ const stockLongNameCache = new Map<string, string>();
 function DetailRow({
   label,
   value,
-  valueClass = "text-white",
+  valueClass,
+  isDark,
 }: {
   label: string;
   value: string;
   valueClass?: string;
+  isDark: boolean;
 }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2.5 text-sm">
-      <span className="shrink-0 text-[#8e94a5]">{label}</span>
-      <span className={`text-right font-medium ${valueClass}`}>{value}</span>
+      <span className={`shrink-0 ${isDark ? "text-[#8e94a5]" : "text-[#8A8072]"}`}>{label}</span>
+      <span className={`text-right font-medium ${valueClass ?? (isDark ? "text-[#F3F1EC]" : "text-[#2B2620]")}`}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -43,9 +47,10 @@ function DetailRow({
 interface Props {
   tx: TransactionRow | null;
   onClose: () => void;
+  isDark: boolean;
 }
 
-export function TransactionDetailModal({ tx, onClose }: Props) {
+export function TransactionDetailModal({ tx, onClose, isDark }: Props) {
   const [fetchedLongName, setFetchedLongName] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,12 +97,21 @@ export function TransactionDetailModal({ tx, onClose }: Props) {
   if (!tx) return null;
 
   const isDivision = (tx.tipo || "").toLowerCase() === "division_accion";
+  const mutedClass = isDark ? "text-[#8b949e]" : "text-[#8A8072]";
   const { text: amountText, signClass: amountClass } = isDivision
-    ? { text: "Sin flujo de caja (USD)", signClass: "text-[#8b949e]" }
-    : formatTxSignedAmount(tx.monto_total, tx.currency, tx.tipo);
+    ? { text: "Sin flujo de caja (USD)", signClass: mutedClass }
+    : formatTxSignedAmount(tx.monto_total, tx.currency, tx.tipo, isDark);
   const dir = txDirectionLabel(tx.tipo);
   const dirClass =
-    dir === "Egreso" ? "text-[#f87171]" : dir === "Sin flujo de efectivo" ? "text-[#8b949e]" : "text-[#4ade80]";
+    dir === "Egreso"
+      ? isDark
+        ? "text-rose-400"
+        : "text-rose-600"
+      : dir === "Sin flujo de efectivo"
+        ? mutedClass
+        : isDark
+          ? "text-emerald-400"
+          : "text-emerald-600";
 
   const fechaLong = formatDateLongEs(tx.fecha);
   const executed = formatExecutedAt(tx.occurred_at ?? null) ?? fechaLong;
@@ -134,24 +148,27 @@ export function TransactionDetailModal({ tx, onClose }: Props) {
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-[#30363d] bg-[#12121e] shadow-2xl"
+        className={`max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border shadow-2xl ${
+          isDark ? "border-[#30363d] bg-[#12121e]" : "border-[#E8E1D4] bg-white"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-[#2a2a2a] px-5 pb-4 pt-5">
+        <div className={`border-b px-5 pb-4 pt-5 ${isDark ? "border-[#2a2a2a]" : "border-[#F0EAE0]"}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <TxAvatar tx={tx} size="lg" />
+              <TxAvatar tx={tx} size="lg" isDark={isDark} />
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2 sm:gap-3">
                 <div className="min-w-0 flex flex-col gap-1.5">
-                  <h2 id="tx-detail-title" className="text-lg font-bold leading-tight tracking-tight text-white">
+                  <h2
+                    id="tx-detail-title"
+                    className={`text-lg font-bold leading-tight tracking-tight ${isDark ? "text-[#F3F1EC]" : "text-[#2B2620]"}`}
+                  >
                     {detailTitle}
                   </h2>
-                  {stockSubtitle && (
-                    <p className="text-[11px] leading-snug text-[#8b949e]">{stockSubtitle}</p>
-                  )}
+                  {stockSubtitle && <p className={`text-[11px] leading-snug ${mutedClass}`}>{stockSubtitle}</p>}
                 </div>
                 <span
-                  className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-wide ${badgeStyleForTx(tx)}`}
+                  className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-1 text-[10px] font-bold uppercase leading-none tracking-wide ${badgeStyleForTx(tx, isDark)}`}
                 >
                   {detailBadgeLabel(tx)}
                 </span>
@@ -159,7 +176,11 @@ export function TransactionDetailModal({ tx, onClose }: Props) {
             </div>
             <button
               type="button"
-              className="shrink-0 self-start rounded-lg p-1.5 text-[#8b949e] transition hover:bg-[#30363d] hover:text-white"
+              className={`shrink-0 self-start rounded-lg p-1.5 transition ${
+                isDark
+                  ? "text-[#8b949e] hover:bg-[#30363d] hover:text-[#F3F1EC]"
+                  : "text-[#8A8072] hover:bg-[#F5F1E8] hover:text-[#2B2620]"
+              }`}
               aria-label="Cerrar"
               onClick={onClose}
             >
@@ -168,43 +189,43 @@ export function TransactionDetailModal({ tx, onClose }: Props) {
           </div>
         </div>
 
-        <div className="border-b border-[#2a2a2a] px-5 py-6 text-center">
+        <div className={`border-b px-5 py-6 text-center ${isDark ? "border-[#2a2a2a]" : "border-[#F0EAE0]"}`}>
           <p className={`text-2xl font-semibold tabular-nums sm:text-3xl ${amountClass}`}>{amountText}</p>
         </div>
 
         <div className="px-5 pb-6 pt-1">
-          <DetailRow label="Fecha" value={fechaLong} />
-          <DetailRow label="Ejecutado" value={executed} />
+          <DetailRow label="Fecha" value={fechaLong} isDark={isDark} />
+          <DetailRow label="Ejecutado" value={executed} isDark={isDark} />
 
           {showShares && !isDivision && (
-            <DetailRow label="Acciones" value={formatSharesExact(tx.acciones)} />
+            <DetailRow label="Acciones" value={formatSharesExact(tx.acciones)} isDark={isDark} />
           )}
 
           {isDivision && (
             <>
-              <DetailRow label="Acciones antes" value={formatSharesExact(tx.precio_unitario)} />
-              <DetailRow label="Acciones después" value={formatSharesExact(tx.acciones)} />
+              <DetailRow label="Acciones antes" value={formatSharesExact(tx.precio_unitario)} isDark={isDark} />
+              <DetailRow label="Acciones después" value={formatSharesExact(tx.acciones)} isDark={isDark} />
               {tx.nombre_activo?.trim() ? (
-                <DetailRow label="Detalle" value={tx.nombre_activo.trim()} />
+                <DetailRow label="Detalle" value={tx.nombre_activo.trim()} isDark={isDark} />
               ) : null}
             </>
           )}
 
           {showPrice && (
-            <DetailRow label="Precio por acción" value={formatMoney(tx.precio_unitario)} />
+            <DetailRow label="Precio por acción" value={formatMoney(tx.precio_unitario)} isDark={isDark} />
           )}
 
-          <DetailRow label="Moneda" value={(tx.currency || "USD").toUpperCase()} />
+          <DetailRow label="Moneda" value={(tx.currency || "USD").toUpperCase()} isDark={isDark} />
 
           {tx.source === "wallet" && clp != null && clp > 0 && (
-            <DetailRow label="Monto CLP" value={formatClpDots(clp)} />
+            <DetailRow label="Monto CLP" value={formatClpDots(clp)} isDark={isDark} />
           )}
 
           {tx.source === "wallet" && fx != null && fx > 0 && (
-            <DetailRow label="Tipo de cambio" value={formatFxRateClpPerUsd(fx)} />
+            <DetailRow label="Tipo de cambio" value={formatFxRateClpPerUsd(fx)} isDark={isDark} />
           )}
 
-          <DetailRow label="Dirección" value={dir} valueClass={dirClass} />
+          <DetailRow label="Dirección" value={dir} valueClass={dirClass} isDark={isDark} />
         </div>
       </div>
     </div>

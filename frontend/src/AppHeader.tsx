@@ -60,7 +60,6 @@ interface AppHeaderProps {
 
 function headerSubtitle(pathname: string, investmentsEnabled: boolean): string {
   if (pathname.startsWith("/profile")) return "Servicios y preferencias";
-  if (pathname.startsWith("/transactions")) return "Movimientos y actividad";
   if (!investmentsEnabled && pathname === "/") return "Inicio";
   return "Resumen del portafolio";
 }

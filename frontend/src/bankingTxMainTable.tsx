@@ -33,13 +33,13 @@ export const BankingTxTd = memo(function BankingTxTd({
   switch (colKey) {
     case "fecha":
       return (
-        <td className="align-middle whitespace-nowrap px-2 py-3 text-center text-[12px] text-slate-700 banking-dark:text-zinc-200 sm:px-2.5">
+        <td className="align-middle whitespace-nowrap px-2 py-3 text-center text-[12px] text-[#4A453C] banking-dark:text-[#c9d1d9] sm:px-2.5">
           {row.fecha.slice(0, 10)}
         </td>
       );
     case "descripcion":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-left text-[12px] leading-snug text-slate-600 banking-dark:text-zinc-300 sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-left text-[12px] leading-snug text-[#4A453C] banking-dark:text-[#c9d1d9] sm:px-2.5">
           <span className="line-clamp-3 break-words [overflow-wrap:anywhere]">
             {row.description?.trim() || "—"}
           </span>
@@ -47,15 +47,15 @@ export const BankingTxTd = memo(function BankingTxTd({
       );
     case "producto":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-center text-[12px] text-slate-700 banking-dark:text-zinc-200 sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-center text-[12px] text-[#4A453C] banking-dark:text-[#c9d1d9] sm:px-2.5">
           <span className="line-clamp-3 break-words [overflow-wrap:anywhere]">{row.account_name}</span>
         </td>
       );
     case "monto": {
-      /** Positivos en verde, cargos/descuentos en rojo (signo viene en el texto). */
+      /** Positivos en verde, cargos/descuentos en color de texto neutro (signo viene en el texto). */
       const signClass = income
         ? "text-emerald-600 banking-dark:text-emerald-400"
-        : "text-slate-900 banking-dark:text-zinc-100";
+        : "text-[#2B2620] banking-dark:text-[#F3F1EC]";
       const text = `${income ? "+" : "-"}${formatBankingClpSigned(row.amount)}`;
       const rowJustify = montoAlign === "center" ? "justify-center" : "justify-end";
       return (
@@ -68,7 +68,7 @@ export const BankingTxTd = memo(function BankingTxTd({
     }
     case "categoria":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-slate-700 banking-dark:text-zinc-200 sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-[#4A453C] banking-dark:text-[#c9d1d9] sm:px-2.5">
           <span className="line-clamp-2 break-words font-medium leading-snug [overflow-wrap:anywhere]">
             {row.category_name}
           </span>
@@ -76,7 +76,7 @@ export const BankingTxTd = memo(function BankingTxTd({
       );
     case "subcategoria":
       return (
-        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-slate-700 banking-dark:text-zinc-200 sm:px-2.5">
+        <td className="align-middle min-w-0 px-2 py-3 text-center text-[11.5px] text-[#4A453C] banking-dark:text-[#c9d1d9] sm:px-2.5">
           <span className="line-clamp-3 break-words font-medium leading-snug [overflow-wrap:anywhere]">
             {row.subcategory_name}
           </span>
@@ -88,8 +88,8 @@ export const BankingTxTd = memo(function BankingTxTd({
           <span
             className={`inline-flex max-w-full justify-center rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
               row.is_shared
-                ? "bg-violet-50 text-violet-600 banking-dark:bg-violet-500/15 banking-dark:text-violet-300"
-                : "bg-indigo-50 text-indigo-600 banking-dark:bg-indigo-500/15 banking-dark:text-indigo-300"
+                ? "bg-[#C79A56]/16 text-[#8A6631] banking-dark:bg-[#C79A56]/15 banking-dark:text-[#C79A56]"
+                : "bg-[#8FBFA6]/16 text-[#3F6B52] banking-dark:bg-[#8FBFA6]/15 banking-dark:text-[#8FBFA6]"
             }`}
           >
             {row.is_shared ? "Compartido" : "Personal"}
@@ -131,15 +131,15 @@ export function BankingTxPaidStatusBadge({ text }: { text: string }) {
     );
   }
   return (
-    <span className="inline-flex justify-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400 banking-dark:bg-zinc-800 banking-dark:text-zinc-500">
+    <span className="inline-flex justify-center whitespace-nowrap rounded-full bg-[#F5F1E8] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#9A9284] banking-dark:bg-[#161b22] banking-dark:text-[#6b7280]">
       —
     </span>
   );
 }
 
 export const txIconBtn =
-  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-slate-500 transition hover:border-slate-400 hover:bg-slate-100 hover:text-slate-800 banking-dark:text-zinc-500 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-200";
-export const txIconBtnDanger = `${txIconBtn} hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 banking-dark:hover:border-rose-900/55 banking-dark:hover:bg-rose-950/45 banking-dark:hover:text-rose-300`;
+  "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-[#8A8072] transition hover:border-[#DCD3C2] hover:bg-[#F5F1E8] hover:text-[#2B2620] banking-dark:text-[#8b949e] banking-dark:hover:border-[#30363d] banking-dark:hover:bg-[#161b22] banking-dark:hover:text-[#F3F1EC]";
+export const txIconBtnDanger = `${txIconBtn} hover:border-[#dba7b4] hover:bg-[#FDF2F5] hover:text-[#A65568] banking-dark:hover:border-[#6b3a44] banking-dark:hover:bg-[#2a1216]/70 banking-dark:hover:text-[#cc8e9e]`;
 
 /** `#rrggbb` (o `#rgb`) → `rgba(...)`; color de respaldo si el valor no es un hex válido. */
 export function hexToRgba(hex: string, alpha: number): string {
@@ -222,7 +222,7 @@ export function BankingTxRowActionsMenu({
               ref={menuRef}
               role="menu"
               aria-label={`Acciones: ${row.description?.trim() || row.category_name}`}
-              className="fixed z-[90] w-[9.5rem] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl shadow-slate-300/30 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:shadow-black/40"
+              className="fixed z-[90] w-[9.5rem] overflow-hidden rounded-xl border border-[#E8E1D4] bg-white py-1 shadow-xl shadow-[#2B2620]/10 banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-black/40"
               style={{ top: pos.top, left: pos.left }}
             >
               <button
@@ -234,9 +234,9 @@ export function BankingTxRowActionsMenu({
                   setOpen(false);
                   openEdit(row);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-800"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[#2B2620] transition hover:bg-[#F5F1E8] disabled:cursor-not-allowed disabled:opacity-40 banking-dark:text-[#F3F1EC] banking-dark:hover:bg-[#1c2129]"
               >
-                <IconPencil className="h-4 w-4 text-slate-400 banking-dark:text-zinc-500" />
+                <IconPencil className="h-4 w-4 text-[#9A9284] banking-dark:text-[#6b7280]" />
                 Editar
               </button>
               <button
@@ -246,7 +246,7 @@ export function BankingTxRowActionsMenu({
                   setOpen(false);
                   void removeRow(row);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-rose-600 transition hover:bg-rose-50 banking-dark:text-rose-300 banking-dark:hover:bg-rose-950/40"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[#A65568] transition hover:bg-[#FDF2F5] banking-dark:text-[#cc8e9e] banking-dark:hover:bg-[#2a1216]/70"
               >
                 <IconTrash className="h-4 w-4" />
                 Borrar
@@ -274,7 +274,7 @@ export const BankingTxListRow = memo(function BankingTxListRow({
   const income = row.amount >= 0;
   const signClass = income
     ? "text-emerald-600 banking-dark:text-emerald-400"
-    : "text-slate-900 banking-dark:text-zinc-100";
+    : "text-[#2B2620] banking-dark:text-[#F3F1EC]";
   const amountText = `${income ? "+" : "-"}${formatBankingClpSigned(row.amount)}`;
   const title = row.description?.trim() || row.category_name;
   const showProducto = visibleCols.has("producto");
@@ -301,20 +301,20 @@ export const BankingTxListRow = memo(function BankingTxListRow({
         {initial}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 break-words text-[13px] font-semibold leading-snug text-slate-800 [overflow-wrap:anywhere] banking-dark:text-zinc-100">
+        <p className="line-clamp-2 break-words text-[13px] font-semibold leading-snug text-[#2B2620] [overflow-wrap:anywhere] banking-dark:text-[#F3F1EC]">
           {title}
         </p>
-        <p className="mt-0.5 truncate text-[11.5px] text-slate-400 banking-dark:text-zinc-500">
+        <p className="mt-0.5 truncate text-[11.5px] text-[#9A9284] banking-dark:text-[#6b7280]">
           {row.fecha.slice(0, 10)}
           {showProducto ? ` · ${row.account_name}` : ""}
         </p>
       </div>
       {showCategoria ? (
         <div className="hidden w-40 min-w-0 shrink-0 text-right sm:block">
-          <p className="line-clamp-2 break-words text-[12px] font-medium leading-snug text-slate-600 [overflow-wrap:anywhere] banking-dark:text-zinc-300">
+          <p className="line-clamp-2 break-words text-[12px] font-medium leading-snug text-[#4A453C] [overflow-wrap:anywhere] banking-dark:text-[#c9d1d9]">
             {row.category_name}
           </p>
-          <p className="line-clamp-2 break-words text-[11px] leading-snug text-slate-400 [overflow-wrap:anywhere] banking-dark:text-zinc-500">
+          <p className="line-clamp-2 break-words text-[11px] leading-snug text-[#9A9284] [overflow-wrap:anywhere] banking-dark:text-[#6b7280]">
             {row.subcategory_name}
           </p>
         </div>
@@ -324,8 +324,8 @@ export const BankingTxListRow = memo(function BankingTxListRow({
           <span
             className={`inline-flex justify-center rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
               row.is_shared
-                ? "bg-violet-50 text-violet-600 banking-dark:bg-violet-500/15 banking-dark:text-violet-300"
-                : "bg-indigo-50 text-indigo-600 banking-dark:bg-indigo-500/15 banking-dark:text-indigo-300"
+                ? "bg-[#C79A56]/16 text-[#8A6631] banking-dark:bg-[#C79A56]/15 banking-dark:text-[#C79A56]"
+                : "bg-[#8FBFA6]/16 text-[#3F6B52] banking-dark:bg-[#8FBFA6]/15 banking-dark:text-[#8FBFA6]"
             }`}
           >
             {row.is_shared ? "Compartido" : "Personal"}

@@ -17,8 +17,11 @@ type MonthScopeFilter = "wallet" | "stocks" | "fondos";
 type Pill = "Todos" | string;
 
 /** Columna de etiqueta (más estrecha = menos hueco hasta las píldoras / input). */
-const FILTER_LABEL =
-  "w-[5rem] shrink-0 text-left text-[10px] font-semibold uppercase leading-tight tracking-wide text-[#6e7681]";
+function filterLabelClass(isDark: boolean): string {
+  return `w-[5rem] shrink-0 text-left text-[10px] font-semibold uppercase leading-tight tracking-wide ${
+    isDark ? "text-[#8b949e]" : "text-[#8A8072]"
+  }`;
+}
 
 const FILTER_ROW_GAP = "gap-1.5";
 
@@ -46,8 +49,10 @@ interface Props {
   onEdit: (tx: TransactionRow) => void;
   onToast: (msg: string) => void;
   onMutate: () => void | Promise<void>;
-  /** When false, only the transaction list card is shown (e.g. /transactions page). */
+  /** When true (default), shows the monthly movements chart too — used by the Panel's "Actividad" tab. */
   showMonthly?: boolean;
+  /** Tema explícito (pantalla fuera de /banking/* o /profile — ver docs/design-colors.md). */
+  isDark: boolean;
 }
 
 export function ActivitySection({
@@ -56,6 +61,7 @@ export function ActivitySection({
   onToast,
   onMutate,
   showMonthly = true,
+  isDark,
 }: Props) {
   const [monthCur, setMonthCur] = useState<CurFilter>("USD");
   const [monthScope, setMonthScope] = useState<MonthScopeFilter>("stocks");
@@ -202,26 +208,49 @@ export function ActivitySection({
     ? "max-h-[min(26rem,42dvh)] sm:max-h-[min(30rem,48dvh)]"
     : "max-h-[min(38rem,72dvh)] sm:max-h-[min(42rem,75dvh)]";
 
-  const activityCardClass =
-    "rounded-2xl border border-[#30363d] bg-[#161b22] p-5 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset] md:p-6";
+  const activityCardClass = `rounded-2xl border p-5 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset] md:p-6 ${
+    isDark ? "border-[#30363d] bg-[#161b22]" : "border-[#E8E1D4] bg-white shadow-none shadow-[#2B2620]/[0.04]"
+  }`;
+  const headingClass = isDark ? "text-[#F3F1EC]" : "text-[#2B2620]";
+  const subHeadingClass = isDark ? "text-[#8b949e]" : "text-[#8A8072]";
+  const mutedLabelClass = `text-[10px] font-medium uppercase tracking-wide ${
+    isDark ? "text-[#6e7681]" : "text-[#9A9284]"
+  }`;
+  const segPillActive = isDark ? "bg-[#8FBFA6] text-[#1F2E25]" : "bg-[#8FBFA6] text-[#1F2E25]";
+  const segPillIdle = isDark
+    ? "bg-[#21262d] text-[#8b949e] hover:text-[#F3F1EC]"
+    : "bg-[#F5F1E8] text-[#8A8072] hover:text-[#2B2620]";
+  const axisColor = isDark ? "#8b949e" : "#8A8072";
+  const gridColor = isDark ? "#21262d" : "#E8E1D4";
+  const tooltipCardClass = isDark
+    ? "rounded-lg border border-[#30363d] bg-[#161b22] px-3 py-2 text-xs shadow-lg"
+    : "rounded-lg border border-[#E8E1D4] bg-white px-3 py-2 text-xs shadow-lg shadow-[#2B2620]/10";
+  const tooltipValueClass = isDark ? "text-[#F3F1EC]" : "text-[#2B2620]";
+  const searchInputClass = isDark
+    ? "h-[38px] w-full min-w-[12rem] flex-1 rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm leading-tight text-[#F3F1EC] placeholder:text-[#484f58] focus:border-[#8FBFA6] focus:outline-none lg:min-w-[22rem]"
+    : "h-[38px] w-full min-w-[12rem] flex-1 rounded-lg border border-[#DCD3C2] bg-white px-3 py-2 text-sm leading-tight text-[#2B2620] placeholder:text-[#9A9284] focus:border-[#8FBFA6] focus:outline-none lg:min-w-[22rem]";
+  const listContainerClass = isDark
+    ? "border-[#21262d] bg-[#0d1117]"
+    : "border-[#E8E1D4] bg-[#FBFAF7]";
+  const emptyTextClass = isDark ? "text-[#8b949e]" : "text-[#8A8072]";
 
   return (
     <section>
       <div className={showMonthly ? "space-y-6" : ""}>
         {showMonthly && (
-          <h2 className="text-base font-bold uppercase tracking-[0.12em] text-white">Actividad</h2>
+          <h2 className={`text-base font-bold uppercase tracking-[0.12em] ${headingClass}`}>Actividad</h2>
         )}
 
         {showMonthly && (
           <div className={activityCardClass}>
             <div className="mb-5 flex flex-col gap-4">
               <div className="flex flex-row flex-wrap items-center justify-between gap-x-4 gap-y-3">
-                <h3 className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#8b949e]">
-                  <span className="text-base font-bold tracking-[0.12em] text-white">Movimientos mensuales</span>
+                <h3 className={`flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-[0.08em] ${subHeadingClass}`}>
+                  <span className={`text-base font-bold tracking-[0.12em] ${headingClass}`}>Movimientos mensuales</span>
                 </h3>
                 <div className="flex flex-shrink-0 flex-row flex-wrap items-center justify-end gap-x-5 gap-y-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-[#6e7681]">Moneda</span>
+                    <span className={mutedLabelClass}>Moneda</span>
                     {(["USD", "CLP"] as const).map((k) => {
                       const usdDisabled = monthScope === "fondos" && k === "USD";
                       return (
@@ -238,8 +267,8 @@ export function ActivitySection({
                             if (!usdDisabled) setMonthCur(k);
                           }}
                           className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                            monthCur === k ? "bg-white text-[#0d1117]" : "bg-[#21262d] text-[#8b949e] hover:text-white"
-                          } ${usdDisabled ? "cursor-not-allowed opacity-40 hover:text-[#8b949e]" : ""}`}
+                            monthCur === k ? segPillActive : segPillIdle
+                          } ${usdDisabled ? "cursor-not-allowed opacity-40" : ""}`}
                         >
                           {k}
                         </button>
@@ -247,7 +276,7 @@ export function ActivitySection({
                     })}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-[#6e7681]">Vista</span>
+                    <span className={mutedLabelClass}>Vista</span>
                     {(
                       [
                         { id: "wallet" as const, label: "Billetera" },
@@ -260,7 +289,7 @@ export function ActivitySection({
                         type="button"
                         onClick={() => setMonthScope(id)}
                         className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          monthScope === id ? "bg-white text-[#0d1117]" : "bg-[#21262d] text-[#8b949e] hover:text-white"
+                          monthScope === id ? segPillActive : segPillIdle
                         }`}
                       >
                         {label}
@@ -269,13 +298,19 @@ export function ActivitySection({
                   </div>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-4 text-[10px] text-[#8b949e] sm:justify-end">
+              <div className={`flex flex-wrap items-center gap-4 text-[10px] sm:justify-end ${subHeadingClass}`}>
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-[#22c55e]" aria-hidden />
+                  <span
+                    className={`inline-block h-2 w-2 shrink-0 rounded-full ${isDark ? "bg-[#34d399]" : "bg-[#059669]"}`}
+                    aria-hidden
+                  />
                   {chartGreenLabel}
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-[#ef4444]" aria-hidden />
+                  <span
+                    className={`inline-block h-2 w-2 shrink-0 rounded-full ${isDark ? "bg-[#fb7185]" : "bg-[#e11d48]"}`}
+                    aria-hidden
+                  />
                   {chartRedLabel}
                 </span>
               </div>
@@ -283,37 +318,49 @@ export function ActivitySection({
           <div className="h-[200px] w-full sm:h-[220px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={monthlyChartData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid stroke="#21262d" vertical={false} />
+                <CartesianGrid stroke={gridColor} vertical={false} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fill: "#8b949e", fontSize: 10 }}
+                  tick={{ fill: axisColor, fontSize: 10 }}
                   interval={0}
                   angle={-35}
                   textAnchor="end"
                   height={56}
                 />
-                <YAxis tick={{ fill: "#8b949e", fontSize: 10 }} tickFormatter={chartFmt} width={64} />
+                <YAxis tick={{ fill: axisColor, fontSize: 10 }} tickFormatter={chartFmt} width={64} />
                 <Tooltip
                   content={({ active, payload }) => {
                     if (!active || !payload?.length) return null;
                     const p = payload[0].payload as MonthlyChartPoint;
                     return (
-                      <div className="rounded-lg border border-[#30363d] bg-[#161b22] px-3 py-2 text-xs shadow-lg">
-                        <p className="mb-2 font-medium text-[#e6edf3]">{p.label}</p>
-                        <p className="text-[#22c55e]">
+                      <div className={tooltipCardClass}>
+                        <p className={`mb-2 font-medium ${tooltipValueClass}`}>{p.label}</p>
+                        <p className={isDark ? "text-[#34d399]" : "text-[#059669]"}>
                           {chartGreenLabel}{" "}
-                          <span className="text-[#e6edf3] tabular-nums">{tooltipMoney(p.barGreen)}</span>
+                          <span className={`tabular-nums ${tooltipValueClass}`}>{tooltipMoney(p.barGreen)}</span>
                         </p>
-                        <p className="mt-0.5 text-[#ef4444]">
+                        <p className={`mt-0.5 ${isDark ? "text-[#fb7185]" : "text-[#e11d48]"}`}>
                           {chartRedLabel}{" "}
-                          <span className="text-[#e6edf3] tabular-nums">{tooltipMoney(p.barRed)}</span>
+                          <span className={`tabular-nums ${tooltipValueClass}`}>{tooltipMoney(p.barRed)}</span>
                         </p>
                       </div>
                     );
                   }}
                 />
-                <Bar dataKey="barGreen" name={chartGreenLabel} fill="#22c55e" radius={[4, 4, 0, 0]} maxBarSize={28} />
-                <Bar dataKey="barRed" name={chartRedLabel} fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                <Bar
+                  dataKey="barGreen"
+                  name={chartGreenLabel}
+                  fill={isDark ? "#34d399" : "#059669"}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={28}
+                />
+                <Bar
+                  dataKey="barRed"
+                  name={chartRedLabel}
+                  fill={isDark ? "#fb7185" : "#e11d48"}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={28}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -323,11 +370,11 @@ export function ActivitySection({
       {/* Transacciones — misma familia visual que movimientos mensuales */}
       <div className={activityCardClass}>
         <div className="mb-5">
-          <h3 className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-[0.08em] text-[#8b949e]">
-            <span className="text-base font-bold tracking-[0.12em] text-white">Transacciones</span>
-            <span className="tabular-nums text-white">({total})</span>
+          <h3 className={`flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs font-semibold uppercase tracking-[0.08em] ${subHeadingClass}`}>
+            <span className={`text-base font-bold tracking-[0.12em] ${headingClass}`}>Transacciones</span>
+            <span className={`tabular-nums ${headingClass}`}>({total})</span>
             {loading && items.length > 0 && (
-              <span className="text-[11px] font-normal normal-case tracking-normal text-[#6e7681]">
+              <span className={`text-[11px] font-normal normal-case tracking-normal ${isDark ? "text-[#6e7681]" : "text-[#9A9284]"}`}>
                 Actualizando…
               </span>
             )}
@@ -343,19 +390,20 @@ export function ActivitySection({
               options={["Todos", "Acciones", "Fondos", "AFP", "Wallet USD"]}
               onChange={setCategoria}
               pillsSingleRow
+              isDark={isDark}
             />
-            <TipoFilterRow value={tipo} onChange={setTipo} options={availableTipos} />
+            <TipoFilterRow value={tipo} onChange={setTipo} options={availableTipos} isDark={isDark} />
           </div>
           {/* Derecha: Buscar arriba, Moneda abajo (alineados a la derecha) */}
           <div className="flex w-full shrink-0 flex-col items-stretch gap-3 lg:w-auto lg:items-end">
             <div
               className={`flex min-w-0 w-full items-center ${FILTER_ROW_GAP} lg:w-[min(100%,34rem)] lg:justify-end lg:self-end`}
             >
-              <span className={FILTER_LABEL}>Buscar</span>
+              <span className={filterLabelClass(isDark)}>Buscar</span>
               <input
                 type="search"
                 enterKeyHint="search"
-                className="h-[38px] w-full min-w-[12rem] flex-1 rounded-lg border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm leading-tight text-white placeholder:text-[#484f58] focus:border-[#6e7681] focus:outline-none lg:min-w-[22rem]"
+                className={searchInputClass}
                 placeholder="Ticker o nombre…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
@@ -369,21 +417,22 @@ export function ActivitySection({
                 options={["Todos", "USD", "CLP"]}
                 onChange={setCurrency}
                 inline
+                isDark={isDark}
               />
             </div>
           </div>
         </div>
 
         {loading && items.length === 0 && (
-          <p className="text-sm text-[#8b949e]">Cargando…</p>
+          <p className={`text-sm ${emptyTextClass}`}>Cargando…</p>
         )}
         {!loading && items.length === 0 && (
-          <p className="text-sm text-[#8b949e]">No hay transacciones con estos filtros.</p>
+          <p className={`text-sm ${emptyTextClass}`}>No hay transacciones con estos filtros.</p>
         )}
 
         {items.length > 0 && (
           <div
-            className={`tx-scroll overflow-y-auto overscroll-y-contain rounded-xl border border-[#21262d] bg-[#0d1117] ${txListScrollClass}`}
+            className={`tx-scroll overflow-y-auto overscroll-y-contain rounded-xl border ${listContainerClass} ${txListScrollClass}`}
           >
             <div
               className={`p-2 transition-opacity duration-150 sm:p-3 ${loading ? "opacity-60" : "opacity-100"}`}
@@ -424,6 +473,7 @@ export function ActivitySection({
                   }
                 }}
                 deletingId={deletingId}
+                isDark={isDark}
               />
             </div>
           </div>
@@ -432,7 +482,7 @@ export function ActivitySection({
       </div>
 
       {detailTx != null && (
-        <TransactionDetailModal key={detailTx.id} tx={detailTx} onClose={() => setDetailTx(null)} />
+        <TransactionDetailModal key={detailTx.id} tx={detailTx} onClose={() => setDetailTx(null)} isDark={isDark} />
       )}
     </section>
   );
@@ -442,22 +492,26 @@ function TipoFilterRow({
   value,
   onChange,
   options,
+  isDark,
 }: {
   value: Pill;
   onChange: (v: Pill) => void;
   options: string[];
+  isDark: boolean;
 }) {
   const pills: Pill[] = ["Todos", ...options];
   return (
     <div className={`flex min-w-0 items-center ${FILTER_ROW_GAP}`}>
-      <span className={FILTER_LABEL}>Tipo</span>
-      <div className="filter-pills-scroll flex min-w-0 flex-1 flex-nowrap gap-1.5 overflow-x-auto pb-0.5">
+      <span className={filterLabelClass(isDark)}>Tipo</span>
+      <div
+        className={`${isDark ? "filter-pills-scroll" : "filter-pills-scroll-light"} flex min-w-0 flex-1 flex-nowrap gap-1.5 overflow-x-auto pb-0.5`}
+      >
         {pills.map((o) => (
           <button
             key={o}
             type="button"
             onClick={() => onChange(o)}
-            className={tipoFilterPillClass(o, value === o)}
+            className={tipoFilterPillClass(o, value === o, isDark)}
           >
             {TIPO_FILTER_LABELS[o] ?? o.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
           </button>
@@ -467,28 +521,53 @@ function TipoFilterRow({
   );
 }
 
-function tipoFilterPillClass(option: string, selected: boolean): string {
+/** Mismo mapeo de color que `badgeStyleForTx` (transactionUi.tsx) — píldora de filtro «Tipo» seleccionada. */
+function tipoFilterPillClass(option: string, selected: boolean, isDark: boolean): string {
   const base = "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors";
-  if (!selected) return `${base} bg-[#21262d] text-[#8b949e] hover:text-white`;
-  if (option === "Todos") return `${base} bg-white text-[#0d1117]`;
-  const colors: Record<string, string> = {
-    dividendo: "bg-[#453008] text-[#e2b340] ring-1 ring-[#e2b340]/35",
-    deposito: "bg-[#064e3b] text-[#34d399] ring-1 ring-[#34d399]/25",
-    retiro: "bg-[#5c1f0d] text-[#fca5a5] ring-1 ring-[#fca5a5]/25",
-    interes_caja: "bg-[#0e3c46] text-[#40c4ff] ring-1 ring-[#40c4ff]/25",
-    compensacion: "bg-[#3f3f46] text-[#d4d4d8]",
-    fusion_caja: "bg-[#422006] text-[#fcd34d] ring-1 ring-[#fcd34d]/20",
-    desinversion: "bg-[#14532d] text-[#86efac] ring-1 ring-[#86efac]/20",
-    acat_ingreso: "bg-[#134e4a] text-[#5eead4] ring-1 ring-[#5eead4]/20",
-    acat_comision: "bg-[#4c0519] text-[#fda4af] ring-1 ring-[#fda4af]/20",
-    acat_egreso: "bg-[#4c0519] text-[#fb7185] ring-1 ring-[#fb7185]/20",
-    warrant_comision: "bg-[#3b0764] text-[#d8b4fe] ring-1 ring-[#d8b4fe]/20",
-    warrant_costo: "bg-[#3b0764] text-[#c084fc] ring-1 ring-[#c084fc]/20",
-    compra: "bg-[#2d2b55] text-[#a599e9] ring-1 ring-[#a599e9]/30",
-    reinversion: "bg-[#312e81] text-[#a5b4fc] ring-1 ring-[#a5b4fc]/30",
-    venta: "bg-[#5c1f0d] text-[#fdba74] ring-1 ring-[#fdba74]/25",
+  if (!selected) {
+    return isDark
+      ? `${base} bg-[#21262d] text-[#8b949e] hover:text-[#F3F1EC]`
+      : `${base} bg-[#F5F1E8] text-[#8A8072] hover:text-[#2B2620]`;
+  }
+  if (option === "Todos") return `${base} bg-[#8FBFA6] text-[#1F2E25]`;
+  if (isDark) {
+    const colorsDark: Record<string, string> = {
+      dividendo: "bg-[#C79A56]/18 text-[#E9CB9B]",
+      deposito: "bg-[#8FBFA6]/20 text-[#8FBFA6]",
+      retiro: "bg-[#cc998e]/20 text-[#e7c3b6]",
+      interes_caja: "bg-[#8ec2cc]/20 text-[#b6dfe7]",
+      compensacion: "bg-[#21262d] text-[#9ca3af]",
+      fusion_caja: "bg-[#ccc78e]/18 text-[#e6dfa0]",
+      desinversion: "bg-[#a8cc8e]/18 text-[#b9e6a0]",
+      acat_ingreso: "bg-[#8eccbd]/18 text-[#a0e6d4]",
+      acat_comision: "bg-[#cc8eb8]/18 text-[#e6a8d4]",
+      acat_egreso: "bg-[#cc8eb8]/18 text-[#e6a8d4]",
+      warrant_comision: "bg-[#8ea8cc]/18 text-[#a8bfe6]",
+      warrant_costo: "bg-[#8ea8cc]/18 text-[#a8bfe6]",
+      compra: "bg-[#998ecc]/18 text-[#c4b8ed]",
+      reinversion: "bg-[#bd8ecc]/18 text-[#d9b8e6]",
+      venta: "bg-[#cc8e9e]/20 text-[#e7b4c0]",
+    };
+    return `${base} ${colorsDark[option] ?? "bg-[#8FBFA6] text-[#1F2E25]"}`;
+  }
+  const colorsLight: Record<string, string> = {
+    dividendo: "bg-[#C79A56]/18 text-[#8A6631]",
+    deposito: "bg-[#8FBFA6]/20 text-[#3F6B52]",
+    retiro: "bg-[#cc998e]/20 text-[#a3705f]",
+    interes_caja: "bg-[#8ec2cc]/20 text-[#4a7d8c]",
+    compensacion: "bg-[#F5F1E8] text-[#8A8072]",
+    fusion_caja: "bg-[#ccc78e]/18 text-[#8a8250]",
+    desinversion: "bg-[#a8cc8e]/18 text-[#5f8a4a]",
+    acat_ingreso: "bg-[#8eccbd]/18 text-[#4a8a76]",
+    acat_comision: "bg-[#cc8eb8]/18 text-[#8a4a72]",
+    acat_egreso: "bg-[#cc8eb8]/18 text-[#8a4a72]",
+    warrant_comision: "bg-[#8ea8cc]/18 text-[#4a5f8a]",
+    warrant_costo: "bg-[#8ea8cc]/18 text-[#4a5f8a]",
+    compra: "bg-[#998ecc]/18 text-[#5f549e]",
+    reinversion: "bg-[#bd8ecc]/18 text-[#8a5a9e]",
+    venta: "bg-[#cc8e9e]/20 text-[#A65568]",
   };
-  return `${base} ${colors[option] ?? "bg-white text-[#0d1117]"}`;
+  return `${base} ${colorsLight[option] ?? "bg-[#8FBFA6] text-[#1F2E25]"}`;
 }
 
 function PillRow({
@@ -500,6 +579,7 @@ function PillRow({
   pillsSingleRow,
   /** Columna derecha: el grupo no estira al 100% del contenedor. */
   inline,
+  isDark,
 }: {
   label: string;
   value: string;
@@ -507,16 +587,17 @@ function PillRow({
   onChange: (v: Pill) => void;
   pillsSingleRow?: boolean;
   inline?: boolean;
+  isDark: boolean;
 }) {
   const pillStrip = pillsSingleRow
-    ? "filter-pills-scroll flex min-w-0 flex-1 flex-nowrap gap-1.5 overflow-x-auto pb-0.5"
+    ? `${isDark ? "filter-pills-scroll" : "filter-pills-scroll-light"} flex min-w-0 flex-1 flex-nowrap gap-1.5 overflow-x-auto pb-0.5`
     : inline
       ? "flex min-w-0 flex-wrap gap-1.5"
       : "flex min-w-0 flex-1 flex-wrap gap-1.5";
   const rowCls = inline ? "inline-flex max-w-full" : "flex min-w-0";
   return (
     <div className={`${rowCls} items-center ${FILTER_ROW_GAP}`}>
-      <span className={FILTER_LABEL}>{label}</span>
+      <span className={filterLabelClass(isDark)}>{label}</span>
       <div className={pillStrip}>
         {options.map((o) => (
           <button
@@ -524,7 +605,11 @@ function PillRow({
             type="button"
             onClick={() => onChange(o)}
             className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-              value === o ? "bg-white text-[#0d1117]" : "bg-[#21262d] text-[#8b949e] hover:text-white"
+              value === o
+                ? "bg-[#8FBFA6] text-[#1F2E25]"
+                : isDark
+                  ? "bg-[#21262d] text-[#8b949e] hover:text-[#F3F1EC]"
+                  : "bg-[#F5F1E8] text-[#8A8072] hover:text-[#2B2620]"
             }`}
           >
             {o === "Todos" ? "Todos" : o.charAt(0).toUpperCase() + o.slice(1)}
@@ -541,12 +626,14 @@ function GroupedTransactionRows({
   onEdit,
   onDelete,
   deletingId,
+  isDark,
 }: {
   items: TransactionRow[];
   onOpenDetail: (tx: TransactionRow) => void;
   onEdit: (tx: TransactionRow) => void;
   onDelete: (tx: TransactionRow) => void;
   deletingId: number | null;
+  isDark: boolean;
 }) {
   const groups = useMemo(() => {
     const m = new Map<number, TransactionRow[]>();
@@ -559,16 +646,23 @@ function GroupedTransactionRows({
     return years.map((y) => ({ year: y, rows: m.get(y)! }));
   }, [items]);
 
+  const yearStripClass = isDark
+    ? "border-[#3d444d] bg-[#111820]"
+    : "border-[#DCD3C2] bg-[#F5F1E8]";
+  const yearNumberClass = isDark ? "text-[#F3F1EC]" : "text-[#2B2620]";
+  const yearCountClass = isDark ? "text-[#8b949e]" : "text-[#8A8072]";
+  const listBgClass = isDark ? "divide-[#21262d] bg-[#0d1117]" : "divide-[#F0EAE0] bg-[#FBFAF7]";
+
   return (
     <div className="flex flex-col">
       {groups.map(({ year, rows }, gi) => (
         <section key={year} className={gi === 0 ? "-mt-2 sm:-mt-3" : ""}>
           {/* Franja de año: líneas más visibles que divide-y de filas + fondo apenas distinto para leer al scroll */}
-          <div className="-mx-2 flex flex-wrap items-center gap-2 border-y border-[#3d444d] bg-[#111820] px-2 py-3.5 sm:-mx-3 sm:px-3">
-            <span className="text-lg font-bold tabular-nums leading-none tracking-tight text-white">{year}</span>
-            <span className="text-sm font-medium leading-none text-[#8b949e]">{rows.length} movimientos</span>
+          <div className={`-mx-2 flex flex-wrap items-center gap-2 border-y px-2 py-3.5 sm:-mx-3 sm:px-3 ${yearStripClass}`}>
+            <span className={`text-lg font-bold tabular-nums leading-none tracking-tight ${yearNumberClass}`}>{year}</span>
+            <span className={`text-sm font-medium leading-none ${yearCountClass}`}>{rows.length} movimientos</span>
           </div>
-          <ul className="-mx-2 divide-y divide-[#21262d] overflow-x-auto bg-[#0d1117] px-2 sm:-mx-3 sm:px-3">
+          <ul className={`-mx-2 divide-y overflow-x-auto px-2 sm:-mx-3 sm:px-3 ${listBgClass}`}>
             {rows.map((tx) => (
               <TransactionRowView
                 key={tx.id}
@@ -577,6 +671,7 @@ function GroupedTransactionRows({
                 onEdit={() => onEdit(tx)}
                 onDelete={() => onDelete(tx)}
                 deleting={deletingId === tx.id}
+                isDark={isDark}
               />
             ))}
           </ul>
@@ -595,12 +690,14 @@ function TransactionRowView({
   onEdit,
   onDelete,
   deleting,
+  isDark,
 }: {
   tx: TransactionRow;
   onOpenDetail: () => void;
   onEdit: () => void;
   onDelete: () => void;
   deleting: boolean;
+  isDark: boolean;
 }) {
   const isFintualSynced =
     tx.source === "fintual" || tx.source === "wallet" || tx.id >= 10_000_000;
@@ -608,13 +705,17 @@ function TransactionRowView({
   const day = d.getDate();
   const mo = d.toLocaleDateString("es", { month: "short" }).replace(".", "").toUpperCase() + ".";
   const isDivision = (tx.tipo || "").toLowerCase() === "division_accion";
+  const mutedClass = isDark ? "text-[#8b949e]" : "text-[#8A8072]";
   const amountFmt = isDivision
-    ? { text: "Sin flujo USD", signClass: "text-[#8b949e]" }
-    : formatTxSignedAmount(tx.monto_total, tx.currency, tx.tipo);
+    ? { text: "Sin flujo USD", signClass: mutedClass }
+    : formatTxSignedAmount(tx.monto_total, tx.currency, tx.tipo, isDark);
   const { text, signClass } = amountFmt;
   const showShares =
     ((tx.tipo === "compra" || tx.tipo === "reinversion" || tx.tipo === "venta") && tx.acciones > 1e-8) ||
     (isDivision && (tx.acciones > 1e-18 || tx.precio_unitario > 1e-18));
+  const dayClass = isDark ? "text-[#F3F1EC]" : "text-[#2B2620]";
+  const moClass = isDark ? "text-[#9ca3af]" : "text-[#9A9284]";
+  const nameClass = isDark ? "text-[#F3F1EC]" : "text-[#2B2620]";
 
   return (
     <li
@@ -632,23 +733,23 @@ function TransactionRowView({
       {/* Columnas alineadas: fecha | badge (ancho fijo) | icono | nombre | monto */}
       <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2.5 md:gap-3">
         <div className="flex w-[42px] shrink-0 flex-col items-center justify-center text-center sm:w-[48px]">
-          <p className="text-xl font-bold leading-none tracking-tight text-white sm:text-2xl">{day}</p>
-          <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#9ca3af] sm:text-[10px]">{mo}</p>
+          <p className={`text-xl font-bold leading-none tracking-tight sm:text-2xl ${dayClass}`}>{day}</p>
+          <p className={`mt-0.5 text-[9px] font-semibold uppercase tracking-wide sm:text-[10px] ${moClass}`}>{mo}</p>
         </div>
 
         <div className="flex w-[138px] shrink-0 items-center justify-center">
           <span
-            className={`flex ${BADGE_FIXED} items-center justify-center rounded-full px-2 text-center text-[9px] font-bold uppercase leading-none tracking-wide sm:text-[10px] ${badgeStyleForTx(tx)}`}
+            className={`flex ${BADGE_FIXED} items-center justify-center rounded-full px-2 text-center text-[9px] font-bold uppercase leading-none tracking-wide sm:text-[10px] ${badgeStyleForTx(tx, isDark)}`}
           >
             {badgeLabel(tx)}
           </span>
         </div>
 
         <div className="flex shrink-0 items-center justify-center">
-          <TxAvatar tx={tx} />
+          <TxAvatar tx={tx} isDark={isDark} />
         </div>
 
-        <p className="min-w-0 flex-1 truncate pl-0.5 text-left text-[14px] font-semibold text-white sm:pl-1 sm:text-[15px]">
+        <p className={`min-w-0 flex-1 truncate pl-0.5 text-left text-[14px] font-semibold sm:pl-1 sm:text-[15px] ${nameClass}`}>
           {txDisplayName(tx)}
         </p>
       </div>
@@ -656,7 +757,7 @@ function TransactionRowView({
       <div className="flex shrink-0 flex-col items-end justify-center gap-0.5 pl-2 sm:ml-2 sm:w-[min(100%,128px)] sm:pl-0 md:ml-3 md:w-36">
         <p className={`text-[15px] font-semibold tabular-nums sm:text-base ${signClass}`}>{text}</p>
         {showShares && (
-          <p className="text-[11px] text-[#8b949e]">
+          <p className={`text-[11px] ${mutedClass}`}>
             {isDivision ? (
               <>
                 {formatSharesExact(tx.precio_unitario)} → {formatSharesExact(tx.acciones)} acciones
@@ -672,7 +773,7 @@ function TransactionRowView({
           <div className="flex gap-3 text-xs">
             <button
               type="button"
-              className="text-[#2dd4bf] hover:underline"
+              className={isDark ? "text-[#8FBFA6] hover:underline" : "text-[#3F6B52] hover:underline"}
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit();
@@ -682,7 +783,11 @@ function TransactionRowView({
             </button>
             <button
               type="button"
-              className="text-[#f87171] hover:underline disabled:opacity-40"
+              className={
+                isDark
+                  ? "text-[#cc8e9e] hover:underline disabled:opacity-40"
+                  : "text-[#A65568] hover:underline disabled:opacity-40"
+              }
               disabled={deleting}
               onClick={(e) => {
                 e.stopPropagation();

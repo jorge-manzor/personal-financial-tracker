@@ -53,17 +53,13 @@ function movementSubtitle(tx: TransactionRow): string {
   return dateStr;
 }
 
-function movementAmount(tx: TransactionRow): { text: string; className: string } {
+function movementAmount(tx: TransactionRow, isDark: boolean): { text: string; className: string } {
   const isDivision = (tx.tipo || "").toLowerCase() === "division_accion";
   if (isDivision) {
-    return { text: "Sin flujo USD", className: "text-[#8b949e]" };
+    return { text: "Sin flujo USD", className: isDark ? "text-[#8b949e]" : "text-[#8A8072]" };
   }
-  const { text, signClass } = formatTxSignedAmount(tx.monto_total, tx.currency, tx.tipo);
-  const isNeg = signClass.includes("f87171");
-  return {
-    text,
-    className: isNeg ? "text-[#fb7185]" : "text-[#2dd4bf]",
-  };
+  const { text, signClass } = formatTxSignedAmount(tx.monto_total, tx.currency, tx.tipo, isDark);
+  return { text, className: signClass };
 }
 
 function summarizeComprasVentas(items: TransactionRow[]): { compras: number; ventas: number } {
@@ -84,9 +80,10 @@ interface Props {
   holding: Holding | null;
   onClose: () => void;
   dataVersion: number;
+  isDark: boolean;
 }
 
-export function StockMovementsModal({ holding, onClose, dataVersion }: Props) {
+export function StockMovementsModal({ holding, onClose, dataVersion, isDark }: Props) {
   const [items, setItems] = useState<TransactionRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -159,6 +156,16 @@ export function StockMovementsModal({ holding, onClose, dataVersion }: Props) {
   const countLabel =
     items.length === 1 ? "1 movimiento" : `${items.length} movimientos`;
 
+  const cardBg = isDark ? "bg-[#161b22]" : "bg-white";
+  const cardBorder = isDark ? "border-[#30363d]" : "border-[#E8E1D4]";
+  const textPrimary = isDark ? "text-white" : "text-[#2B2620]";
+  const textMuted = isDark ? "text-[#8b949e]" : "text-[#8A8072]";
+  const rowDivider = isDark ? "divide-[#21262d]" : "divide-[#F0EAE0]";
+  const emeraldClass = isDark ? "text-emerald-400" : "text-emerald-600";
+  const roseClass = isDark ? "text-rose-400" : "text-rose-600";
+  const closeHover = isDark ? "hover:bg-[#21262d] hover:text-white" : "hover:bg-[#F5F1E8] hover:text-[#2B2620]";
+  const errorClass = isDark ? "text-[#f85149]" : "text-[#e11d48]";
+
   return (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center p-4"
@@ -173,21 +180,21 @@ export function StockMovementsModal({ holding, onClose, dataVersion }: Props) {
         onClick={onClose}
       />
       <div
-        className="relative flex max-h-[min(640px,85vh)] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-[#30363d] bg-[#161b22] shadow-2xl"
+        className={`relative flex max-h-[min(640px,85vh)] w-full max-w-lg flex-col overflow-hidden rounded-xl border ${cardBorder} ${cardBg} shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex shrink-0 items-center gap-3 border-b border-[#30363d] px-4 py-3 sm:px-5 sm:py-4">
-          <StockLogoImg symbol={holding.ticker} size="lg" />
+        <header className={`flex shrink-0 items-center gap-3 border-b ${cardBorder} px-4 py-3 sm:px-5 sm:py-4`}>
+          <StockLogoImg symbol={holding.ticker} size="lg" isDark={isDark} />
           <div className="min-w-0 flex-1">
-            <h2 id="stock-mov-title" className="text-lg font-bold leading-tight tracking-tight text-white">
+            <h2 id="stock-mov-title" className={`text-lg font-bold leading-tight tracking-tight ${textPrimary}`}>
               {holding.ticker}
             </h2>
-            <p className="mt-0.5 truncate text-sm leading-snug text-[#8b949e]">{nombre}</p>
+            <p className={`mt-0.5 truncate text-sm leading-snug ${textMuted}`}>{nombre}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg p-1.5 text-[#8b949e] transition hover:bg-[#21262d] hover:text-white"
+            className={`shrink-0 rounded-lg p-1.5 ${textMuted} transition ${closeHover}`}
             aria-label="Cerrar"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -196,42 +203,42 @@ export function StockMovementsModal({ holding, onClose, dataVersion }: Props) {
           </button>
         </header>
 
-        <div className="grid shrink-0 grid-cols-3 gap-2 border-b border-[#30363d] px-4 py-3 sm:px-5">
+        <div className={`grid shrink-0 grid-cols-3 gap-2 border-b ${cardBorder} px-4 py-3 sm:px-5`}>
           <div className="text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8b949e]">Valor</p>
-            <p className="mt-1 text-sm font-bold tabular-nums text-white">{formatMoney(holding.current_value)}</p>
+            <p className={`text-[10px] font-semibold uppercase tracking-wide ${textMuted}`}>Valor</p>
+            <p className={`mt-1 text-sm font-bold tabular-nums ${textPrimary}`}>{formatMoney(holding.current_value)}</p>
           </div>
           <div className="text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8b949e]">Compras</p>
-            <p className="mt-1 text-sm font-bold tabular-nums text-[#2dd4bf]">
+            <p className={`text-[10px] font-semibold uppercase tracking-wide ${textMuted}`}>Compras</p>
+            <p className={`mt-1 text-sm font-bold tabular-nums ${emeraldClass}`}>
               {loading ? "…" : formatMoney(compras)}
             </p>
           </div>
           <div className="text-center">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8b949e]">Ventas</p>
-            <p className="mt-1 text-sm font-bold tabular-nums text-[#fb7185]">
+            <p className={`text-[10px] font-semibold uppercase tracking-wide ${textMuted}`}>Ventas</p>
+            <p className={`mt-1 text-sm font-bold tabular-nums ${roseClass}`}>
               {loading ? "…" : formatMoney(ventas)}
             </p>
           </div>
         </div>
 
         <div className="tx-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 py-1 sm:px-3">
-          {error && <p className="px-2 py-6 text-center text-sm text-[#f85149]">{error}</p>}
+          {error && <p className={`px-2 py-6 text-center text-sm ${errorClass}`}>{error}</p>}
           {!error && loading && (
-            <p className="px-2 py-8 text-center text-sm text-[#8b949e]">Cargando movimientos…</p>
+            <p className={`px-2 py-8 text-center text-sm ${textMuted}`}>Cargando movimientos…</p>
           )}
           {!error && !loading && items.length === 0 && (
-            <p className="px-2 py-8 text-center text-sm text-[#8b949e]">Sin movimientos para este activo.</p>
+            <p className={`px-2 py-8 text-center text-sm ${textMuted}`}>Sin movimientos para este activo.</p>
           )}
           {!error && !loading && items.length > 0 && (
-            <ul className="divide-y divide-[#21262d]">
+            <ul className={`divide-y ${rowDivider}`}>
               {items.map((tx) => {
-                const { text, className } = movementAmount(tx);
+                const { text, className } = movementAmount(tx, isDark);
                 return (
                   <li key={tx.id} className="flex gap-3 px-2 py-3 sm:px-3">
                     <div className="min-w-0 flex-1">
-                      <p className="text-[14px] font-semibold text-white">{movementTitle(tx)}</p>
-                      <p className="mt-0.5 text-[12px] leading-snug text-[#8b949e]">{movementSubtitle(tx)}</p>
+                      <p className={`text-[14px] font-semibold ${textPrimary}`}>{movementTitle(tx)}</p>
+                      <p className={`mt-0.5 text-[12px] leading-snug ${textMuted}`}>{movementSubtitle(tx)}</p>
                     </div>
                     <p className={`shrink-0 text-right text-[15px] font-semibold tabular-nums ${className}`}>
                       {text}
@@ -243,8 +250,8 @@ export function StockMovementsModal({ holding, onClose, dataVersion }: Props) {
           )}
         </div>
 
-        <footer className="shrink-0 border-t border-[#30363d] px-4 py-2.5 text-center sm:px-5">
-          <p className="text-xs text-[#8b949e]">{loading ? "…" : countLabel}</p>
+        <footer className={`shrink-0 border-t ${cardBorder} px-4 py-2.5 text-center sm:px-5`}>
+          <p className={`text-xs ${textMuted}`}>{loading ? "…" : countLabel}</p>
         </footer>
       </div>
     </div>

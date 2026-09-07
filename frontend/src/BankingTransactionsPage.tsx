@@ -62,8 +62,10 @@ import {
   DEFAULT_BANKING_TX_COLUMN_ORDER,
   DEFAULT_BANKING_TX_COLUMN_VISIBILITY,
   accountingYearRange,
+  bankingAccountAtBank,
   bankingAccountIncludedInTotalBalance,
   bankingBalanceScopeQueryParam,
+  bankingProductBadgeLabel,
   bankingModalCategoryTriggerClass,
   bankingModalControlClass,
   bankingModalFieldLabelClass,
@@ -81,7 +83,6 @@ import {
   buildYm,
   cancelIdlePrefetch,
   creditCardUnpaidAllocatedByChecking,
-  dateInputClass,
   firstDayIsoFromMonthInput,
   isAbortError,
   isBankingTxColumnRequired,
@@ -109,7 +110,16 @@ import {
   type BankingTxSharedScopeOption,
   type BankingTxTcPaidOption,
 } from "./bankingTxShared";
-import { IconCalendar, IconChevronLeft, IconChevronRight, IconColumns, IconX } from "./bankingTxIcons";
+import {
+  IconBank,
+  IconCalendar,
+  IconChevronLeft,
+  IconChevronRight,
+  IconColumns,
+  IconCreditCard,
+  IconX,
+} from "./bankingTxIcons";
+import { BankingDatePicker } from "./BankingDatePicker";
 import {
   BankingBalanceScopeHelpButton,
   BankingNonCreditTotalBalanceCard,
@@ -145,7 +155,7 @@ function SiNoField({
   return (
     <div className="space-y-1.5">
       <span className={bankingModalFieldLabelClass}>{label}</span>
-      <div className="flex gap-2 rounded-xl border border-slate-300 bg-slate-50/80 p-1 banking-dark:border-zinc-600 banking-dark:bg-zinc-900/75">
+      <div className="flex gap-2 rounded-xl border border-[#DCD3C2] bg-[#F5F1E8]/80 p-1 banking-dark:border-[#30363d] banking-dark:bg-[#161b22]/75">
         <button
           type="button"
           aria-pressed={value === true}
@@ -153,7 +163,7 @@ function SiNoField({
           className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
             value === true
               ? "border border-emerald-200 bg-emerald-100 text-emerald-800 shadow-sm ring-1 ring-emerald-200/80 banking-dark:border-emerald-800/55 banking-dark:bg-emerald-950/55 banking-dark:text-emerald-300 banking-dark:ring-emerald-800/60 banking-dark:shadow-none"
-              : "border border-transparent text-slate-600 hover:bg-white hover:text-slate-900 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-100"
+              : "border border-transparent text-[#4A453C] hover:bg-white hover:text-[#2B2620] banking-dark:text-[#8b949e] banking-dark:hover:bg-[#161b22] banking-dark:hover:text-[#F3F1EC]"
           }`}
         >
           {yesLabel}
@@ -165,7 +175,7 @@ function SiNoField({
           className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition ${
             value === false
               ? "border border-rose-200 bg-rose-100 text-rose-800 shadow-sm ring-1 ring-rose-200/80 banking-dark:border-rose-900/45 banking-dark:bg-rose-950/50 banking-dark:text-rose-300 banking-dark:ring-rose-900/55 banking-dark:shadow-none"
-              : "border border-transparent text-slate-600 hover:bg-white hover:text-slate-900 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-100"
+              : "border border-transparent text-[#4A453C] hover:bg-white hover:text-[#2B2620] banking-dark:text-[#8b949e] banking-dark:hover:bg-[#161b22] banking-dark:hover:text-[#F3F1EC]"
           }`}
         >
           {noLabel}
@@ -2027,8 +2037,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     <div
       className={`banking-theme w-full min-h-[calc(100dvh-3.5rem)] ${
         isDark
-          ? "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(251,191,36,0.055),transparent_52%),linear-gradient(to_bottom,#0d0d0d,#070707)] text-zinc-300"
-          : "bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100/80 text-slate-800"
+          ? "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(143,191,166,0.06),transparent_52%),linear-gradient(to_bottom,#0d1117,#0a0d12)] text-[#c9d1d9]"
+          : "bg-[radial-gradient(ellipse_100%_120%_at_50%_-35%,rgba(199,154,86,0.09),transparent_52%),linear-gradient(to_bottom,#FAF7F1,#F5F1E8)] text-[#4A453C]"
       }`}
     >
     <div className="mx-auto w-full max-w-[min(100%,1560px)] space-y-6 px-4 pb-28 pt-4 md:px-10 md:pt-6">
@@ -2036,7 +2046,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         <section aria-labelledby="banking-account-balances-heading" className="mx-auto max-w-[64rem]">
           <h2
             id="banking-account-balances-heading"
-            className="mb-3 text-lg font-semibold text-slate-800 banking-dark:text-zinc-100"
+            className="mb-3 text-lg font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]"
           >
             Saldos cuentas
           </h2>
@@ -2090,7 +2100,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       })}
                     </div>
                     {balanceCardsOverflowLeft ? (
-                      <div className="pointer-events-none absolute left-0 top-0 flex h-[calc(100%-0.25rem)] w-14 items-center justify-start rounded-l-2xl bg-gradient-to-r from-slate-50 to-transparent banking-dark:from-[#0d0d0d]">
+                      <div className="pointer-events-none absolute left-0 top-0 flex h-[calc(100%-0.25rem)] w-14 items-center justify-start rounded-l-2xl bg-gradient-to-r from-[#FAF7F1] to-transparent banking-dark:from-[#0d1117]">
                         <button
                           type="button"
                           onClick={() =>
@@ -2100,14 +2110,14 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                             })
                           }
                           aria-label="Ver cuentas anteriores"
-                          className="pointer-events-auto ml-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm transition hover:border-slate-300 hover:text-slate-600 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:text-zinc-500 banking-dark:hover:text-zinc-300"
+                          className="pointer-events-auto ml-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-[#E8E1D4] bg-white text-[#9A9284] shadow-sm transition hover:border-[#DCD3C2] hover:text-[#4A453C] banking-dark:border-[#1e242e] banking-dark:bg-[#12161d] banking-dark:text-[#6b7280] banking-dark:hover:text-[#c9d1d9]"
                         >
                           <IconChevronLeft className="h-3.5 w-3.5" />
                         </button>
                       </div>
                     ) : null}
                     {balanceCardsOverflowRight ? (
-                      <div className="pointer-events-none absolute right-0 top-0 flex h-[calc(100%-0.25rem)] w-14 items-center justify-end rounded-r-2xl bg-gradient-to-l from-slate-50 to-transparent banking-dark:from-[#0d0d0d]">
+                      <div className="pointer-events-none absolute right-0 top-0 flex h-[calc(100%-0.25rem)] w-14 items-center justify-end rounded-r-2xl bg-gradient-to-l from-[#FAF7F1] to-transparent banking-dark:from-[#0d1117]">
                         <button
                           type="button"
                           onClick={() =>
@@ -2117,7 +2127,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                             })
                           }
                           aria-label="Ver más cuentas"
-                          className="pointer-events-auto mr-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm transition hover:border-slate-300 hover:text-slate-600 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:text-zinc-500 banking-dark:hover:text-zinc-300"
+                          className="pointer-events-auto mr-1.5 flex h-6 w-6 items-center justify-center rounded-full border border-[#E8E1D4] bg-white text-[#9A9284] shadow-sm transition hover:border-[#DCD3C2] hover:text-[#4A453C] banking-dark:border-[#1e242e] banking-dark:bg-[#12161d] banking-dark:text-[#6b7280] banking-dark:hover:text-[#c9d1d9]"
                         >
                           <IconChevronRight className="h-3.5 w-3.5" />
                         </button>
@@ -2177,9 +2187,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         </div>
         </div>
 
-        <div className="space-y-5 banking-dark:text-zinc-300">
+        <div className="space-y-5 banking-dark:text-[#c9d1d9]">
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1">
-          <h2 className="min-w-0 truncate text-lg font-semibold text-slate-800 banking-dark:text-zinc-100">
+          <h2 className="min-w-0 truncate text-lg font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">
             {movementTab === "credit_card"
               ? "Tarjeta de crédito"
               : movementTab === "shared"
@@ -2196,9 +2206,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               aria-haspopup="dialog"
               aria-controls="banking-tx-column-picker"
               onClick={() => setColumnPickerOpen((o) => !o)}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800"
+              className="inline-flex items-center gap-2 rounded-xl border border-[#DCD3C2] bg-white px-3.5 py-2 text-xs font-semibold text-[#4A453C] shadow-sm transition hover:border-[#8FBFA6] hover:bg-[#F5F1E8] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:hover:border-[#8FBFA6]/60 banking-dark:hover:bg-[#1c2129]"
             >
-              <IconColumns className="h-4 w-4 text-slate-400 banking-dark:text-zinc-500" aria-hidden />
+              <IconColumns className="h-4 w-4 text-[#9A9284] banking-dark:text-[#6b7280]" aria-hidden />
               Columnas
             </button>
             {columnPickerOpen && (
@@ -2206,12 +2216,12 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 id="banking-tx-column-picker"
                 role="dialog"
                 aria-label="Columnas de la tabla"
-                className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(calc(100vw-2rem),21rem)] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-300/30 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:shadow-black/40"
+                className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(calc(100vw-2rem),21rem)] rounded-2xl border border-[#E8E1D4] bg-white p-3 shadow-xl shadow-[#2B2620]/10 banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-black/40"
               >
-                <p className="mb-1 text-[12px] font-medium uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">
+                <p className="mb-1 text-[12px] font-medium uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">
                   Orden y visibilidad
                 </p>
-                <p className="mb-2 text-[12px] leading-snug text-slate-500 banking-dark:text-zinc-400">
+                <p className="mb-2 text-[12px] leading-snug text-[#8A8072] banking-dark:text-[#8b949e]">
                   Arrastra ⋮⋮ para ordenar. Fecha y Monto no se pueden ocultar.
                 </p>
                 <DndContext
@@ -2239,7 +2249,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 <button
                   type="button"
                   onClick={resetBankingTxColumns}
-                  className="mt-3 w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 banking-dark:border-zinc-700 banking-dark:text-zinc-400 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-100"
+                  className="mt-3 w-full rounded-xl border border-[#E8E1D4] px-3 py-2 text-xs font-semibold text-[#4A453C] transition hover:border-[#DCD3C2] hover:bg-[#F5F1E8] hover:text-[#2B2620] banking-dark:border-[#30363d] banking-dark:text-[#8b949e] banking-dark:hover:border-[#8FBFA6]/60 banking-dark:hover:bg-[#1c2129] banking-dark:hover:text-[#F3F1EC]"
                 >
                   Restablecer orden y columnas
                 </button>
@@ -2248,7 +2258,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
           </div>
           <Link
             to="/profile#banking"
-            className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800"
+            className="rounded-xl border border-[#DCD3C2] bg-white px-3.5 py-2 text-xs font-semibold text-[#4A453C] shadow-sm transition hover:border-[#8FBFA6] hover:bg-[#F5F1E8] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:hover:border-[#8FBFA6]/60 banking-dark:hover:bg-[#1c2129]"
           >
             Cuentas
           </Link>
@@ -2256,13 +2266,13 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             type="button"
             disabled={!hasVisibleAccount}
             onClick={openNew}
-            className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40 banking-dark:border-amber-600/45 banking-dark:bg-amber-600 banking-dark:text-zinc-950 banking-dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)] banking-dark:hover:border-amber-500/55 banking-dark:hover:bg-amber-500"
+            className="rounded-xl border border-[#6FA588] bg-[#8FBFA6] px-4 py-2 text-xs font-semibold text-[#1F2E25] shadow-sm transition hover:bg-[#7FB097] disabled:cursor-not-allowed disabled:opacity-40"
           >
             + Nuevo movimiento
           </button>
           </div>
         {movementTab !== "all" ? (
-          <p className="min-w-0 text-sm text-slate-600 banking-dark:text-zinc-400">
+          <p className="min-w-0 text-sm text-[#4A453C] banking-dark:text-[#c9d1d9]">
             {movementTab === "credit_card"
               ? "Controla y mantén el orden de tus cargos pendientes de pago de tus tarjetas de crédito."
               : movementTab === "shared"
@@ -2273,11 +2283,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
       </div>
 
       {accounts.length === 0 && !loading && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900/90 banking-dark:border-amber-900/45 banking-dark:bg-amber-950/35 banking-dark:text-amber-100/90">
+        <p className="rounded-lg border border-[#C79A56]/35 bg-[#C79A56]/12 px-4 py-3 text-sm text-[#8A6631] banking-dark:border-[#C79A56]/30 banking-dark:bg-[#C79A56]/10 banking-dark:text-[#C79A56]">
           Primero crea al menos un producto en{" "}
           <Link
             to="/profile#banking"
-            className="font-medium text-teal-700 underline decoration-teal-300 hover:text-teal-800 banking-dark:text-amber-300/95 banking-dark:decoration-amber-900 banking-dark:hover:text-amber-200"
+            className="font-medium text-[#3F6B52] underline decoration-[#8FBFA6] hover:text-[#2B4E3B] banking-dark:text-[#8FBFA6] banking-dark:decoration-[#8FBFA6]/40 banking-dark:hover:text-[#a9d3bd]"
           >
             Cuentas
           </Link>
@@ -2285,11 +2295,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         </p>
       )}
       {accounts.length > 0 && !hasVisibleAccount && !loading && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900/90 banking-dark:border-amber-900/45 banking-dark:bg-amber-950/35 banking-dark:text-amber-100/90">
+        <p className="rounded-lg border border-[#C79A56]/35 bg-[#C79A56]/12 px-4 py-3 text-sm text-[#8A6631] banking-dark:border-[#C79A56]/30 banking-dark:bg-[#C79A56]/10 banking-dark:text-[#C79A56]">
           Ningún producto está visible para movimientos. Activa al menos uno en{" "}
           <Link
             to="/profile#banking"
-            className="font-medium text-teal-700 underline decoration-teal-300 hover:text-teal-800 banking-dark:text-amber-300/95 banking-dark:decoration-amber-900 banking-dark:hover:text-amber-200"
+            className="font-medium text-[#3F6B52] underline decoration-[#8FBFA6] hover:text-[#2B4E3B] banking-dark:text-[#8FBFA6] banking-dark:decoration-[#8FBFA6]/40 banking-dark:hover:text-[#a9d3bd]"
           >
             Cuentas
           </Link>
@@ -2317,19 +2327,19 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
       {movementTab === "shared" && !loading && sharedSelectionGlobalTotals.count > 0 ? (
         <div className={`rounded-xl px-4 py-3 text-sm ${BANKING_SELECTION_TICKET_ACCENT_CLASS}`}>
-          <p className="font-semibold text-slate-800 banking-dark:text-zinc-100">
+          <p className="font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">
             Selección global ({sharedSelectionGlobalTotals.count} movimiento(s)):
           </p>
-          <ul className="mt-1 space-y-0.5 text-slate-600 banking-dark:text-zinc-300">
+          <ul className="mt-1 space-y-0.5 text-[#4A453C] banking-dark:text-[#c9d1d9]">
             <li>
               Total gasto{" "}
-              <strong className="tabular-nums text-indigo-800 banking-dark:text-indigo-300">
+              <strong className="tabular-nums text-[#3F6B52] banking-dark:text-[#8FBFA6]">
                 {formatClpDots(sharedSelectionGlobalTotals.totalAbs)}
               </strong>
             </li>
             <li>
               Por persona{" "}
-              <strong className="tabular-nums text-indigo-800 banking-dark:text-indigo-300">
+              <strong className="tabular-nums text-[#3F6B52] banking-dark:text-[#8FBFA6]">
                 {formatClpDots(Math.abs(sharedSelectionGlobalTotals.sumPerPerson))}
               </strong>
             </li>
@@ -2362,13 +2372,13 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
       {movementTab === "provisiones" && !loading && provisionSelectionGlobalTotals.count > 0 ? (
         <div className={`rounded-xl px-4 py-3 text-sm ${BANKING_SELECTION_TICKET_ACCENT_CLASS}`}>
-          <p className="font-semibold text-slate-800 banking-dark:text-zinc-100">
+          <p className="font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">
             Selección global ({provisionSelectionGlobalTotals.count} movimiento(s)):
           </p>
-          <ul className="mt-1 space-y-0.5 text-slate-600 banking-dark:text-zinc-300">
+          <ul className="mt-1 space-y-0.5 text-[#4A453C] banking-dark:text-[#c9d1d9]">
             <li>
               Suma de movimientos{" "}
-              <strong className="tabular-nums text-indigo-800 banking-dark:text-indigo-300">
+              <strong className="tabular-nums text-[#3F6B52] banking-dark:text-[#8FBFA6]">
                 {formatClpDots(Math.abs(provisionSelectionGlobalTotals.sum))}
               </strong>
             </li>
@@ -2414,7 +2424,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               setLoadError(null);
               void reloadBankingFull(bankingTxPage);
             }}
-            className="shrink-0 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-sm font-semibold text-rose-800 transition hover:bg-rose-100 banking-dark:border-rose-800 banking-dark:bg-zinc-900 banking-dark:text-rose-100 banking-dark:hover:bg-zinc-800"
+            className="shrink-0 rounded-lg border border-[#dba7b4] bg-white px-3 py-1.5 text-sm font-semibold text-[#A65568] transition hover:bg-[#FDF2F5] banking-dark:border-[#6b3a44] banking-dark:bg-[#161b22] banking-dark:text-[#cc8e9e] banking-dark:hover:bg-[#2a1216]/70"
           >
             Reintentar
           </button>
@@ -2423,19 +2433,19 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
       <div className={BANKING_FILTER_CAPSULE_CLASS}>
         {loading ? (
-          <p className="p-6 text-sm text-slate-400 banking-dark:text-zinc-500">Cargando…</p>
+          <p className="p-6 text-sm text-[#9A9284] banking-dark:text-[#6b7280]">Cargando…</p>
         ) : loadError && items.length === 0 ? null : items.length === 0 && !bankingTxFiltersActive ? (
-          <p className="p-6 text-sm text-slate-400 banking-dark:text-zinc-500">
+          <p className="p-6 text-sm text-[#9A9284] banking-dark:text-[#6b7280]">
             No hay movimientos en este período. Amplía el rango Desde / hasta.
           </p>
         ) : (
           <BankingTxFilterUICtx.Provider value={bankingTxFilterUICtxValue}>
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 banking-dark:bg-zinc-950">
-              <p className="text-[13px] text-slate-500 banking-dark:text-zinc-400">
-                Mostrando <strong className="tabular-nums text-slate-800 banking-dark:text-zinc-200">{bankingTxTotal}</strong> movimientos
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 banking-dark:bg-[#0d1117]">
+              <p className="text-[13px] text-[#8A8072] banking-dark:text-[#8b949e]">
+                Mostrando <strong className="tabular-nums text-[#2B2620] banking-dark:text-[#F3F1EC]">{bankingTxTotal}</strong> movimientos
                 {tabRefreshing ? (
-                  <span className="ml-2 inline-flex items-center gap-1.5 text-slate-400 banking-dark:text-zinc-500">
-                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400 banking-dark:bg-amber-900/70" />
+                  <span className="ml-2 inline-flex items-center gap-1.5 text-[#9A9284] banking-dark:text-[#6b7280]">
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#9A9284] banking-dark:bg-[#8FBFA6]/70" />
                     Actualizando…
                   </span>
                 ) : null}
@@ -2448,14 +2458,14 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     aria-haspopup="dialog"
                     aria-controls="banking-tx-date-range-panel"
                     onClick={() => setDateRangePickerOpen((o) => !o)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#DCD3C2] bg-white px-3.5 py-2 text-xs font-semibold text-[#4A453C] shadow-sm transition hover:border-[#8FBFA6] hover:bg-[#F5F1E8] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:hover:border-[#8FBFA6]/60 banking-dark:hover:bg-[#1c2129]"
                   >
-                    <IconCalendar className="h-4 w-4 shrink-0 text-slate-400 banking-dark:text-zinc-500" />
+                    <IconCalendar className="h-4 w-4 shrink-0 text-[#9A9284] banking-dark:text-[#6b7280]" />
                     <span className="tabular-nums">
                       {bankingTxDateFrom || "…"} → {bankingTxDateTo || "…"}
                     </span>
                     {bankingBalanceScope === "ledger" ? (
-                      <span className="rounded-full bg-teal-100 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-teal-800 banking-dark:bg-amber-900/40 banking-dark:text-amber-200">
+                      <span className="rounded-full bg-[#8FBFA6]/20 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none text-[#3F6B52] banking-dark:bg-[#8FBFA6]/15 banking-dark:text-[#8FBFA6]">
                         Actual
                       </span>
                     ) : null}
@@ -2465,10 +2475,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       id="banking-tx-date-range-panel"
                       role="dialog"
                       aria-label="Rango de fechas"
-                      className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(calc(100vw-2rem),18rem)] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-300/30 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:shadow-black/40"
+                      className="absolute right-0 top-[calc(100%+8px)] z-[70] w-[min(calc(100vw-2rem),18rem)] rounded-2xl border border-[#E8E1D4] bg-white p-4 shadow-xl shadow-[#2B2620]/10 banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-black/40"
                     >
                       <div className="space-y-3">
-                        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">
+                        <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">
                           Desde
                           <input
                             id="banking-tx-date-from"
@@ -2480,7 +2490,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                             aria-label="Fecha desde (movimiento)"
                           />
                         </label>
-                        <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-400 banking-dark:text-zinc-500">
+                        <label className="block text-[11px] font-semibold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">
                           Hasta
                           <input
                             id="banking-tx-date-to"
@@ -2500,16 +2510,16 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                           setBankingTxDateFrom(r.from);
                           setBankingTxDateTo(r.to);
                         }}
-                        className="mt-3 inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[12px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-100 banking-dark:border-zinc-700 banking-dark:bg-zinc-800 banking-dark:text-zinc-300 banking-dark:hover:bg-zinc-800/70"
+                        className="mt-3 inline-flex items-center rounded-full border border-[#E8E1D4] bg-[#F5F1E8] px-3 py-1.5 text-[12px] font-semibold text-[#4A453C] transition hover:border-[#DCD3C2] hover:bg-[#E8E1D4] banking-dark:border-[#1e242e] banking-dark:bg-[#161b22] banking-dark:text-[#c9d1d9] banking-dark:hover:bg-[#1c2129]/70"
                       >
                         Últimos 2 meses
                       </button>
                       <div
-                        className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5 banking-dark:bg-zinc-800/60"
+                        className="mt-4 flex items-center justify-between rounded-xl bg-[#F5F1E8] px-3 py-2.5 banking-dark:bg-[#161b22]/60"
                         id="banking-balance-scope-actual-group"
                       >
                         <span
-                          className="flex items-center gap-1 text-xs font-semibold text-slate-600 banking-dark:text-zinc-300"
+                          className="flex items-center gap-1 text-xs font-semibold text-[#4A453C] banking-dark:text-[#c9d1d9]"
                           id="banking-balance-scope-actual-label"
                         >
                           Actual
@@ -2538,7 +2548,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   <button
                     type="button"
                     onClick={clearBankingTxFilters}
-                    className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-500 banking-dark:hover:bg-zinc-800"
+                    className="inline-flex items-center rounded-xl border border-[#DCD3C2] bg-white px-3.5 py-2 text-xs font-semibold text-[#4A453C] shadow-sm transition hover:border-[#8FBFA6] hover:bg-[#F5F1E8] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:hover:border-[#8FBFA6]/60 banking-dark:hover:bg-[#1c2129]"
                   >
                     Limpiar filtros
                   </button>
@@ -2554,16 +2564,16 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
           <BankingTxFilterUICtx.Provider value={bankingTxFilterUICtxValue}>
             {filteredBankingTxItems.length === 0 ? (
               <div className="px-6 py-14 text-center">
-                <p className="text-sm font-medium text-slate-800 banking-dark:text-zinc-200">
+                <p className="text-sm font-medium text-[#2B2620] banking-dark:text-[#c9d1d9]">
                   Ningún resultado con estos filtros
                 </p>
-                <p className="mt-1 text-xs text-slate-400 banking-dark:text-zinc-500">
+                <p className="mt-1 text-xs text-[#9A9284] banking-dark:text-[#6b7280]">
                   Ajusta los filtros en los encabezados de la tabla o pulsa «Limpiar filtros». El período Desde / hasta no se modifica.
                 </p>
                 <button
                   type="button"
                   onClick={clearBankingTxFilters}
-                  className="mt-4 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-800"
+                  className="mt-4 rounded-lg border border-[#DCD3C2] bg-white px-4 py-2 text-sm font-medium text-[#2B2620] shadow-sm transition hover:bg-[#F5F1E8] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:hover:bg-[#1c2129]"
                 >
                   Limpiar filtros
                 </button>
@@ -2589,26 +2599,26 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       disabled={loading || bankingTxPage <= 1}
                       onClick={() => void goBankingTxPage(bankingTxPage - 1)}
                       aria-label="Página anterior"
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 banking-dark:border-zinc-700 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#E8E1D4] text-[#8A8072] transition hover:border-[#DCD3C2] hover:bg-[#F5F1E8] disabled:cursor-not-allowed disabled:opacity-40 banking-dark:border-[#1e242e] banking-dark:text-[#8b949e] banking-dark:hover:bg-[#161b22]"
                     >
                       <IconChevronLeft className="h-4 w-4" />
                     </button>
-                    <span className="text-[12px] tabular-nums text-slate-600 banking-dark:text-zinc-400">
-                      Página <strong className="text-slate-800 banking-dark:text-zinc-200">{bankingTxPage}</strong> de{" "}
-                      <strong className="text-slate-800 banking-dark:text-zinc-200">{bankingTxTotalPages}</strong>
+                    <span className="text-[12px] tabular-nums text-[#4A453C] banking-dark:text-[#8b949e]">
+                      Página <strong className="text-[#2B2620] banking-dark:text-[#F3F1EC]">{bankingTxPage}</strong> de{" "}
+                      <strong className="text-[#2B2620] banking-dark:text-[#F3F1EC]">{bankingTxTotalPages}</strong>
                     </span>
                     <button
                       type="button"
                       disabled={loading || bankingTxPage >= bankingTxTotalPages}
                       onClick={() => void goBankingTxPage(bankingTxPage + 1)}
                       aria-label="Página siguiente"
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 banking-dark:border-zinc-700 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#E8E1D4] text-[#8A8072] transition hover:border-[#DCD3C2] hover:bg-[#F5F1E8] disabled:cursor-not-allowed disabled:opacity-40 banking-dark:border-[#1e242e] banking-dark:text-[#8b949e] banking-dark:hover:bg-[#161b22]"
                     >
                       <IconChevronRight className="h-4 w-4" />
                     </button>
                   </div>
                   <p
-                    className="text-[12px] text-slate-400 banking-dark:text-zinc-500"
+                    className="text-[12px] text-[#9A9284] banking-dark:text-[#6b7280]"
                     title={
                       filterAccountIds.length > 0
                         ? filterAccountIds.length === 1
@@ -2617,7 +2627,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                         : undefined
                     }
                   >
-                    <strong className="text-slate-700 banking-dark:text-zinc-300">{BANKING_TX_PAGE_SIZE}</strong> por página
+                    <strong className="text-[#4A453C] banking-dark:text-[#c9d1d9]">{BANKING_TX_PAGE_SIZE}</strong> por página
                   </p>
                 </div>
               </>
@@ -2628,7 +2638,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     ref={filterPopoverPanelRef}
                     role="dialog"
                     aria-label={`Filtro: ${BANKING_TX_COLUMN_LABELS[headerFilterOpen]}`}
-                    className="banking-theme rounded-xl border border-slate-300 bg-white p-3 shadow-xl shadow-slate-900/10 ring-1 ring-slate-300 banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:shadow-black/40 banking-dark:ring-zinc-700"
+                    className="banking-theme rounded-xl border border-[#DCD3C2] bg-white p-3 shadow-xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-black/40 banking-dark:ring-[#30363d]"
                     style={{
                       position: "fixed",
                       top: headerFilterPopoverPos.top,
@@ -2652,7 +2662,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
       {modalOpen && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[2px] banking-dark:bg-black/65 banking-dark:backdrop-blur-[3px]"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px] banking-dark:bg-black/65 banking-dark:backdrop-blur-[3px]"
           role="dialog"
           aria-modal="true"
           aria-labelledby="banking-tx-modal-title"
@@ -2661,9 +2671,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             closeMovementModal();
           }}
         >
-          <div className="banking-theme tx-scroll max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/15 banking-dark:border-zinc-700 banking-dark:bg-zinc-950 banking-dark:shadow-black/50">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-6 py-4 banking-dark:border-zinc-800">
-              <h3 id="banking-tx-modal-title" className="text-base font-semibold text-slate-900 banking-dark:text-zinc-100">
+          <div className="banking-theme tx-scroll max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-[#E8E1D4] bg-white shadow-2xl shadow-[#2B2620]/10 banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-black/50">
+            <div className="flex items-center justify-between gap-3 border-b border-[#F0EAE0] px-6 py-4 banking-dark:border-[#1e242e]">
+              <h3 id="banking-tx-modal-title" className="text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">
                 {editing ? "Editar movimiento" : "Nuevo movimiento"}
               </h3>
               <button
@@ -2671,27 +2681,24 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 disabled={saving}
                 onClick={() => closeMovementModal()}
                 aria-label="Cerrar"
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:pointer-events-none disabled:opacity-40 banking-dark:text-zinc-500 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-200"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#9A9284] transition hover:bg-[#F5F1E8] hover:text-[#2B2620] disabled:pointer-events-none disabled:opacity-40 banking-dark:text-[#6b7280] banking-dark:hover:bg-[#161b22] banking-dark:hover:text-[#F3F1EC]"
               >
                 <IconX className="h-4 w-4" />
               </button>
             </div>
 
             <div className="space-y-4 px-6 py-5">
-              <label className="block">
+              <div className="space-y-1.5">
                 <span className={bankingModalFieldLabelClass}>Fecha de la transacción</span>
-                <input
-                  type="date"
+                <BankingDatePicker
                   value={fecha}
-                  onChange={(e) => {
-                    const v = e.target.value;
+                  onChange={(v) => {
                     setFecha(v);
                     setAccountingMonthYm(v.slice(0, 7));
                   }}
-                  onClick={pickDate}
-                  className={dateInputClass}
+                  ariaLabel="Fecha de la transacción"
                 />
-              </label>
+              </div>
 
               <div ref={accountMenuRef} className="space-y-1.5">
                 <span id="banking-tx-account-label" className={bankingModalFieldLabelClass}>
@@ -2712,16 +2719,36 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   }}
                   className={bankingModalCategoryTriggerClass}
                 >
-                  <span
-                    className={`min-w-0 flex-1 truncate font-semibold ${selectedAccount ? "text-slate-800 banking-dark:text-zinc-50" : "text-slate-500 banking-dark:text-zinc-400"}`}
-                  >
-                    {selectedAccount?.name ?? "Selecciona producto o cuenta"}
+                  <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-[#F5F1E8] text-[#4A453C] banking-dark:bg-[#161b22] banking-dark:text-[#c9d1d9]">
+                    {selectedAccount?.product_type === "tarjeta_credito" ? (
+                      <IconCreditCard className="h-3.5 w-3.5" />
+                    ) : (
+                      <IconBank className="h-3.5 w-3.5" />
+                    )}
                   </span>
+                  <span className="min-w-0 flex-1">
+                    <span
+                      className={`block truncate font-semibold ${selectedAccount ? "text-[#2B2620] banking-dark:text-[#F3F1EC]" : "text-[#8A8072] banking-dark:text-[#8b949e]"}`}
+                    >
+                      {selectedAccount?.name ?? "Selecciona producto o cuenta"}
+                    </span>
+                    {selectedAccount ? (
+                      <span className="block truncate text-[10.5px] font-normal text-[#8A8072] banking-dark:text-[#8b949e]">
+                        {bankingProductBadgeLabel(selectedAccount.product_type)}
+                        {selectedAccount.bank_name ? ` · ${selectedAccount.bank_name}` : ""}
+                      </span>
+                    ) : null}
+                  </span>
+                  {selectedAccount ? (
+                    <span className="shrink-0 rounded-full bg-[#C79A56]/16 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#8A6631] banking-dark:bg-[#C79A56]/15 banking-dark:text-[#C79A56]">
+                      {bankingProductBadgeLabel(selectedAccount.product_type)}
+                    </span>
+                  ) : null}
                   <svg
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden
-                    className={`h-5 w-5 shrink-0 text-slate-500 transition banking-dark:text-amber-200/75 ${accountMenuOpen ? "rotate-180" : ""}`}
+                    className={`h-5 w-5 shrink-0 text-[#8A8072] transition banking-dark:text-[#8FBFA6]/75 ${accountMenuOpen ? "rotate-180" : ""}`}
                   >
                     <path
                       fillRule="evenodd"
@@ -2779,7 +2806,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   className={bankingModalCategoryTriggerClass}
                 >
                   <span
-                    className={`min-w-0 flex-1 truncate font-semibold ${selectedCategory ? "text-slate-800 banking-dark:text-zinc-50" : "text-slate-500 banking-dark:text-zinc-400"}`}
+                    className={`min-w-0 flex-1 truncate font-semibold ${selectedCategory ? "text-[#2B2620] banking-dark:text-[#F3F1EC]" : "text-[#8A8072] banking-dark:text-[#8b949e]"}`}
                   >
                     {selectedCategory?.name ?? "Selecciona categoría"}
                   </span>
@@ -2787,7 +2814,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden
-                    className={`h-5 w-5 shrink-0 text-slate-500 transition banking-dark:text-amber-200/75 ${categoryMenuOpen ? "rotate-180" : ""}`}
+                    className={`h-5 w-5 shrink-0 text-[#8A8072] transition banking-dark:text-[#8FBFA6]/75 ${categoryMenuOpen ? "rotate-180" : ""}`}
                   >
                     <path
                       fillRule="evenodd"
@@ -2823,7 +2850,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     className={bankingModalCategoryTriggerClass}
                   >
                     <span
-                      className={`min-w-0 flex-1 truncate font-semibold ${selectedSubcategoryRow ? "text-slate-800 banking-dark:text-zinc-50" : "text-slate-500 banking-dark:text-zinc-400"}`}
+                      className={`min-w-0 flex-1 truncate font-semibold ${selectedSubcategoryRow ? "text-[#2B2620] banking-dark:text-[#F3F1EC]" : "text-[#8A8072] banking-dark:text-[#8b949e]"}`}
                     >
                       {selectedSubcategoryRow?.name ?? "Selecciona subcategoría"}
                     </span>
@@ -2831,7 +2858,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       viewBox="0 0 20 20"
                       fill="currentColor"
                       aria-hidden
-                      className={`h-5 w-5 shrink-0 text-slate-500 transition banking-dark:text-amber-200/75 ${subcategoryMenuOpen ? "rotate-180" : ""}`}
+                      className={`h-5 w-5 shrink-0 text-[#8A8072] transition banking-dark:text-[#8FBFA6]/75 ${subcategoryMenuOpen ? "rotate-180" : ""}`}
                     >
                       <path
                         fillRule="evenodd"
@@ -2866,7 +2893,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     movimiento en la cuenta destino con el monto de signo contrario.
                   </p>
                   {transferDestinationOptions.length === 0 && (
-                    <p className="mt-1 text-[12px] text-amber-800/90 banking-dark:text-amber-200/90">
+                    <p className="mt-1 text-[12px] text-[#8A6631]/90 banking-dark:text-[#C79A56]/90">
                       No hay otra cuenta disponible. Crea otra cuenta (no tarjeta) en Cuentas.
                     </p>
                   )}
@@ -2886,8 +2913,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   onClick={() => setScopeMenuOpen((o) => !o)}
                   className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left text-sm font-medium shadow-sm ring-1 transition focus:outline-none focus:ring-2 ${
                     isShared
-                      ? "border-violet-200 bg-violet-100 text-violet-900 ring-violet-200 focus:ring-violet-400/45 banking-dark:border-violet-800/55 banking-dark:bg-violet-950/55 banking-dark:text-violet-200 banking-dark:ring-violet-800/55 banking-dark:focus:ring-violet-600/35"
-                      : "border-indigo-200 bg-indigo-100 text-indigo-900 ring-indigo-200 focus:ring-indigo-400/45 banking-dark:border-indigo-800/55 banking-dark:bg-indigo-950/50 banking-dark:text-indigo-200/95 banking-dark:ring-indigo-800/55 banking-dark:focus:ring-indigo-600/35"
+                      ? "border-[#C79A56]/50 bg-[#C79A56]/16 text-[#8A6631] ring-[#C79A56]/40 focus:ring-[#C79A56]/45 banking-dark:border-[#C79A56]/45 banking-dark:bg-[#C79A56]/12 banking-dark:text-[#C79A56] banking-dark:ring-[#C79A56]/35 banking-dark:focus:ring-[#C79A56]/35"
+                      : "border-[#8FBFA6]/60 bg-[#8FBFA6]/14 text-[#3F6B52] ring-[#8FBFA6]/40 focus:ring-[#8FBFA6]/45 banking-dark:border-[#8FBFA6]/50 banking-dark:bg-[#8FBFA6]/12 banking-dark:text-[#8FBFA6] banking-dark:ring-[#8FBFA6]/40 banking-dark:focus:ring-[#8FBFA6]/35"
                   }`}
                 >
                   <span>
@@ -2897,8 +2924,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     <span
                       className={`mt-0.5 block text-[12px] font-normal ${
                         isShared
-                          ? "text-violet-800/90 banking-dark:text-violet-400/90"
-                          : "text-indigo-800/90 banking-dark:text-indigo-400/90"
+                          ? "text-[#8A6631]/90 banking-dark:text-[#C79A56]/90"
+                          : "text-[#3F6B52]/90 banking-dark:text-[#8FBFA6]/90"
                       }`}
                     >
                       {isShared
@@ -2912,8 +2939,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     aria-hidden
                     className={`h-5 w-5 shrink-0 opacity-75 transition ${
                       isShared
-                        ? "text-violet-700 banking-dark:text-violet-300/90"
-                        : "text-indigo-700 banking-dark:text-indigo-300/85"
+                        ? "text-[#8A6631] banking-dark:text-[#C79A56]/90"
+                        : "text-[#3F6B52] banking-dark:text-[#8FBFA6]/85"
                     } ${scopeMenuOpen ? "rotate-180" : ""}`}
                   >
                     <path
@@ -2925,21 +2952,21 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 </button>
 
                 {isShared && (
-                  <div className="space-y-4 border-t border-slate-300 pt-4 banking-dark:border-zinc-700">
-                    <div className="overflow-hidden rounded-xl border border-slate-300 bg-slate-50/80 banking-dark:border-zinc-600 banking-dark:bg-zinc-900/80">
+                  <div className="space-y-4 border-t border-[#DCD3C2] pt-4 banking-dark:border-[#30363d]">
+                    <div className="overflow-hidden rounded-xl border border-[#DCD3C2] bg-[#F5F1E8]/80 banking-dark:border-[#30363d] banking-dark:bg-[#161b22]/80">
                       <table className="w-full border-collapse text-sm">
                         <thead>
-                          <tr className="border-b border-slate-300 bg-white banking-dark:border-zinc-700 banking-dark:bg-zinc-900">
-                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">
+                          <tr className="border-b border-[#DCD3C2] bg-white banking-dark:border-[#30363d] banking-dark:bg-[#161b22]">
+                            <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[#8A8072] banking-dark:text-[#8b949e]">
                               Personas
                             </th>
-                            <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-500 banking-dark:text-zinc-400">
+                            <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-[#8A8072] banking-dark:text-[#8b949e]">
                               Monto P/P
                             </th>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr className="align-middle banking-dark:bg-zinc-950">
+                          <tr className="align-middle banking-dark:bg-[#0d1117]">
                             <td className="px-3 py-2">
                               <input
                                 type="number"
@@ -2947,10 +2974,10 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                                 min={1}
                                 value={splitParticipants}
                                 onChange={(e) => setSplitParticipants(e.target.value)}
-                                className="w-[4.25rem] rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-center font-mono text-sm text-slate-800 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:focus:border-amber-600/55 banking-dark:focus:ring-amber-500/15"
+                                className="w-[4.25rem] rounded-lg border border-[#DCD3C2] bg-white px-2 py-1.5 text-center font-mono text-sm text-[#2B2620] outline-none focus:border-[#8FBFA6] focus:ring-2 focus:ring-[#8FBFA6]/20 [color-scheme:light] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:focus:border-[#8FBFA6] banking-dark:focus:ring-[#8FBFA6]/15"
                               />
                             </td>
-                            <td className="px-3 py-2 text-right font-mono text-slate-800 banking-dark:text-zinc-200">
+                            <td className="px-3 py-2 text-right font-mono text-[#2B2620] banking-dark:text-[#F3F1EC]">
                               {amountPerPersonLabel}
                             </td>
                           </tr>
@@ -2991,12 +3018,12 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   ref={accountingMonthTriggerRef}
                   role="group"
                   aria-labelledby="banking-tx-accounting-month-label"
-                  className="mt-1.5 flex min-h-[42px] items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none shadow-sm transition hover:border-slate-300 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-400/20 [color-scheme:light] banking-dark:border-zinc-600 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-500 banking-dark:focus-within:border-amber-600/55 banking-dark:focus-within:ring-amber-500/15"
+                  className="mt-1.5 flex min-h-[42px] items-center justify-between gap-2 rounded-lg border border-[#DCD3C2] bg-white px-3 py-2 text-sm outline-none shadow-sm transition hover:border-[#8FBFA6] focus-within:border-[#8FBFA6] focus-within:ring-2 focus-within:ring-[#8FBFA6]/20 [color-scheme:light] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:hover:border-[#8FBFA6]/60 banking-dark:focus-within:border-[#8FBFA6] banking-dark:focus-within:ring-[#8FBFA6]/15"
                 >
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                     <button
                       type="button"
-                      className="rounded-md px-2 py-1 text-left text-slate-800 transition hover:bg-indigo-50 hover:text-indigo-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/60 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-100 banking-dark:focus-visible:ring-amber-500/35"
+                      className="rounded-md px-2 py-1 text-left text-[#2B2620] transition hover:bg-[#8FBFA6]/12 hover:text-[#3F6B52] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8FBFA6]/40 banking-dark:text-[#F3F1EC] banking-dark:hover:bg-[#1c2129] banking-dark:hover:text-[#8FBFA6] banking-dark:focus-visible:ring-[#8FBFA6]/35"
                       aria-label={`Mes: ${ACCOUNTING_MONTH_ABBR_ES[accountingYmParts.m - 1]}`}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -3007,7 +3034,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     </button>
                     <button
                       type="button"
-                      className="rounded-md px-2 py-1 tabular-nums text-slate-800 transition hover:bg-indigo-50 hover:text-indigo-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300/60 banking-dark:text-zinc-200 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-100 banking-dark:focus-visible:ring-amber-500/35"
+                      className="rounded-md px-2 py-1 tabular-nums text-[#2B2620] transition hover:bg-[#8FBFA6]/12 hover:text-[#3F6B52] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8FBFA6]/40 banking-dark:text-[#F3F1EC] banking-dark:hover:bg-[#1c2129] banking-dark:hover:text-[#8FBFA6] banking-dark:focus-visible:ring-[#8FBFA6]/35"
                       aria-label={`Año: ${accountingYmParts.y}`}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -3019,7 +3046,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                   </div>
                   <button
                     type="button"
-                    className="shrink-0 rounded-md p-1 text-slate-500 outline-none transition hover:bg-indigo-50 hover:text-indigo-700 focus-visible:ring-2 focus-visible:ring-indigo-300/60 banking-dark:text-zinc-400 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-amber-200/90 banking-dark:focus-visible:ring-amber-500/35"
+                    className="shrink-0 rounded-md p-1 text-[#8A8072] outline-none transition hover:bg-[#8FBFA6]/12 hover:text-[#3F6B52] focus-visible:ring-2 focus-visible:ring-[#8FBFA6]/40 banking-dark:text-[#8b949e] banking-dark:hover:bg-[#1c2129] banking-dark:hover:text-[#8FBFA6]/90 banking-dark:focus-visible:ring-[#8FBFA6]/35"
                     aria-label="Elegir mes"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -3036,12 +3063,12 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-100 px-6 py-4 banking-dark:border-zinc-800">
+            <div className="flex justify-end gap-2 border-t border-[#F0EAE0] px-6 py-4 banking-dark:border-[#1e242e]">
               <button
                 type="button"
                 disabled={saving}
                 onClick={() => closeMovementModal()}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-50 banking-dark:border-zinc-700 banking-dark:bg-zinc-900 banking-dark:text-zinc-200 banking-dark:hover:border-zinc-600 banking-dark:hover:bg-zinc-800"
+                className="rounded-xl border border-[#DCD3C2] bg-white px-4 py-2 text-sm font-medium text-[#4A453C] shadow-sm transition hover:border-[#8FBFA6] hover:bg-[#F5F1E8] disabled:opacity-50 banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:text-[#F3F1EC] banking-dark:hover:border-[#8FBFA6]/60 banking-dark:hover:bg-[#1c2129]"
               >
                 Cancelar
               </button>
@@ -3058,7 +3085,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     (transferDestinationAccountId === "" || transferDestinationOptions.length === 0))
                 }
                 onClick={() => void saveModal()}
-                className="rounded-xl border border-indigo-800 bg-indigo-800 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:border-indigo-700 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40 banking-dark:border-amber-600/45 banking-dark:bg-amber-600 banking-dark:text-zinc-950 banking-dark:hover:border-amber-500/55 banking-dark:hover:bg-amber-500"
+                className="rounded-xl border border-[#6FA588] bg-[#8FBFA6] px-4 py-2 text-sm font-semibold text-[#1F2E25] shadow-sm transition hover:bg-[#7FB097] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {saving ? "Guardando…" : editing ? "Guardar cambios" : "Registrar"}
               </button>
@@ -3080,27 +3107,27 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: scopePanelBox.width,
               zIndex: 9999,
             }}
-            className="banking-theme overflow-hidden rounded-xl border border-slate-300 bg-white shadow-2xl shadow-slate-900/10 ring-1 ring-slate-300 banking-dark:border-amber-900/45 banking-dark:bg-zinc-900 banking-dark:shadow-black/45 banking-dark:ring-amber-950/35"
+            className="banking-theme overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-black/45 banking-dark:ring-[#30363d]"
           >
             <div className="grid gap-2 p-2 sm:grid-cols-2">
               <button
                 type="button"
                 role="option"
                 aria-selected={!isShared}
-                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-400/50 banking-dark:focus:ring-indigo-600/35 ${
+                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-[#8FBFA6]/50 banking-dark:focus:ring-[#8FBFA6]/35 ${
                   !isShared
-                    ? "border-indigo-300 bg-indigo-100 ring-2 ring-indigo-300 banking-dark:border-indigo-800/55 banking-dark:bg-indigo-950/50 banking-dark:ring-indigo-700/50"
-                    : "border-slate-300 bg-white hover:border-indigo-200 hover:bg-indigo-50/50 banking-dark:border-zinc-600 banking-dark:bg-zinc-950 banking-dark:hover:border-indigo-800/45 banking-dark:hover:bg-indigo-950/20"
+                    ? "border-[#8FBFA6] bg-[#8FBFA6]/16 ring-2 ring-[#8FBFA6]/40 banking-dark:border-[#8FBFA6]/55 banking-dark:bg-[#8FBFA6]/12 banking-dark:ring-[#8FBFA6]/35"
+                    : "border-[#DCD3C2] bg-white hover:border-[#8FBFA6]/50 hover:bg-[#8FBFA6]/10 banking-dark:border-[#30363d] banking-dark:bg-[#0d1117] banking-dark:hover:border-[#8FBFA6]/45 banking-dark:hover:bg-[#8FBFA6]/10"
                 }`}
                 onClick={() => {
                   setIsShared(false);
                   setScopeMenuOpen(false);
                 }}
               >
-                <span className="block text-sm font-semibold text-indigo-900 banking-dark:text-indigo-200/95">
+                <span className="block text-sm font-semibold text-[#3F6B52] banking-dark:text-[#8FBFA6]">
                   Personal
                 </span>
-                <span className="mt-1 block text-[12px] leading-snug text-indigo-800/85 banking-dark:text-indigo-400/85">
+                <span className="mt-1 block text-[12px] leading-snug text-[#4C7A64]/90 banking-dark:text-[#a9d3bd]/85">
                   Movimiento individual
                 </span>
               </button>
@@ -3108,20 +3135,20 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                 type="button"
                 role="option"
                 aria-selected={isShared}
-                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-violet-400/50 banking-dark:focus:ring-violet-600/30 ${
+                className={`rounded-xl border px-3 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-[#C79A56]/50 banking-dark:focus:ring-[#C79A56]/30 ${
                   isShared
-                    ? "border-violet-300 bg-violet-100 ring-2 ring-violet-300 banking-dark:border-violet-800/55 banking-dark:bg-violet-950/55 banking-dark:ring-violet-800/55"
-                    : "border-slate-300 bg-white hover:border-violet-200 hover:bg-violet-50/50 banking-dark:border-zinc-600 banking-dark:bg-zinc-950 banking-dark:hover:border-violet-800/45 banking-dark:hover:bg-violet-950/25"
+                    ? "border-[#C79A56] bg-[#C79A56]/16 ring-2 ring-[#C79A56]/40 banking-dark:border-[#C79A56]/55 banking-dark:bg-[#C79A56]/12 banking-dark:ring-[#C79A56]/35"
+                    : "border-[#DCD3C2] bg-white hover:border-[#C79A56]/50 hover:bg-[#C79A56]/10 banking-dark:border-[#30363d] banking-dark:bg-[#0d1117] banking-dark:hover:border-[#C79A56]/45 banking-dark:hover:bg-[#C79A56]/10"
                 }`}
                 onClick={() => {
                   setIsShared(true);
                   setScopeMenuOpen(false);
                 }}
               >
-                <span className="block text-sm font-semibold text-violet-900 banking-dark:text-violet-200">
+                <span className="block text-sm font-semibold text-[#8A6631] banking-dark:text-[#C79A56]">
                   Compartido
                 </span>
-                <span className="mt-1 block text-[12px] leading-snug text-violet-800/85 banking-dark:text-violet-400/85">
+                <span className="mt-1 block text-[12px] leading-snug text-[#8A6631]/90 banking-dark:text-[#C79A56]/85">
                   Reparto entre personas
                 </span>
               </button>
@@ -3144,33 +3171,55 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: accountPanelBox.width,
               zIndex: 9998,
             }}
-            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-slate-300 bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-300 banking-dark:border-amber-900/45 banking-dark:bg-zinc-900 banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-amber-950/35"
+            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-[#30363d]"
           >
             <div className={bankingPickerListScrollClass}>
-              <div className="flex flex-col gap-0.5 px-1.5 py-1.5 banking-dark:bg-zinc-900/98">
-                {accountOptions.map((a) => {
-                  const sel = a.id === accountId;
-                  return (
-                    <button
-                      key={a.id}
-                      type="button"
-                      role="option"
-                      aria-selected={sel}
-                      className={`rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
-                        sel
-                          ? "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/80 banking-dark:bg-amber-600/35 banking-dark:text-zinc-50 banking-dark:ring-amber-400/45"
-                          : "text-slate-800 hover:bg-slate-50 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-50"
-                      }`}
-                      onClick={() => {
-                        setAccountId(a.id);
-                        setAccountMenuOpen(false);
-                      }}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{a.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {[
+                { label: "Cuentas", rows: accountOptions.filter((a) => a.product_type !== "tarjeta_credito") },
+                { label: "Tarjetas de crédito", rows: accountOptions.filter((a) => a.product_type === "tarjeta_credito") },
+              ]
+                .filter((g) => g.rows.length > 0)
+                .map((g) => (
+                  <div key={g.label} className="px-1.5 py-1.5 banking-dark:bg-[#161b22]/98">
+                    <p className="px-1.5 pb-1 text-[9.5px] font-bold uppercase tracking-wide text-[#9A9284] banking-dark:text-[#6b7280]">
+                      {g.label}
+                    </p>
+                    <div className="flex flex-col gap-0.5">
+                      {g.rows.map((a) => {
+                        const sel = a.id === accountId;
+                        return (
+                          <button
+                            key={a.id}
+                            type="button"
+                            role="option"
+                            aria-selected={sel}
+                            className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors ${
+                              sel
+                                ? "bg-[#8FBFA6]/14 text-[#3F6B52] ring-1 ring-[#8FBFA6]/40 banking-dark:bg-[#8FBFA6]/18 banking-dark:text-[#8FBFA6] banking-dark:ring-[#8FBFA6]/45"
+                                : "text-[#2B2620] hover:bg-[#F5F1E8] banking-dark:text-[#F3F1EC] banking-dark:hover:bg-[#1c2129] banking-dark:hover:text-[#F3F1EC]"
+                            }`}
+                            onClick={() => {
+                              setAccountId(a.id);
+                              setAccountMenuOpen(false);
+                            }}
+                          >
+                            <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-lg bg-[#F5F1E8] text-[#4A453C] banking-dark:bg-[#0d1117] banking-dark:text-[#c9d1d9]">
+                              {a.product_type === "tarjeta_credito" ? (
+                                <IconCreditCard className="h-3.5 w-3.5" />
+                              ) : (
+                                <IconBank className="h-3.5 w-3.5" />
+                              )}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                            <span className="shrink-0 text-[10.5px] font-semibold tabular-nums text-[#8A8072] banking-dark:text-[#8b949e]">
+                              {formatClpDots(bankingAccountAtBank(a))}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
             </div>
           </div>,
           document.body,
@@ -3190,9 +3239,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: categoryPanelBox.width,
               zIndex: 10000,
             }}
-            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-slate-300 bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-300 banking-dark:border-amber-900/45 banking-dark:bg-zinc-900 banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-amber-950/35"
+            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-[#30363d]"
           >
-            <div className="shrink-0 border-b border-slate-300 bg-white px-2 pb-2 pt-2 banking-dark:border-amber-900/35 banking-dark:bg-zinc-800">
+            <div className="shrink-0 border-b border-[#DCD3C2] bg-white px-2 pb-2 pt-2 banking-dark:border-[#30363d] banking-dark:bg-[#161b22]">
               <input
                 ref={categorySearchInputRef}
                 type="search"
@@ -3208,11 +3257,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             </div>
             <div className={bankingPickerListScrollClass}>
               {categoryOptionsFiltered.length === 0 ? (
-                <p className="px-3 py-6 text-center text-sm text-slate-500 banking-dark:text-zinc-400">
+                <p className="px-3 py-6 text-center text-sm text-[#8A8072] banking-dark:text-[#8b949e]">
                   Sin coincidencias. Prueba con otras letras o borra el filtro.
                 </p>
               ) : (
-                <div className="flex flex-col gap-0.5 px-1.5 pb-1.5 pt-0.5 banking-dark:bg-zinc-900/98">
+                <div className="flex flex-col gap-0.5 px-1.5 pb-1.5 pt-0.5 banking-dark:bg-[#161b22]/98">
                   {categoryOptionsFiltered.map((c) => {
                     const sel = c.id === categoryId;
                     return (
@@ -3223,8 +3272,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                         aria-selected={sel}
                         className={`rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
                           sel
-                            ? "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/80 banking-dark:bg-amber-600/35 banking-dark:text-zinc-50 banking-dark:ring-amber-400/45"
-                            : "text-slate-800 hover:bg-slate-50 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-50"
+                            ? "bg-[#8FBFA6]/14 text-[#3F6B52] ring-1 ring-[#8FBFA6]/40 banking-dark:bg-[#8FBFA6]/18 banking-dark:text-[#8FBFA6] banking-dark:ring-[#8FBFA6]/45"
+                            : "text-[#2B2620] hover:bg-[#F5F1E8] banking-dark:text-[#F3F1EC] banking-dark:hover:bg-[#1c2129] banking-dark:hover:text-[#F3F1EC]"
                         }`}
                         onClick={() => {
                           setCategoryId(c.id);
@@ -3256,9 +3305,9 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               width: subcategoryPanelBox.width,
               zIndex: 10002,
             }}
-            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-slate-300 bg-white shadow-2xl shadow-slate-900/15 ring-1 ring-slate-300 banking-dark:border-amber-900/45 banking-dark:bg-zinc-900 banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-amber-950/35"
+            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-[#30363d]"
           >
-            <div className="shrink-0 border-b border-slate-300 bg-white px-2 pb-2 pt-2 banking-dark:border-amber-900/35 banking-dark:bg-zinc-800">
+            <div className="shrink-0 border-b border-[#DCD3C2] bg-white px-2 pb-2 pt-2 banking-dark:border-[#30363d] banking-dark:bg-[#161b22]">
               <input
                 ref={subcategorySearchInputRef}
                 type="search"
@@ -3274,11 +3323,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
             </div>
             <div className={bankingPickerListScrollClass}>
               {subOptionsFiltered.length === 0 ? (
-                <p className="px-3 py-6 text-center text-sm text-slate-500 banking-dark:text-zinc-400">
+                <p className="px-3 py-6 text-center text-sm text-[#8A8072] banking-dark:text-[#8b949e]">
                   Sin coincidencias. Prueba con otras letras o borra el filtro.
                 </p>
               ) : (
-                <div className="flex flex-col gap-0.5 px-1.5 pb-1.5 pt-0.5 banking-dark:bg-zinc-900/98">
+                <div className="flex flex-col gap-0.5 px-1.5 pb-1.5 pt-0.5 banking-dark:bg-[#161b22]/98">
                   {subOptionsFiltered.map((s) => {
                     const sel = s.id === subcategoryId;
                     return (
@@ -3289,8 +3338,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                         aria-selected={sel}
                         className={`rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-colors ${
                           sel
-                            ? "bg-indigo-50 text-indigo-900 ring-1 ring-indigo-200/80 banking-dark:bg-amber-600/35 banking-dark:text-zinc-50 banking-dark:ring-amber-400/45"
-                            : "text-slate-800 hover:bg-slate-50 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-800 banking-dark:hover:text-zinc-50"
+                            ? "bg-[#8FBFA6]/14 text-[#3F6B52] ring-1 ring-[#8FBFA6]/40 banking-dark:bg-[#8FBFA6]/18 banking-dark:text-[#8FBFA6] banking-dark:ring-[#8FBFA6]/45"
+                            : "text-[#2B2620] hover:bg-[#F5F1E8] banking-dark:text-[#F3F1EC] banking-dark:hover:bg-[#1c2129] banking-dark:hover:text-[#F3F1EC]"
                         }`}
                         onClick={() => {
                           setSubcategoryId(s.id);
@@ -3324,11 +3373,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               transform: accountingMonthPanelBox.openUpward ? "translateY(-100%)" : undefined,
               zIndex: 10001,
             }}
-            className="banking-theme overflow-hidden rounded-xl border border-slate-300 bg-white shadow-2xl shadow-slate-900/10 ring-1 ring-slate-300 banking-dark:border-amber-900/45 banking-dark:bg-zinc-900 banking-dark:ring-amber-950/35 banking-dark:shadow-black/45"
+            className="banking-theme overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:ring-[#30363d] banking-dark:shadow-black/45"
           >
             {accountingPickMode === "month" ? (
               <div
-                className="tx-scroll grid grid-cols-3 gap-1 overflow-y-auto p-2 banking-dark:bg-zinc-950"
+                className="tx-scroll grid grid-cols-3 gap-1 overflow-y-auto p-2 banking-dark:bg-[#0d1117]"
                 style={{ maxHeight: accountingMonthPanelBox.maxHeight }}
               >
                 {ACCOUNTING_MONTH_ABBR_ES.map((abbr, idx) => {
@@ -3340,8 +3389,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       type="button"
                       className={`rounded-lg px-2 py-2 text-sm font-medium transition ${
                         sel
-                          ? "bg-indigo-100 text-indigo-900 ring-2 ring-indigo-300 banking-dark:bg-amber-600/35 banking-dark:text-zinc-50 banking-dark:ring-amber-400/45"
-                          : "text-slate-800 hover:bg-slate-50 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-800"
+                          ? "bg-[#8FBFA6]/18 text-[#3F6B52] ring-2 ring-[#8FBFA6]/45 banking-dark:bg-[#8FBFA6]/18 banking-dark:text-[#8FBFA6] banking-dark:ring-[#8FBFA6]/45"
+                          : "text-[#2B2620] hover:bg-[#F5F1E8] banking-dark:text-[#F3F1EC] banking-dark:hover:bg-[#1c2129]"
                       }`}
                       onClick={() => {
                         setAccountingMonthYm(buildYm(accountingYmParts.y, mi));
@@ -3355,7 +3404,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               </div>
             ) : (
               <div
-                className="tx-scroll overflow-y-auto p-2 banking-dark:bg-zinc-950"
+                className="tx-scroll overflow-y-auto p-2 banking-dark:bg-[#0d1117]"
                 style={{ maxHeight: accountingMonthPanelBox.maxHeight }}
               >
                 <div className="grid grid-cols-4 gap-1">
@@ -3367,8 +3416,8 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                         type="button"
                         className={`rounded-lg px-2 py-2 text-sm tabular-nums transition ${
                           sel
-                            ? "bg-indigo-100 text-indigo-900 ring-2 ring-indigo-300 banking-dark:bg-amber-600/35 banking-dark:text-zinc-50 banking-dark:ring-amber-400/45"
-                            : "text-slate-800 hover:bg-slate-50 banking-dark:text-zinc-100 banking-dark:hover:bg-zinc-800"
+                            ? "bg-[#8FBFA6]/18 text-[#3F6B52] ring-2 ring-[#8FBFA6]/45 banking-dark:bg-[#8FBFA6]/18 banking-dark:text-[#8FBFA6] banking-dark:ring-[#8FBFA6]/45"
+                            : "text-[#2B2620] hover:bg-[#F5F1E8] banking-dark:text-[#F3F1EC] banking-dark:hover:bg-[#1c2129]"
                         }`}
                         onClick={() => {
                           setAccountingMonthYm(buildYm(yy, accountingYmParts.m));

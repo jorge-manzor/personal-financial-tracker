@@ -85,26 +85,26 @@ def _category_is_internal_reserved(c: BankingCategory | None) -> bool:
 
 
 CATEGORY_COLOR_PALETTE = (
-    "#4f46e5",  # indigo-600 — acento primario del sitio
-    "#7c3aed",  # violet-600
-    "#2563eb",  # blue-600
-    "#0891b2",  # cyan-600
-    "#059669",  # emerald-600
-    "#0d9488",  # teal-600
-    "#d97706",  # amber-600
-    "#e11d48",  # rose-600
-    "#c026d3",  # fuchsia-600
-    "#0284c7",  # sky-600
-    "#9333ea",  # purple-600
-    "#475569",  # slate-600
+    "#cc998e",  # coral pastel
+    "#ccb38e",  # ámbar pastel
+    "#ccc78e",  # mostaza pastel
+    "#a8cc8e",  # oliva pastel
+    "#8ecca8",  # salvia pastel
+    "#8eccbd",  # menta pastel
+    "#8ec2cc",  # teal pastel
+    "#8ea8cc",  # celeste pastel
+    "#998ecc",  # índigo pastel
+    "#bd8ecc",  # lavanda pastel
+    "#cc8eb8",  # malva pastel
+    "#cc8e9e",  # rosa pastel
 )
 
 # Colores de UI por nombre de categoría (hex RGB pedidos por producto).
-_BANK_CAT_GREEN = "#00a329"  # Remuneracion, Otros Ingresos, Ahorros, Inversiones
-_BANK_CAT_GRAY = "#8f8f8f"  # Transferencia(s)
-_BANK_CAT_BLUE = "#008cf0"  # Pago Tarjeta de Credito
-_BANK_CAT_ROSE = "#fb7185"  # Provisiones
-_BANK_CAT_DEFAULT = "#4f46e5"  # resto — indigo-600, acento del nuevo estilo
+_BANK_CAT_GREEN = "#7fbd84"  # Remuneracion, Otros Ingresos, Ahorros, Inversiones
+_BANK_CAT_GRAY = "#bfb9b0"  # Transferencia(s)
+_BANK_CAT_BLUE = "#8ea8cc"  # Pago Tarjeta de Credito
+_BANK_CAT_ROSE = "#cc8e9e"  # Provisiones
+_BANK_CAT_DEFAULT = "#8FBFA6"  # resto — salvia, acento primario del sitio
 
 _BANK_CAT_NAMES_GREEN = frozenset({"remuneracion", "otros ingresos", "ahorros", "inversiones"})
 
@@ -499,6 +499,50 @@ def backfill_banking_category_colors(db: Session) -> None:
     if changed:
         db.commit()
         logger.info("Backfill: color asignado en categorías bancarias")
+
+
+# Paleta índigo (saturada) anterior → pasteles actuales, para re-paletear filas ya guardadas.
+# Solo se tocan valores que coinciden EXACTO con un color asignado automáticamente antes de
+# este cambio — nunca un color que el usuario haya elegido a mano con el selector.
+_LEGACY_BANK_CATEGORY_COLOR_REMAP = {
+    "#4f46e5": "#cc998e",
+    "#7c3aed": "#ccb38e",
+    "#2563eb": "#ccc78e",
+    "#0891b2": "#a8cc8e",
+    "#059669": "#8ecca8",
+    "#0d9488": "#8eccbd",
+    "#d97706": "#8ec2cc",
+    "#e11d48": "#8ea8cc",
+    "#c026d3": "#998ecc",
+    "#0284c7": "#bd8ecc",
+    "#9333ea": "#cc8eb8",
+    "#475569": "#cc8e9e",
+    # Semánticos (Remuneracion/Ingresos/Ahorros/Inversiones, Transferencia(s),
+    # Pago Tarjeta de Credito, Provisiones).
+    "#00a329": "#7fbd84",
+    "#8f8f8f": "#bfb9b0",
+    "#008cf0": "#8ea8cc",
+    "#fb7185": "#cc8e9e",
+}
+
+
+def repalette_legacy_banking_category_colors(db: Session) -> None:
+    """
+    Migra a pasteles los colores que siguen siendo el default automático de la paleta
+    índigo anterior. Idempotente por diseño (un `UPDATE ... WHERE color = :old` deja de
+    matchear filas después de la primera corrida) — no depende de una tabla de flags, así
+    que corre igual en SQLite y Postgres.
+    """
+    changed = False
+    for c in db.query(BankingCategory).all():
+        new_hex = _LEGACY_BANK_CATEGORY_COLOR_REMAP.get((c.color or "").lower())
+        if new_hex is None:
+            continue
+        c.color = new_hex
+        changed = True
+    if changed:
+        db.commit()
+        logger.info("Re-paleteadas categorías banking a tonos pasteles")
 
 
 def reconcile_banking_account_balance(db: Session, account_id: int) -> None:
