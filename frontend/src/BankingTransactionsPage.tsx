@@ -139,6 +139,35 @@ import {
   BankingSharedPendingChargesTable,
 } from "./bankingTxAuxTables";
 
+/**
+ * Posición + alto máximo para un desplegable portaleado que cuelga de `el` (producto,
+ * categoría, subcategoría). Se abre hacia abajo si hay espacio razonable; si no, hacia
+ * arriba. `maxHeight` se limita al espacio real disponible en esa dirección para que el
+ * panel nunca quede recortado por el borde de la ventana — el listado interno hace scroll
+ * dentro de ese alto en vez de exigir scrollear el modal de fondo para alcanzarlo.
+ */
+function computeDropdownPanelBox(el: HTMLElement): {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+  openUpward: boolean;
+} {
+  const r = el.getBoundingClientRect();
+  const gap = 8;
+  const margin = 12;
+  const spaceBelow = window.innerHeight - r.bottom - gap - margin;
+  const spaceAbove = r.top - gap - margin;
+  const openUpward = spaceBelow < 200 && spaceAbove > spaceBelow;
+  return {
+    top: openUpward ? r.top - gap : r.bottom + gap,
+    left: r.left,
+    width: r.width,
+    maxHeight: Math.max(160, openUpward ? spaceAbove : spaceBelow),
+    openUpward,
+  };
+}
+
 function SiNoField({
   label,
   yesLabel = "Sí",
@@ -506,15 +535,18 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const accountTriggerRef = useRef<HTMLButtonElement>(null);
   const accountPanelRef = useRef<HTMLDivElement>(null);
-  const [accountPanelBox, setAccountPanelBox] = useState<{ top: number; left: number; width: number } | null>(
-    null,
-  );
+  const [accountPanelBox, setAccountPanelBox] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    openUpward: boolean;
+  } | null>(null);
 
   const updateAccountPanelBox = useCallback(() => {
     const el = accountTriggerRef.current;
     if (!el) return;
-    const r = el.getBoundingClientRect();
-    setAccountPanelBox({ top: r.bottom + 8, left: r.left, width: r.width });
+    setAccountPanelBox(computeDropdownPanelBox(el));
   }, []);
 
   useLayoutEffect(() => {
@@ -554,9 +586,13 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const categoryMenuRef = useRef<HTMLDivElement>(null);
   const categoryTriggerRef = useRef<HTMLButtonElement>(null);
   const categoryPanelRef = useRef<HTMLDivElement>(null);
-  const [categoryPanelBox, setCategoryPanelBox] = useState<{ top: number; left: number; width: number } | null>(
-    null,
-  );
+  const [categoryPanelBox, setCategoryPanelBox] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    openUpward: boolean;
+  } | null>(null);
   const [categoryPickerSearch, setCategoryPickerSearch] = useState("");
   const categorySearchInputRef = useRef<HTMLInputElement>(null);
 
@@ -564,9 +600,13 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const subcategoryMenuRef = useRef<HTMLDivElement>(null);
   const subcategoryTriggerRef = useRef<HTMLButtonElement>(null);
   const subcategoryPanelRef = useRef<HTMLDivElement>(null);
-  const [subcategoryPanelBox, setSubcategoryPanelBox] = useState<{ top: number; left: number; width: number } | null>(
-    null,
-  );
+  const [subcategoryPanelBox, setSubcategoryPanelBox] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    openUpward: boolean;
+  } | null>(null);
   const [subcategoryPickerSearch, setSubcategoryPickerSearch] = useState("");
   const subcategorySearchInputRef = useRef<HTMLInputElement>(null);
 
@@ -641,8 +681,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const updateCategoryPanelBox = useCallback(() => {
     const el = categoryTriggerRef.current;
     if (!el) return;
-    const r = el.getBoundingClientRect();
-    setCategoryPanelBox({ top: r.bottom + 8, left: r.left, width: r.width });
+    setCategoryPanelBox(computeDropdownPanelBox(el));
   }, []);
 
   useLayoutEffect(() => {
@@ -681,8 +720,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
   const updateSubcategoryPanelBox = useCallback(() => {
     const el = subcategoryTriggerRef.current;
     if (!el) return;
-    const r = el.getBoundingClientRect();
-    setSubcategoryPanelBox({ top: r.bottom + 8, left: r.left, width: r.width });
+    setSubcategoryPanelBox(computeDropdownPanelBox(el));
   }, []);
 
   useLayoutEffect(() => {
@@ -729,6 +767,57 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
     const id = requestAnimationFrame(() => subcategorySearchInputRef.current?.focus());
     return () => cancelAnimationFrame(id);
   }, [subcategoryMenuOpen]);
+
+  const [transferDestAccountMenuOpen, setTransferDestAccountMenuOpen] = useState(false);
+  const transferDestAccountMenuRef = useRef<HTMLDivElement>(null);
+  const transferDestAccountTriggerRef = useRef<HTMLButtonElement>(null);
+  const transferDestAccountPanelRef = useRef<HTMLDivElement>(null);
+  const [transferDestAccountPanelBox, setTransferDestAccountPanelBox] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    openUpward: boolean;
+  } | null>(null);
+
+  const updateTransferDestAccountPanelBox = useCallback(() => {
+    const el = transferDestAccountTriggerRef.current;
+    if (!el) return;
+    setTransferDestAccountPanelBox(computeDropdownPanelBox(el));
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!transferDestAccountMenuOpen) {
+      setTransferDestAccountPanelBox(null);
+      return;
+    }
+    updateTransferDestAccountPanelBox();
+    window.addEventListener("scroll", updateTransferDestAccountPanelBox, true);
+    window.addEventListener("resize", updateTransferDestAccountPanelBox);
+    return () => {
+      window.removeEventListener("scroll", updateTransferDestAccountPanelBox, true);
+      window.removeEventListener("resize", updateTransferDestAccountPanelBox);
+    };
+  }, [transferDestAccountMenuOpen, updateTransferDestAccountPanelBox]);
+
+  useEffect(() => {
+    if (!transferDestAccountMenuOpen) return;
+    function handleDown(e: MouseEvent) {
+      const t = e.target as Node;
+      if (transferDestAccountMenuRef.current?.contains(t)) return;
+      if (transferDestAccountPanelRef.current?.contains(t)) return;
+      setTransferDestAccountMenuOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setTransferDestAccountMenuOpen(false);
+    }
+    document.addEventListener("mousedown", handleDown);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleDown);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [transferDestAccountMenuOpen]);
 
   const effectiveBankingMovementDateRange = useMemo(
     () => resolveBankingTxMovementDateRange(bankingTxDateFrom, bankingTxDateTo),
@@ -1264,6 +1353,14 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
         (accountId === "" || a.id !== accountId),
     );
   }, [accounts, accountId]);
+
+  const selectedTransferDestinationAccount = useMemo(
+    () =>
+      transferDestinationAccountId === ""
+        ? undefined
+        : accounts.find((a) => a.id === transferDestinationAccountId),
+    [accounts, transferDestinationAccountId],
+  );
 
   const orderedVisibleBankingTxColumns = useMemo(
     () => columnOrder.filter((k) => columnVisibility[k]),
@@ -2662,7 +2759,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
 
       {modalOpen && (
         <div
-          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[2px] banking-dark:bg-black/65 banking-dark:backdrop-blur-[3px]"
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4 banking-dark:bg-black/70"
           role="dialog"
           aria-modal="true"
           aria-labelledby="banking-tx-modal-title"
@@ -2715,6 +2812,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     if (accountOptions.length === 0) return;
                     setCategoryMenuOpen(false);
                     setSubcategoryMenuOpen(false);
+                    setTransferDestAccountMenuOpen(false);
                     setAccountMenuOpen((open) => !open);
                   }}
                   className={bankingModalCategoryTriggerClass}
@@ -2797,6 +2895,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                     if (categoryOptions.length === 0) return;
                     setAccountMenuOpen(false);
                     setSubcategoryMenuOpen(false);
+                    setTransferDestAccountMenuOpen(false);
                     setCategoryMenuOpen((open) => {
                       const next = !open;
                       if (next) setCategoryPickerSearch("");
@@ -2841,6 +2940,7 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                       if (subOptions.length === 0) return;
                       setAccountMenuOpen(false);
                       setCategoryMenuOpen(false);
+                      setTransferDestAccountMenuOpen(false);
                       setSubcategoryMenuOpen((open) => {
                         const next = !open;
                         if (next) setSubcategoryPickerSearch("");
@@ -2871,33 +2971,72 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               )}
 
               {isOwnAccountsTransfer && !editing && (
-                <label className="block">
-                  <span className={bankingModalFieldLabelClass}>¿A qué producto va la transferencia?</span>
-                  <select
-                    value={transferDestinationAccountId === "" ? "" : String(transferDestinationAccountId)}
-                    onChange={(e) =>
-                      setTransferDestinationAccountId(e.target.value ? Number(e.target.value) : "")
-                    }
-                    className={bankingModalControlClass}
+                <div ref={transferDestAccountMenuRef} className="space-y-1.5">
+                  <span id="banking-tx-transfer-dest-label" className={bankingModalFieldLabelClass}>
+                    ¿A qué producto va la transferencia?
+                  </span>
+                  <button
+                    ref={transferDestAccountTriggerRef}
+                    type="button"
+                    aria-expanded={transferDestAccountMenuOpen}
+                    aria-haspopup="listbox"
+                    aria-labelledby="banking-tx-transfer-dest-label"
                     disabled={transferDestinationOptions.length === 0}
+                    onClick={() => {
+                      if (transferDestinationOptions.length === 0) return;
+                      setAccountMenuOpen(false);
+                      setCategoryMenuOpen(false);
+                      setSubcategoryMenuOpen(false);
+                      setTransferDestAccountMenuOpen((open) => !open);
+                    }}
+                    className={bankingModalCategoryTriggerClass}
                   >
-                    <option value="">Selecciona cuenta destino…</option>
-                    {transferDestinationOptions.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p className={`mt-1.5 ${bankingModalHelperTextClass}`}>
+                    <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-lg bg-[#F5F1E8] text-[#4A453C] banking-dark:bg-[#161b22] banking-dark:text-[#c9d1d9]">
+                      <IconBank className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={`block truncate font-semibold ${selectedTransferDestinationAccount ? "text-[#2B2620] banking-dark:text-[#F3F1EC]" : "text-[#8A8072] banking-dark:text-[#8b949e]"}`}
+                      >
+                        {selectedTransferDestinationAccount?.name ?? "Selecciona cuenta destino…"}
+                      </span>
+                      {selectedTransferDestinationAccount ? (
+                        <span className="block truncate text-[10.5px] font-normal text-[#8A8072] banking-dark:text-[#8b949e]">
+                          {bankingProductBadgeLabel(selectedTransferDestinationAccount.product_type)}
+                          {selectedTransferDestinationAccount.bank_name
+                            ? ` · ${selectedTransferDestinationAccount.bank_name}`
+                            : ""}
+                        </span>
+                      ) : null}
+                    </span>
+                    {selectedTransferDestinationAccount ? (
+                      <span className="shrink-0 rounded-full bg-[#C79A56]/16 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[#8A6631] banking-dark:bg-[#C79A56]/15 banking-dark:text-[#C79A56]">
+                        {bankingProductBadgeLabel(selectedTransferDestinationAccount.product_type)}
+                      </span>
+                    ) : null}
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden
+                      className={`h-5 w-5 shrink-0 text-[#8A8072] transition-transform banking-dark:text-[#8FBFA6]/75 ${transferDestAccountMenuOpen ? "rotate-180" : ""}`}
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.24 4.496a.75.75 0 01-1.08 0l-4.24-4.497a.75.75 0 01.02-1.06z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                  <p className={bankingModalHelperTextClass}>
                     No puede ser la cuenta de este movimiento ni una tarjeta de crédito. Se creará un segundo
                     movimiento en la cuenta destino con el monto de signo contrario.
                   </p>
                   {transferDestinationOptions.length === 0 && (
-                    <p className="mt-1 text-[12px] text-[#8A6631]/90 banking-dark:text-[#C79A56]/90">
+                    <p className="text-[12px] text-[#8A6631]/90 banking-dark:text-[#C79A56]/90">
                       No hay otra cuenta disponible. Crea otra cuenta (no tarjeta) en Cuentas.
                     </p>
                   )}
-                </label>
+                </div>
               )}
 
               <div ref={scopeMenuRef} className="relative space-y-1.5">
@@ -3169,9 +3308,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               top: accountPanelBox.top,
               left: accountPanelBox.left,
               width: accountPanelBox.width,
+              maxHeight: accountPanelBox.maxHeight,
+              transform: accountPanelBox.openUpward ? "translateY(-100%)" : undefined,
               zIndex: 9998,
             }}
-            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-[#30363d]"
+            className="banking-theme flex flex-col overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-[#30363d]"
           >
             <div className={bankingPickerListScrollClass}>
               {[
@@ -3211,15 +3352,77 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
                               )}
                             </span>
                             <span className="min-w-0 flex-1 truncate">{a.name}</span>
-                            <span className="shrink-0 text-[10.5px] font-semibold tabular-nums text-[#8A8072] banking-dark:text-[#8b949e]">
-                              {formatClpDots(bankingAccountAtBank(a))}
-                            </span>
+                            {a.product_type !== "tarjeta_credito" && (
+                              <span className="shrink-0 text-[10.5px] font-semibold tabular-nums text-[#8A8072] banking-dark:text-[#8b949e]">
+                                {formatClpDots(bankingAccountAtBank(a))}
+                              </span>
+                            )}
                           </button>
                         );
                       })}
                     </div>
                   </div>
                 ))}
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {transferDestAccountMenuOpen &&
+        transferDestAccountPanelBox !== null &&
+        createPortal(
+          <div
+            ref={transferDestAccountPanelRef}
+            role="listbox"
+            aria-labelledby="banking-tx-transfer-dest-label"
+            style={{
+              position: "fixed",
+              top: transferDestAccountPanelBox.top,
+              left: transferDestAccountPanelBox.left,
+              width: transferDestAccountPanelBox.width,
+              maxHeight: transferDestAccountPanelBox.maxHeight,
+              transform: transferDestAccountPanelBox.openUpward ? "translateY(-100%)" : undefined,
+              zIndex: 9998,
+            }}
+            className="banking-theme flex flex-col overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-[#30363d]"
+          >
+            <div className={bankingPickerListScrollClass}>
+              {transferDestinationOptions.length === 0 ? (
+                <p className="px-3 py-6 text-center text-sm text-[#8A8072] banking-dark:text-[#8b949e]">
+                  No hay otra cuenta disponible.
+                </p>
+              ) : (
+                <div className="flex flex-col gap-0.5 px-1.5 py-1.5">
+                  {transferDestinationOptions.map((a) => {
+                    const sel = a.id === transferDestinationAccountId;
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        role="option"
+                        aria-selected={sel}
+                        className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-semibold transition-colors ${
+                          sel
+                            ? "bg-[#8FBFA6]/14 text-[#3F6B52] ring-1 ring-[#8FBFA6]/40 banking-dark:bg-[#8FBFA6]/18 banking-dark:text-[#8FBFA6] banking-dark:ring-[#8FBFA6]/45"
+                            : "text-[#2B2620] hover:bg-[#F5F1E8] banking-dark:text-[#F3F1EC] banking-dark:hover:bg-[#1c2129] banking-dark:hover:text-[#F3F1EC]"
+                        }`}
+                        onClick={() => {
+                          setTransferDestinationAccountId(a.id);
+                          setTransferDestAccountMenuOpen(false);
+                        }}
+                      >
+                        <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-lg bg-[#F5F1E8] text-[#4A453C] banking-dark:bg-[#0d1117] banking-dark:text-[#c9d1d9]">
+                          <IconBank className="h-3.5 w-3.5" />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                        <span className="shrink-0 text-[10.5px] font-semibold tabular-nums text-[#8A8072] banking-dark:text-[#8b949e]">
+                          {formatClpDots(bankingAccountAtBank(a))}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>,
           document.body,
@@ -3237,9 +3440,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               top: categoryPanelBox.top,
               left: categoryPanelBox.left,
               width: categoryPanelBox.width,
+              maxHeight: categoryPanelBox.maxHeight,
+              transform: categoryPanelBox.openUpward ? "translateY(-100%)" : undefined,
               zIndex: 10000,
             }}
-            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-[#30363d]"
+            className="banking-theme flex flex-col overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-[#30363d]"
           >
             <div className="shrink-0 border-b border-[#DCD3C2] bg-white px-2 pb-2 pt-2 banking-dark:border-[#30363d] banking-dark:bg-[#161b22]">
               <input
@@ -3303,9 +3508,11 @@ export function BankingTransactionsPage({ onToast }: { onToast: (msg: string | n
               top: subcategoryPanelBox.top,
               left: subcategoryPanelBox.left,
               width: subcategoryPanelBox.width,
+              maxHeight: subcategoryPanelBox.maxHeight,
+              transform: subcategoryPanelBox.openUpward ? "translateY(-100%)" : undefined,
               zIndex: 10002,
             }}
-            className="banking-theme flex max-h-[min(60vh,24rem)] flex-col overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-[#30363d]"
+            className="banking-theme flex flex-col overflow-hidden rounded-xl border border-[#DCD3C2] bg-white shadow-2xl shadow-[#2B2620]/10 ring-1 ring-[#DCD3C2] banking-dark:border-[#30363d] banking-dark:bg-[#161b22] banking-dark:shadow-[0_24px_48px_-12px_rgba(0,0,0,0.65)] banking-dark:ring-[#30363d]"
           >
             <div className="shrink-0 border-b border-[#DCD3C2] bg-white px-2 pb-2 pt-2 banking-dark:border-[#30363d] banking-dark:bg-[#161b22]">
               <input

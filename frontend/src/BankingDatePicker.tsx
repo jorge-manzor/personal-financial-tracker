@@ -227,7 +227,7 @@ export function BankingDatePicker({
                   type="button"
                   aria-label="Mes anterior"
                   onClick={goPrevMonth}
-                  className="flex h-[26px] w-[26px] items-center justify-center rounded-lg text-[#8A8072] transition hover:bg-[#F5F1E8] hover:text-[#2B2620] banking-dark:text-[#8b949e] banking-dark:hover:bg-[#12161d] banking-dark:hover:text-[#F3F1EC]"
+                  className="flex h-[26px] w-[26px] items-center justify-center rounded-lg text-[#8A8072] transition-colors hover:bg-[#F5F1E8] hover:text-[#2B2620] banking-dark:text-[#8b949e] banking-dark:hover:bg-[#12161d] banking-dark:hover:text-[#F3F1EC]"
                 >
                   ‹
                 </button>
@@ -238,7 +238,7 @@ export function BankingDatePicker({
                   type="button"
                   aria-label="Mes siguiente"
                   onClick={goNextMonth}
-                  className="flex h-[26px] w-[26px] items-center justify-center rounded-lg text-[#8A8072] transition hover:bg-[#F5F1E8] hover:text-[#2B2620] banking-dark:text-[#8b949e] banking-dark:hover:bg-[#12161d] banking-dark:hover:text-[#F3F1EC]"
+                  className="flex h-[26px] w-[26px] items-center justify-center rounded-lg text-[#8A8072] transition-colors hover:bg-[#F5F1E8] hover:text-[#2B2620] banking-dark:text-[#8b949e] banking-dark:hover:bg-[#12161d] banking-dark:hover:text-[#F3F1EC]"
                 >
                   ›
                 </button>
@@ -262,7 +262,7 @@ export function BankingDatePicker({
                       key={idx}
                       type="button"
                       onClick={() => pick(c)}
-                      className={`flex h-7 items-center justify-center rounded-full text-[12px] transition ${
+                      className={`flex h-7 items-center justify-center rounded-full text-[12px] transition-colors ${
                         !c.inMonth
                           ? "text-[#C7BFAF] hover:bg-[#F5F1E8] banking-dark:text-[#4b5361] banking-dark:hover:bg-[#12161d]"
                           : isSelected
@@ -280,7 +280,7 @@ export function BankingDatePicker({
               <button
                 type="button"
                 onClick={() => pick({ ...t, inMonth: true })}
-                className="flex w-full items-center justify-center border-t border-[#F0EAE0] py-2.5 text-[11.5px] font-bold text-[#3F6B52] transition hover:bg-[#F5F1E8] banking-dark:border-[#1e242e] banking-dark:text-[#8FBFA6] banking-dark:hover:bg-[#12161d]"
+                className="flex w-full items-center justify-center border-t border-[#F0EAE0] py-2.5 text-[11.5px] font-bold text-[#3F6B52] transition-colors hover:bg-[#F5F1E8] banking-dark:border-[#1e242e] banking-dark:text-[#8FBFA6] banking-dark:hover:bg-[#12161d]"
               >
                 Hoy · {formatDateLabelEs(isoFromParts(t.y, t.m, t.d))}
               </button>
