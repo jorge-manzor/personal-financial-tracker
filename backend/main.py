@@ -33,6 +33,7 @@ from auth import (
     hash_password,
 )
 from auth_routes import router as auth_router
+from banking_analytics_routes import router as banking_analytics_router
 from banking_personal_order_routes import router as banking_personal_order_router
 from savings_calculator_routes import router as savings_calculator_router
 from banking_routes import router as banking_router
@@ -756,6 +757,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(banking_router, prefix="/banking", tags=["banking"])
+app.include_router(banking_analytics_router, prefix="/banking", tags=["banking"])
 app.include_router(banking_personal_order_router, prefix="/banking", tags=["banking"])
 app.include_router(savings_calculator_router, prefix="/banking", tags=["banking"])
 app.include_router(projects_router, prefix="/proyectos", tags=["proyectos"])
