@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* Mirrors frontend/src/index.css: dark-mode classes toggle under `.banking-dark`
+   on an ancestor element (used by BankingConfirmDialog, AccountSelect, etc.). */
+@custom-variant banking-dark (.banking-dark &);
+
+@theme {
+  --color-bg: #0d1117;
+  --color-card: #161b22;
+  --color-border: #30363d;
+  --color-gain: #22c55e;
+  --color-loss: #ef4444;
+  --color-dividend: #2dd4bf;
+}

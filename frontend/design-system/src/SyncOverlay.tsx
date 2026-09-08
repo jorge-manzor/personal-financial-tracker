@@ -1,0 +1,140 @@
+import type { SyncStatus } from "./types";
+
+export type TickerUiState = "pending" | "downloading" | "done";
+
+interface SyncOverlayProps {
+  status: SyncStatus;
+  progressPct: number;
+  tickerStates: Record<string, TickerUiState>;
+  order: string[];
+  /** Detalle enviado por el servidor (SSE), p. ej. etapa de sincronización Fintual. */
+  detailMessage?: string | null;
+}
+
+function Spinner({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-90"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+      />
+    </svg>
+  );
+}
+
+export function SyncOverlay({
+  status,
+  progressPct,
+  tickerStates,
+  order,
+  detailMessage,
+}: SyncOverlayProps) {
+  /** Hasta el primer avance real del SSE la barra fija en 0% se ve “muerta”; mostramos barrido. */
+  const indeterminate = progressPct < 8;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0d1117] px-4 py-8 sm:px-6">
+      <div className="flex w-full max-w-md flex-col items-stretch gap-6">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="flex flex-col items-center gap-2">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#30363d] bg-white shadow-[0_0_0_1px_rgba(255,255,255,0.06)_inset]"
+              aria-hidden
+            >
+              <svg viewBox="0 0 100 100" className="h-7 w-7">
+                <path
+                  d="M70.08,47.01 A27,27 0 1 0 55.41,78.47"
+                  fill="none"
+                  stroke="#4B7B63"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M55.41,78.47 C59.64,76.5 60.57,63.25 63,62 C65.43,60.76 67.5,73 70,71 C72.5,69 75.33,56.17 78,50 C80.67,43.83 83.87,38.27 86,34"
+                  fill="none"
+                  stroke="#C79A56"
+                  strokeWidth="7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle cx="86" cy="34" r="7" fill="#C79A56" />
+              </svg>
+            </div>
+            <h1 className="text-xl font-semibold leading-tight">
+              <span className="text-[#8FBFA6]">Zendo</span>
+              <span className="text-white"> Finance</span>
+            </h1>
+          </div>
+
+          <div className="flex w-full flex-col items-center gap-2">
+            <div className="inline-flex items-center justify-center gap-2.5 text-sm text-[#8b949e]">
+              <Spinner className="h-4 w-4 shrink-0 animate-spin text-[#22c55e]" />
+              <span>Actualizando tu portafolio...</span>
+            </div>
+            {(detailMessage || order.length === 0) && (
+              <p className="text-xs leading-relaxed text-[#6e7681]">
+                {detailMessage ||
+                  "Obteniendo lista de activos y preparando descargas. Esto puede tardar unos segundos."}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="h-2 w-full overflow-hidden rounded-full bg-[#21262d]">
+          {indeterminate ? (
+            <div className="boot-bar h-full w-1/3 rounded-full bg-[#22c55e]" />
+          ) : (
+            <div
+              className="h-full rounded-full bg-[#22c55e] transition-[width] duration-300"
+              style={{ width: `${Math.min(100, Math.max(0, progressPct))}%` }}
+            />
+          )}
+        </div>
+
+        <div className="max-h-48 w-full overflow-y-auto rounded-xl border border-[#30363d] bg-[#161b22] p-3 text-sm">
+          {order.map((t) => {
+            const st = tickerStates[t] ?? "pending";
+            const icon = st === "done" ? "✅" : st === "downloading" ? "🔄" : "⏳";
+            const label =
+              st === "done" ? "listo" : st === "downloading" ? "descargando..." : "en cola";
+            return (
+              <div key={t} className="flex justify-between gap-4 border-b border-[#21262d] py-2 last:border-0">
+                <span className="font-medium text-[#e6edf3]">
+                  {icon} {t}
+                </span>
+                <span className="shrink-0 text-[#8b949e]">{label}</span>
+              </div>
+            );
+          })}
+          {order.length === 0 && (
+            <div className="flex items-center justify-center gap-2 py-1 text-[#8b949e]">
+              <Spinner className="h-3.5 w-3.5 shrink-0 animate-spin text-[#22c55e]" />
+              <span>Preparando datos...</span>
+            </div>
+          )}
+        </div>
+
+        <p className="text-center text-xs text-[#8b949e]">
+          Última actualización:{" "}
+          {status.last_updated
+            ? new Date(status.last_updated + "T12:00:00").toLocaleDateString("es")
+            : "—"}
+        </p>
+      </div>
+    </div>
+  );
+}

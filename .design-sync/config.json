@@ -1,0 +1,18 @@
+{
+  "projectId": "93488d22-dfea-45bd-87ce-5cac41f4427a",
+  "shape": "package",
+  "pkg": "@zendo/design-system",
+  "globalName": "ZendoDS",
+  "srcDir": "frontend/design-system/src",
+  "buildCmd": "cd frontend/design-system && npm run build",
+  "cssEntry": "dist/styles.css",
+  "readmeHeader": ".design-sync/conventions.md",
+  "overrides": {
+    "BankingConfirmDialog": { "cardMode": "single", "primaryStory": "Default" },
+    "BankingDatePicker": { "cardMode": "single", "primaryStory": "Open" },
+    "IconMenuButton": { "cardMode": "single", "primaryStory": "EditDelete" },
+    "SyncOverlay": { "cardMode": "single", "primaryStory": "Downloading" },
+    "PanelSectoresTab": { "cardMode": "column" },
+    "PortfolioChart": { "cardMode": "column" }
+  }
+}

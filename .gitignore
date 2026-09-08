@@ -13,3 +13,12 @@ frontend/dist/
 *.pyc
 .pytest_cache/
 backend/.pytest_cache/
+
+# Claude Design sync (design-system export for claude.ai/design)
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+frontend/design-system/node_modules/
+frontend/design-system/dist/
