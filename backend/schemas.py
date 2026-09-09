@@ -838,6 +838,58 @@ class ProjectOut(BaseModel):
     items: list[ProjectItemOut] = Field(default_factory=list)
 
 
+class BankingAnalyticsCategorySegment(BaseModel):
+    category_id: int
+    nombre: str
+    monto: float
+    pct: float = Field(..., description="% del total de egresos del mes (0-100).")
+    color: str
+
+
+class BankingAnalyticsTopCategoryItem(BaseModel):
+    rank: int
+    category_id: int
+    nombre: str
+    monto: float
+    color: str
+    variacion_pct: float | None = Field(
+        default=None,
+        description="Variación % vs. mes anterior. None si es categoría nueva o no hay historial previo.",
+    )
+    es_nueva: bool = Field(..., description="True si la categoría no tuvo gasto el mes anterior.")
+
+
+class BankingAnalyticsCategorySummaryOut(BaseModel):
+    month: str = Field(..., description="Mes consultado, formato YYYY-MM.")
+    empty: bool = Field(..., description="True si no hay movimientos reales (ingreso ni egreso) en el mes.")
+    total_ingresos: float
+    total_egresos: float
+    balance_neto: float
+    ingresos_var_pct: float | None = Field(default=None, description="vs. mes anterior; None si no hay base.")
+    egresos_var_pct: float | None = Field(default=None, description="vs. mes anterior; None si no hay base.")
+    segments: list[BankingAnalyticsCategorySegment] = Field(default_factory=list)
+    top_categorias: list[BankingAnalyticsTopCategoryItem] = Field(default_factory=list)
+    tiene_historial_previo: bool = Field(
+        ..., description="False si el mes anterior no tiene ningún movimiento real (usuario nuevo)."
+    )
+
+
+class BankingAnalyticsMonthlyTrendPoint(BaseModel):
+    month: str = Field(..., description="YYYY-MM")
+    label: str = Field(..., description='Ej. "Oct 2026"')
+    ingresos: float
+    egresos: float
+
+
+class BankingAnalyticsMonthlyTrendOut(BaseModel):
+    empty: bool = Field(..., description="True si el usuario no tiene ningún movimiento histórico.")
+    meses: list[BankingAnalyticsMonthlyTrendPoint] = Field(default_factory=list)
+    ingreso_promedio: float
+    egreso_promedio: float
+    ahorro_promedio: float
+    mejor_mes: str | None = Field(default=None, description="Label del mes con mayor balance neto del rango.")
+
+
 class ProjectListOut(BaseModel):
     """Vista liviana para el listado (sin aportes/ítems anidados)."""
 

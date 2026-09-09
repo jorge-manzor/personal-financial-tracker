@@ -332,3 +332,53 @@ export interface BankingCreditCardUnpaidGroup {
 
 /** GET /banking/shared/unsettled-grouped — misma forma que cargos TC pendientes */
 export type BankingSharedUnsettledGroup = BankingCreditCardUnpaidGroup;
+
+/** Analítica (Release 1) — GET /banking/analytics/category-summary?month=YYYY-MM */
+export interface BankingAnalyticsCategorySegment {
+  category_id: number;
+  nombre: string;
+  monto: number;
+  pct: number;
+  color: string;
+}
+
+export interface BankingAnalyticsTopCategoryItem {
+  rank: number;
+  category_id: number;
+  nombre: string;
+  monto: number;
+  color: string;
+  /** null si es categoría nueva o no hay historial previo suficiente. */
+  variacion_pct: number | null;
+  es_nueva: boolean;
+}
+
+export interface BankingAnalyticsCategorySummary {
+  month: string;
+  empty: boolean;
+  total_ingresos: number;
+  total_egresos: number;
+  balance_neto: number;
+  ingresos_var_pct: number | null;
+  egresos_var_pct: number | null;
+  segments: BankingAnalyticsCategorySegment[];
+  top_categorias: BankingAnalyticsTopCategoryItem[];
+  tiene_historial_previo: boolean;
+}
+
+/** GET /banking/analytics/monthly-trend?month=YYYY-MM&meses=6|12 */
+export interface BankingAnalyticsMonthlyTrendPoint {
+  month: string;
+  label: string;
+  ingresos: number;
+  egresos: number;
+}
+
+export interface BankingAnalyticsMonthlyTrend {
+  empty: boolean;
+  meses: BankingAnalyticsMonthlyTrendPoint[];
+  ingreso_promedio: number;
+  egreso_promedio: number;
+  ahorro_promedio: number;
+  mejor_mes: string | null;
+}

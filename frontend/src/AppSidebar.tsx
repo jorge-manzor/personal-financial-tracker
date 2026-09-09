@@ -117,6 +117,25 @@ function IconSavingsCalc({ className }: { className?: string }) {
   );
 }
 
+function IconAnalytics({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="28"
+      height="28"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M4 20V10M11 20V4M18 20v-7" />
+    </svg>
+  );
+}
+
 function IconProjects({ className }: { className?: string }) {
   return (
     <svg
@@ -236,6 +255,9 @@ export function AppSidebar({
           <>
             <SidebarNavLink to="/banking/transactions" label="Movimientos bancarios">
               <IconBanking className="shrink-0" />
+            </SidebarNavLink>
+            <SidebarNavLink to="/banking/analitica" label="Analítica">
+              <IconAnalytics className="shrink-0" />
             </SidebarNavLink>
             <SidebarNavLink to="/banking/provisiones" label="Provisiones">
               <IconProvisions className="shrink-0" />

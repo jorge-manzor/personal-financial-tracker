@@ -32,6 +32,9 @@ const Profile = lazy(() => import("./Profile").then((m) => ({ default: m.Profile
 const BankingTransactionsPage = lazy(() =>
   import("./BankingTransactionsPage").then((m) => ({ default: m.BankingTransactionsPage })),
 );
+const BankingAnalyticsPage = lazy(() =>
+  import("./BankingAnalyticsPage").then((m) => ({ default: m.BankingAnalyticsPage })),
+);
 const BankingProvisionsPage = lazy(() =>
   import("./BankingProvisionsPage").then((m) => ({ default: m.BankingProvisionsPage })),
 );
@@ -496,6 +499,12 @@ export default function App() {
                   ) : (
                     <Navigate to="/" replace />
                   )
+                }
+              />
+              <Route
+                path="/banking/analitica"
+                element={
+                  bankingOn ? <BankingAnalyticsPage onToast={setToast} /> : <Navigate to="/" replace />
                 }
               />
               <Route
