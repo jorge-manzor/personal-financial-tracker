@@ -372,11 +372,6 @@ export function BankingAnalyticsPage({ onToast }: { onToast: (msg: string | null
       <div className={innerClass}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-col gap-1.5">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-[#8A8072] banking-dark:text-[#8b949e]">
-              <span>Banking</span>
-              <span className="text-[#C79A56]">/</span>
-              <span>Analítica</span>
-            </div>
             <h1 className="text-[28px] font-semibold tracking-tight text-[#2B2620] banking-dark:text-[#F3F1EC]">
               Vista general
             </h1>
@@ -492,54 +487,56 @@ export function BankingAnalyticsPage({ onToast }: { onToast: (msg: string | null
             </Link>
           </div>
         ) : (
-          <div className="grid items-start gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
-            <div className={cardClass + " flex flex-col gap-4"}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
+          <>
+            <div className="grid items-stretch gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
+              <div className={cardClass + " flex flex-col gap-4"}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="mb-1 text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">
+                      Gasto por categoría
+                    </h2>
+                    <p className="text-xs text-[#8A8072] banking-dark:text-[#8b949e]">
+                      {MESES_LARGO[monthIndex]} {year} &middot; {formatClpDots(summary.total_egresos)} en total
+                    </p>
+                  </div>
+                  <div className="flex gap-0.5 rounded-[9px] border border-[#DCD3C2] bg-[#F5F1E8] p-[3px] banking-dark:border-[#30363d] banking-dark:bg-[#12161d]">
+                    <button type="button" onClick={() => setDist("dona")} className={pillClass(dist === "dona")}>
+                      Dona
+                    </button>
+                    <button type="button" onClick={() => setDist("barras")} className={pillClass(dist === "barras")}>
+                      Barras
+                    </button>
+                  </div>
+                </div>
+                {summary.segments.length === 0 ? (
+                  <p className="text-sm text-[#8A8072] banking-dark:text-[#8b949e]">
+                    Sin gastos categorizados este mes.
+                  </p>
+                ) : dist === "dona" ? (
+                  <CategoryDonut summary={summary} isDark={isDark} />
+                ) : (
+                  <CategoryBars summary={summary} />
+                )}
+              </div>
+
+              {summary.top_categorias.length > 0 ? (
+                <TopCategoriesPanel summary={summary} />
+              ) : (
+                <div className={cardClass}>
                   <h2 className="mb-1 text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">
-                    Gasto por categoría
+                    Top 5 categorías
                   </h2>
                   <p className="text-xs text-[#8A8072] banking-dark:text-[#8b949e]">
-                    {MESES_LARGO[monthIndex]} {year} &middot; {formatClpDots(summary.total_egresos)} en total
+                    Variación vs. {mesAnteriorLabel}
+                  </p>
+                  <p className="mt-3.5 text-sm text-[#8A8072] banking-dark:text-[#8b949e]">
+                    Sin gastos categorizados este mes.
                   </p>
                 </div>
-                <div className="flex gap-0.5 rounded-[9px] border border-[#DCD3C2] bg-[#F5F1E8] p-[3px] banking-dark:border-[#30363d] banking-dark:bg-[#12161d]">
-                  <button type="button" onClick={() => setDist("dona")} className={pillClass(dist === "dona")}>
-                    Dona
-                  </button>
-                  <button type="button" onClick={() => setDist("barras")} className={pillClass(dist === "barras")}>
-                    Barras
-                  </button>
-                </div>
-              </div>
-              {summary.segments.length === 0 ? (
-                <p className="text-sm text-[#8A8072] banking-dark:text-[#8b949e]">
-                  Sin gastos categorizados este mes.
-                </p>
-              ) : dist === "dona" ? (
-                <CategoryDonut summary={summary} isDark={isDark} />
-              ) : (
-                <CategoryBars summary={summary} />
               )}
             </div>
 
-            {summary.top_categorias.length > 0 ? (
-              <TopCategoriesPanel summary={summary} />
-            ) : (
-              <div className={cardClass}>
-                <h2 className="mb-1 text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">
-                  Top 5 categorías
-                </h2>
-                <p className="text-xs text-[#8A8072] banking-dark:text-[#8b949e]">
-                  Variación vs. {mesAnteriorLabel}
-                </p>
-                <p className="mt-3.5 text-sm text-[#8A8072] banking-dark:text-[#8b949e]">
-                  Sin gastos categorizados este mes.
-                </p>
-              </div>
-            )}
-
-            <div className={cardClass + " flex flex-col gap-4 [grid-column:1/-1]"}>
+            <div className={cardClass + " flex flex-col gap-4"}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="mb-1 text-base font-semibold text-[#2B2620] banking-dark:text-[#F3F1EC]">
@@ -615,7 +612,7 @@ export function BankingAnalyticsPage({ onToast }: { onToast: (msg: string | null
                 </div>
               </div>
             </div>
-          </div>
+          </>
         )}
 
         <p className="mt-0.5 text-[11px] text-[#8A8072] banking-dark:text-[#8b949e]">
