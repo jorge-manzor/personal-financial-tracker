@@ -223,6 +223,12 @@ class UserLogin(BaseModel):
     password: str
 
 
+class GoogleAuthIn(BaseModel):
+    """`credential` = id_token JWT devuelto por Google Identity Services al frontend."""
+
+    credential: str = Field(..., min_length=1)
+
+
 class TokenOut(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -247,6 +253,10 @@ class UserOut(BaseModel):
     fintual_uid: str | None = Field(
         default=None,
         description="Valor guardado de la cookie uid en Fintual, si existe.",
+    )
+    google_linked: bool = Field(
+        default=False,
+        description="True si la cuenta tiene un google_id vinculado (login con Google).",
     )
 
 

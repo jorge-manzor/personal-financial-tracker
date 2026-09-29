@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { postJson } from "./api";
 import { setToken } from "./auth";
+import { GoogleSignInButton } from "./GoogleSignInButton";
 
 type Mode = "login" | "register";
 
@@ -268,6 +269,26 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
               {loading ? (mode === "login" ? "Entrando…" : "Creando cuenta…") : mode === "login" ? "Entrar" : "Crear cuenta"}
             </button>
           </form>
+
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-[#30363d]" />
+            <span className="text-xs text-[#6e7681]">o</span>
+            <div className="h-px flex-1 bg-[#30363d]" />
+          </div>
+
+          <GoogleSignInButton onSuccess={onSuccess} />
+
+          <p className="mt-6 text-center text-xs text-[#6e7681]">
+            Al continuar aceptas nuestros{" "}
+            <a href="/terminos" className="text-[#8FBFA6] hover:underline">
+              Términos de Servicio
+            </a>{" "}
+            y nuestra{" "}
+            <a href="/privacidad" className="text-[#8FBFA6] hover:underline">
+              Política de Privacidad
+            </a>
+            .
+          </p>
         </div>
       </div>
     </div>

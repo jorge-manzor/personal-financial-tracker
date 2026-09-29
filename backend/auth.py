@@ -12,6 +12,8 @@ from typing import Annotated
 import bcrypt
 from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from google.auth.transport import requests as google_requests
+from google.oauth2 import id_token as google_id_token
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
@@ -72,6 +74,72 @@ def verify_password(plain: str, hashed: str) -> bool:
         return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
     except (ValueError, TypeError):
         return False
+
+
+def has_password(user: User) -> bool:
+    """False para cuentas creadas 100% vía Google (`password_hash == ""`)."""
+    return bool((user.password_hash or "").strip())
+
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+
+try:
+    # `requests`/urllib3 (usado solo aquí, para verificar el id_token) intenta conectar
+    # a la primera dirección que devuelva DNS, típicamente IPv6, sin fallback rápido tipo
+    # Happy Eyeballs. En redes con IPv6 configurado pero sin ruta real, eso cuelga la
+    # conexión en vez de fallar rápido. El resto de la app usa httpx (no afectado).
+    import socket
+
+    import urllib3.util.connection as _urllib3_connection
+
+    _urllib3_connection.allowed_gai_family = lambda: socket.AF_INET
+except ImportError:
+    pass
+
+
+class _TimeoutBoundedGoogleRequest(google_requests.Request):
+    """
+    `verify_oauth2_token` llama a este `Request` sin timeout (default `None` = esperar
+    indefinidamente). En redes con IPv6 roto/sin salida, `requests` intenta la primera
+    dirección que devuelve DNS (a menudo IPv6) y puede colgarse para siempre en el connect,
+    a diferencia de `curl` (Happy Eyeballs). Un timeout acotado evita que un login cuelgue
+    la request HTTP indefinidamente.
+    """
+
+    def __call__(self, url, method="GET", body=None, headers=None, timeout=10, **kwargs):
+        return super().__call__(url, method=method, body=body, headers=headers, timeout=timeout, **kwargs)
+
+
+_google_auth_request = _TimeoutBoundedGoogleRequest()
+
+
+def verify_google_id_token(token: str) -> dict:
+    """
+    Verifica firma, `aud` (== GOOGLE_CLIENT_ID) y expiración del id_token de Google
+    (google-auth valida contra las claves públicas de Google), y exige `email_verified`.
+    Nunca loguear `token` ni el payload retornado.
+    """
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Google OAuth no configurado")
+    try:
+        claims = google_id_token.verify_oauth2_token(token, _google_auth_request, GOOGLE_CLIENT_ID)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de Google inválido")
+    except Exception as exc:  # requests.exceptions.* (timeout/conexión) no heredan de ValueError
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="No se pudo verificar el token con Google (problema de red), intenta de nuevo.",
+        ) from exc
+    if not claims.get("email_verified"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Tu email de Google no está verificado. Verifícalo en tu cuenta de Google e intenta de nuevo.",
+        )
+    email = str(claims.get("email") or "").strip()
+    sub = str(claims.get("sub") or "").strip()
+    if not email or not sub:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de Google incompleto")
+    return claims
 
 
 def create_access_token(*, user_id: int, email: str) -> str:

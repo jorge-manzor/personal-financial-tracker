@@ -989,6 +989,24 @@ def _ensure_banking_personal_savings_target_amount() -> None:
     logger.info("Migración: banking_personal_savings_goals.target_amount_clp añadida")
 
 
+def _ensure_users_google_id() -> None:
+    """Login con Google (Épica A): columna `google_id` + índice único en despliegues previos (Postgres)."""
+    from sqlalchemy import inspect as sa_inspect
+
+    insp = sa_inspect(engine)
+    if not insp.has_table("users"):
+        return
+    cols = {c["name"] for c in insp.get_columns("users")}
+    with engine.begin() as conn:
+        if "google_id" not in cols:
+            if engine.dialect.name == "postgresql":
+                conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255)"))
+            else:
+                conn.execute(text("ALTER TABLE users ADD COLUMN google_id VARCHAR(255)"))
+            logger.info("Migración: users.google_id añadida")
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users(google_id)"))
+
+
 def _backfill_personal_provision_category_labels() -> None:
     """Una vez: copia nombres de categorías bancarias legacy a category_label (texto libre)."""
     from models import BankingCategory, BankingPersonalProvisionItem, BankingSubcategory
@@ -1030,6 +1048,7 @@ def on_startup() -> None:
     _ensure_banking_personal_provision_amount_clp()
     _ensure_banking_personal_provision_category_label()
     _ensure_banking_personal_savings_target_amount()
+    _ensure_users_google_id()
     _backfill_personal_provision_category_labels()
     if _db_is_sqlite():
         _migrate_db()

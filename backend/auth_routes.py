@@ -6,6 +6,7 @@ import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from auth import (
@@ -16,14 +17,17 @@ from auth import (
     create_access_token,
     default_services,
     get_user_by_email,
+    has_password,
     hash_password,
     user_services,
+    verify_google_id_token,
     verify_password,
 )
 from database import get_db
 from models import User
 from schemas import (
     FintualCredentialsIn,
+    GoogleAuthIn,
     PasswordChange,
     TokenOut,
     UserLogin,
@@ -58,6 +62,7 @@ def user_out(user: User) -> UserOut:
         fintual_reconnect_required=recon,
         fintual_session_cookie=fs or None,
         fintual_uid=fu or None,
+        google_linked=bool((user.google_id or "").strip()),
     )
 
 
@@ -84,6 +89,66 @@ def auth_login(body: UserLogin, db: Session = Depends(get_db)) -> TokenOut:
     if not u or not verify_password(body.password, u.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
     return TokenOut(access_token=create_access_token(user_id=u.id, email=u.email))
+
+
+@router.post("/google", response_model=TokenOut)
+def auth_google(body: GoogleAuthIn, db: Session = Depends(get_db)) -> TokenOut:
+    """
+    Login/registro con Google. Vinculación automática (US-01): si el email del token
+    (verificado por Google) coincide con una cuenta existente, se vincula ese `google_id`
+    a la cuenta EXISTENTE (mismo user_id, mismo historial) — nunca se crea una cuenta nueva
+    en ese caso. Nunca loguear `body.credential` ni el payload de Google.
+    """
+    claims = verify_google_id_token(body.credential)
+    google_sub = str(claims["sub"])
+    email = str(claims["email"]).strip().lower()
+
+    user = db.query(User).filter(User.google_id == google_sub).first()
+    if user is not None:
+        return TokenOut(access_token=create_access_token(user_id=user.id, email=user.email))
+
+    existing = get_user_by_email(db, email)
+    if existing is not None:
+        if existing.google_id and existing.google_id != google_sub:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Esta cuenta ya tiene otra cuenta de Google vinculada.",
+            )
+        existing.google_id = google_sub
+        db.add(existing)
+        try:
+            db.commit()
+        except IntegrityError:
+            # Doble clic / dos pestañas: otra request ya vinculó este google_id primero.
+            db.rollback()
+            existing = db.query(User).filter(User.google_id == google_sub).first()
+            if existing is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="No se pudo vincular la cuenta de Google, intenta de nuevo.",
+                )
+        db.refresh(existing)
+        return TokenOut(access_token=create_access_token(user_id=existing.id, email=existing.email))
+
+    new_user = User(
+        email=email,
+        password_hash="",
+        google_id=google_sub,
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        services_json=json.dumps(default_services()),
+    )
+    db.add(new_user)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Carrera: otra request ya creó/vinculó esta cuenta (mismo email o mismo google_id) primero.
+        db.rollback()
+        winner = db.query(User).filter(User.google_id == google_sub).first() or get_user_by_email(db, email)
+        if winner is None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No se pudo crear la cuenta, intenta de nuevo.")
+        return TokenOut(access_token=create_access_token(user_id=winner.id, email=winner.email))
+    db.refresh(new_user)
+    return TokenOut(access_token=create_access_token(user_id=new_user.id, email=new_user.email))
 
 
 @router.get("/me", response_model=UserOut)
@@ -133,6 +198,11 @@ def auth_change_password(
     user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
+    if not has_password(user):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tu cuenta no tiene contraseña (usas Google para entrar).",
+        )
     if not verify_password(body.current_password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La contraseña actual no es correcta")
     user.password_hash = hash_password(body.new_password)

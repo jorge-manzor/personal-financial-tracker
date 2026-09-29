@@ -15,8 +15,11 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     email = Column(String(255), nullable=False, unique=True, index=True)
-    password_hash = Column(String(255), nullable=False)
+    # "" para cuentas creadas 100% vía Google (sin contraseña propia); ver auth.has_password.
+    password_hash = Column(String(255), nullable=False, default="")
     created_at = Column(DateTime, nullable=False)
+    # `sub` del id_token de Google si la cuenta está vinculada; NULL = sin vincular.
+    google_id = Column(String(255), nullable=True, unique=True, index=True)
     # Credenciales Fintual por usuario; si son null, se usa FINTUAL_* del entorno.
     fintual_session = Column(Text, nullable=True)
     fintual_uid = Column(String(64), nullable=True)
