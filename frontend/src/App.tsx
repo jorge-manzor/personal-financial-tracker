@@ -427,6 +427,19 @@ export default function App() {
     />
   );
 
+  const landingElement =
+    me && !hasAnyActiveService(me.services) ? (
+      <NoServicesPage />
+    ) : bankingOn ? (
+      <Navigate to="/banking/transactions" replace />
+    ) : proyectosOn ? (
+      <Navigate to="/proyectos" replace />
+    ) : investmentsOn ? (
+      dashboardElement
+    ) : (
+      <NoServicesPage />
+    );
+
   return (
     <BankingThemeProvider>
       <BankingBodyClassSync />
@@ -476,22 +489,10 @@ export default function App() {
                   />
                 }
               />
-              <Route
-                path="/"
-                element={
-                  !hasAnyActiveService(me!.services) ? (
-                    <NoServicesPage />
-                  ) : bankingOn ? (
-                    <Navigate to="/banking/transactions" replace />
-                  ) : proyectosOn ? (
-                    <Navigate to="/proyectos" replace />
-                  ) : investmentsOn ? (
-                    dashboardElement
-                  ) : (
-                    <NoServicesPage />
-                  )
-                }
-              />
+              <Route path="/" element={landingElement} />
+              {/* Cualquier URL desconocida (bookmark/PWA viejo, ruta renombrada) cae al mismo landing
+                  en vez de dejar el <main> en blanco con el sidebar visible. */}
+              <Route path="*" element={landingElement} />
               <Route
                 path="/portfolio"
                 element={investmentsOn ? dashboardElement : <Navigate to="/" replace />}
