@@ -121,6 +121,15 @@ def run_multiuser_migration(engine: Engine) -> None:
             conn.commit()
             logger.info("Columna fintual_reconnect_required en users")
 
+    # Login con Google (Épica A): google_id nullable + único (múltiples NULL permitidos en SQLite).
+    if "users" in inspect(engine).get_table_names() and "google_id" not in _table_cols(engine, "users"):
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN google_id VARCHAR(255)"))
+            conn.commit()
+            conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_google_id ON users(google_id)"))
+            conn.commit()
+            logger.info("Columna google_id en users (login con Google)")
+
     uid_tables = (
         "transactions",
         "manual_assets",

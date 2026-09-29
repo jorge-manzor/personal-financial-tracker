@@ -16,6 +16,8 @@ export interface UserMe {
   /** Credenciales Fintual guardadas (mostrar enmascaradas en Perfil). */
   fintual_session_cookie: string | null;
   fintual_uid: string | null;
+  /** True si la cuenta tiene un google_id vinculado (login con Google). */
+  google_linked: boolean;
 }
 
 export function normalizeUserMe(raw: {
@@ -26,6 +28,7 @@ export function normalizeUserMe(raw: {
   fintual_reconnect_required?: boolean;
   fintual_session_cookie?: string | null;
   fintual_uid?: string | null;
+  google_linked?: boolean;
 }): UserMe {
   const inv = raw.services && "investments" in raw.services ? raw.services.investments : undefined;
   const bank = raw.services && "banking" in raw.services ? raw.services.banking : undefined;
@@ -38,6 +41,7 @@ export function normalizeUserMe(raw: {
     fintual_reconnect_required: raw.fintual_reconnect_required ?? false,
     fintual_session_cookie: raw.fintual_session_cookie ?? null,
     fintual_uid: raw.fintual_uid ?? null,
+    google_linked: raw.google_linked ?? false,
   };
 }
 
