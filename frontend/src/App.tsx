@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { apiFetch, fetchJson } from "./api";
 import { getToken, logoutSession } from "./auth";
 import { Login } from "./Login";
+import { PrivacyPage, TermsPage } from "./LegalPages";
 import { AppHeader } from "./AppHeader";
 import { AppSidebar } from "./AppSidebar";
 import { ManualSnapshotModal } from "./ManualModals";
@@ -361,6 +362,10 @@ export default function App() {
   const onBankingRoute = pathname.startsWith("/banking");
   /** Rutas con tema claro/oscuro propio (ver BankingThemeContext): Banking, Perfil y el Panel de inversiones. */
   const onThemedRoute = onBankingRoute || pathname === "/profile" || pathname === "/" || pathname === "/portfolio";
+
+  // Públicas: Google (y cualquier visitante) debe poder verlas sin iniciar sesión.
+  if (pathname === "/privacidad") return <PrivacyPage />;
+  if (pathname === "/terminos") return <TermsPage />;
 
   if (!authed) {
     return <Login onSuccess={() => setAuthed(true)} />;
