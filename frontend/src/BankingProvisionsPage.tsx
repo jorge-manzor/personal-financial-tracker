@@ -1426,6 +1426,13 @@ export function BankingProvisionsPage({ onToast }: { onToast: (msg: string | nul
                   value={registerMovesYm}
                   onChange={(e) => setRegisterMovesYm(e.target.value)}
                   disabled={registerMovesSaving}
+                  onClick={(e) => {
+                    // El picker nativo solo abre al clickear el ícono de calendario, no el resto
+                    // del input (confunde: "el selector no aparece al hacer clic"). showPicker()
+                    // lo abre desde cualquier punto del campo, en los navegadores que lo soportan.
+                    const el = e.currentTarget;
+                    if (typeof el.showPicker === "function") el.showPicker();
+                  }}
                 />
               </div>
               <div className="mt-6 flex flex-wrap justify-end gap-2">
